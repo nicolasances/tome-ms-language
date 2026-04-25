@@ -20,11 +20,14 @@ export class VocabularyStore {
     }
 
     async insertWord(word: Word): Promise<string> {
-        const result = await this.db.collection(VOCABULARY_COLLECTION).insertOne(word.toBSON());
-        return result.insertedId.toString();
+
+        const result = await this.db.collection(VOCABULARY_COLLECTION).updateOne({english: word.english, language: word.language, translation: word.translation}, { $set: word.toBSON() }, { upsert: true });
+        
+        return result.upsertedId ? result.upsertedId.toHexString() : word.id!;
     }
 
     async updateWord(id: string, fields: { english?: string; translation?: string }): Promise<boolean> {
+
         const result = await this.db.collection(VOCABULARY_COLLECTION).updateOne(
             { _id: new ObjectId(id) },
             { $set: fields }
@@ -33,7 +36,9 @@ export class VocabularyStore {
     }
 
     async deleteWord(id: string): Promise<boolean> {
+
         const result = await this.db.collection(VOCABULARY_COLLECTION).deleteOne({ _id: new ObjectId(id) });
+        
         return result.deletedCount > 0;
     }
 }

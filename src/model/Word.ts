@@ -10,8 +10,8 @@ export class Word {
 
     constructor(language: string, english: string, translation: string, createdAt: string, id?: string) {
         this.language = language;
-        this.english = english;
-        this.translation = translation;
+        this.english = english.toLowerCase();
+        this.translation = translation.toLowerCase();
         this.createdAt = createdAt;
         this.id = id;
     }

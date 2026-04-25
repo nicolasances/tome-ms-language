@@ -18,11 +18,14 @@ export class PostWord extends TotoDelegate<PostWordRequest, PostWordResponse> {
     }
 
     async do(req: PostWordRequest, userContext?: UserContext): Promise<PostWordResponse> {
+        
         const config = this.config as ControllerConfig;
         const db = await config.getMongoDb(config.getDBName());
 
         const word = new Word(req.language, req.english, req.translation, new Date().toISOString());
+
         const store = new VocabularyStore(db, config);
+        
         const id = await store.insertWord(word);
 
         return { id };
