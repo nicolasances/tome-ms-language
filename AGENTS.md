@@ -19,6 +19,9 @@ src/
 │   └── model/        # Event payload models
 ├── api/              # Clients for external microservice APIs
 └── util/             # Shared utilities
+docs/                 # General documentation for the project
+└── capabilities/     # Documents that generally describe the core capabilities of the microservice
+└── specs/            # Documents that describe detailed functionalities, typically subparts of the capabilities
 ```
 
 ---
@@ -141,3 +144,8 @@ export const EVENTS = {
 
 When calling another microservice, wrap all HTTP calls in a dedicated client class named `{Service}API.ts` – e.g. `FlashcardsAPI.ts`. No raw HTTP calls outside of these classes.
 
+--- 
+
+## Documentation 
+- The README mostly contains a general description of the service and a table of content that links to other relevant documentation in the `docs/` folder. 
+- All other documentation is in the `docs/` folder, in the right subfolder, according to the type of document: a Capability description document or a Spec for a feature.
