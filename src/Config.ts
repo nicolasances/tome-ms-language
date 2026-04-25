@@ -11,6 +11,10 @@ export class ControllerConfig extends TotoControllerConfig {
 
     }
 
+    public getDBName() {
+        return "tomelang";
+    }
+
     getProps(): APIOptions {
         return {}
     }
