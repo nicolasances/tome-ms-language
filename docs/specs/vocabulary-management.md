@@ -21,7 +21,7 @@ Each vocabulary entry represents a single word translation.
 | `english`         | string   | The English source word                                            |
 | `translation`     | string   | The TL translation of the English word                             |
 | `createdAt`       | string   | ISO 8601 timestamp of when the entry was created                   |
-| `knowledgeSource` | string   | Optional. Tracks where this vocabulary entry originates from (e.g. the name of a book, course, or external resource that introduced this word). Helps users remember the context in which they learned a word. |
+| `knowledgeSource` | string   | Optional. The ID of the data source this vocabulary entry was imported or derived from. Used for tracking and auditing the origin of vocabulary data (e.g. a source dataset ID, an import job ID, or an external resource identifier). |
 
 *Note*: there can be multiple translations of a given word. This is normal, considering that some languages can be more or less expressive. 
 
@@ -66,7 +66,7 @@ Returns all vocabulary entries for the specified target language.
       "english": "dog",
       "translation": "hund",
       "createdAt": "2026-04-01T10:00:00.000Z",
-      "knowledgeSource": "Danish for Beginners"
+      "knowledgeSource": "src-dataset-42"
     }
   ]
 }
@@ -96,7 +96,7 @@ Adds a single word translation to the vocabulary.
 {
   "english": "dog",
   "translation": "hund",
-  "knowledgeSource": "Danish for Beginners"
+  "knowledgeSource": "src-dataset-42"
 }
 ```
 
@@ -104,7 +104,7 @@ Adds a single word translation to the vocabulary.
 |-------------------|----------|--------------------------------------|
 | `english`         | Yes      | The English source word              |
 | `translation`     | Yes      | The TL translation                   |
-| `knowledgeSource` | No       | Origin of the vocabulary entry (e.g. book or course name) |
+| `knowledgeSource` | No       | ID of the data source this entry originates from |
 
 #### Response — `201 Created`
 
@@ -138,7 +138,7 @@ Inserts multiple word translations in one request.
 ```json
 {
   "words": [
-    { "english": "dog", "translation": "hund", "knowledgeSource": "Danish for Beginners" },
+    { "english": "dog", "translation": "hund", "knowledgeSource": "src-dataset-42" },
     { "english": "cat", "translation": "kat" }
   ]
 }
@@ -200,7 +200,7 @@ At least one field must be provided.
 ```json
 {
   "translation": "hund (updated)",
-  "knowledgeSource": "Danish for Beginners"
+  "knowledgeSource": "src-dataset-99"
 }
 ```
 
@@ -208,7 +208,7 @@ At least one field must be provided.
 |-------------------|----------|----------------------------------------------|
 | `english`         | No       | Updated English word                         |
 | `translation`     | No       | Updated TL translation                       |
-| `knowledgeSource` | No       | Updated origin of the vocabulary entry       |
+| `knowledgeSource` | No       | Updated data source ID for this entry        |
 
 #### Response — `200 OK`
 
