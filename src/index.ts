@@ -1,6 +1,5 @@
 import { getHyperscalerConfiguration, SupportedHyperscalers, TotoMicroservice, TotoMicroserviceConfiguration } from 'totoms';
 import { ControllerConfig } from "./Config";
-import { SayHello } from './dlg/ExampleDelegate';
 import { GetVocabulary } from './dlg/GetVocabulary';
 import { PostWord } from './dlg/PostWord';
 import { PostWords } from './dlg/PostWords';
