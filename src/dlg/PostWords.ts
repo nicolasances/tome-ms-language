@@ -25,15 +25,25 @@ export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse>
 
         const store = new VocabularyStore(db, config);
         const results: PostWordsResponse["results"] = [];
+        const validWords: Word[] = [];
+        const validWordIndexes: number[] = [];
+        const validEnglishValues: string[] = [];
 
-        for (const item of req.words) {
+        for (const [index, item] of req.words.entries()) {
             if (!item.english || !item.translation) {
-                results.push({ english: item.english ?? "", status: "error", reason: "missing_field" });
+                results[index] = { english: item.english ?? "", status: "error", reason: "missing_field" };
                 continue;
             }
-            const word = new Word(req.language, item.english, item.translation, new Date().toISOString());
-            const id = await store.insertWord(word);
-            results.push({ english: item.english, status: "created", id });
+
+            validWords.push(new Word(req.language, item.english, item.translation, new Date().toISOString()));
+            validWordIndexes.push(index);
+            validEnglishValues.push(item.english);
+        }
+
+        const ids = await store.insertWords(validWords);
+
+        for (let i = 0; i < ids.length; i++) {
+            results[validWordIndexes[i]] = { english: validEnglishValues[i], status: "created", id: ids[i] };
         }
 
         return { results };
