@@ -17,7 +17,6 @@ const config: TotoMicroserviceConfiguration = {
     customConfiguration: ControllerConfig,
     apiConfiguration: {
         apiEndpoints: [
-            { method: 'GET', path: '/hello', delegate: SayHello },
             { method: 'GET', path: '/vocabulary/:language', delegate: GetVocabulary },
             { method: 'POST', path: '/vocabulary/:language/words', delegate: PostWord },
             { method: 'POST', path: '/vocabulary/:language/words/batch', delegate: PostWords },
