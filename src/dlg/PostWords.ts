@@ -30,7 +30,7 @@ export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse>
         const validEnglishValues: string[] = [];
 
         for (const [index, item] of req.words.entries()) {
-            if (!item.english || !item.translation) {
+            if (!item.english || !item.translation || !item.knowledgeSource) {
                 results[index] = { english: item.english ?? "", status: "error", reason: "missing_field" };
                 continue;
             }

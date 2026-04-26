@@ -14,6 +14,7 @@ export class PostWord extends TotoDelegate<PostWordRequest, PostWordResponse> {
         }
         if (!req.body.english) throw new ValidationError(400, "No english word provided");
         if (!req.body.translation) throw new ValidationError(400, "No translation provided");
+        if (!req.body.knowledgeSource) throw new ValidationError(400, "No knowledgeSource provided");
         return { language, english: req.body.english, translation: req.body.translation, knowledgeSource: req.body.knowledgeSource };
     }
 
@@ -36,7 +37,7 @@ interface PostWordRequest {
     language: string;
     english: string;
     translation: string;
-    knowledgeSource?: string;
+    knowledgeSource: string;
 }
 
 interface PostWordResponse {

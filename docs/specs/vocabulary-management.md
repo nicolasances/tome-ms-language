@@ -21,7 +21,7 @@ Each vocabulary entry represents a single word translation.
 | `english`         | string   | The English source word                                            |
 | `translation`     | string   | The TL translation of the English word                             |
 | `createdAt`       | string   | ISO 8601 timestamp of when the entry was created                   |
-| `knowledgeSource` | string   | Optional. The ID of the data source this vocabulary entry was imported or derived from. Used for tracking and auditing the origin of vocabulary data (e.g. a source dataset ID, an import job ID, or an external resource identifier). |
+| `knowledgeSource` | string   | The ID of the data source this vocabulary entry was imported or derived from. Used for tracking and auditing the origin of vocabulary data (e.g. a source dataset ID, an import job ID, or an external resource identifier). |
 
 *Note*: there can be multiple translations of a given word. This is normal, considering that some languages can be more or less expressive. 
 
@@ -104,7 +104,7 @@ Adds a single word translation to the vocabulary.
 |-------------------|----------|--------------------------------------|
 | `english`         | Yes      | The English source word              |
 | `translation`     | Yes      | The TL translation                   |
-| `knowledgeSource` | No       | ID of the data source this entry originates from |
+| `knowledgeSource` | Yes      | ID of the data source this entry originates from |
 
 #### Response — `201 Created`
 
@@ -116,10 +116,10 @@ Adds a single word translation to the vocabulary.
 
 #### Error Cases
 
-| Condition                              | Status | Description                            |
-|----------------------------------------|--------|----------------------------------------|
-| Missing `english` or `translation`     | `400`  | Required fields not provided           |
-| Unknown / unsupported `language`       | `400`  | Language is not in the supported list  |
+| Condition                                           | Status | Description                            |
+|-----------------------------------------------------|--------|----------------------------------------|
+| Missing `english`, `translation`, or `knowledgeSource` | `400`  | Required fields not provided           |
+| Unknown / unsupported `language`                    | `400`  | Language is not in the supported list  |
 
 ---
 
@@ -139,7 +139,7 @@ Inserts multiple word translations in one request.
 {
   "words": [
     { "english": "dog", "translation": "hund", "knowledgeSource": "src-dataset-42" },
-    { "english": "cat", "translation": "kat" }
+    { "english": "cat", "translation": "kat", "knowledgeSource": "src-dataset-42" }
   ]
 }
 ```
@@ -148,7 +148,7 @@ Inserts multiple word translations in one request.
 |---------|----------|-----------------------------------------|
 | `words` | Yes      | Array of word objects (min length: 1)   |
 
-Each word object follows the same rules as `PostWord` (`english` and `translation` required; `knowledgeSource` optional).
+Each word object follows the same rules as `PostWord` (`english`, `translation`, and `knowledgeSource` all required).
 
 #### Batch Behaviour
 
