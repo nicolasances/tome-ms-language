@@ -14,7 +14,7 @@ export class PostWord extends TotoDelegate<PostWordRequest, PostWordResponse> {
         }
         if (!req.body.english) throw new ValidationError(400, "No english word provided");
         if (!req.body.translation) throw new ValidationError(400, "No translation provided");
-        return { language, english: req.body.english, translation: req.body.translation };
+        return { language, english: req.body.english, translation: req.body.translation, knowledgeSource: req.body.knowledgeSource };
     }
 
     async do(req: PostWordRequest, userContext?: UserContext): Promise<PostWordResponse> {
@@ -22,7 +22,7 @@ export class PostWord extends TotoDelegate<PostWordRequest, PostWordResponse> {
         const config = this.config as ControllerConfig;
         const db = await config.getMongoDb(config.getDBName());
 
-        const word = new Word(req.language, req.english, req.translation, new Date().toISOString());
+        const word = new Word(req.language, req.english, req.translation, new Date().toISOString(), undefined, req.knowledgeSource);
 
         const store = new VocabularyStore(db, config);
         
@@ -36,6 +36,7 @@ interface PostWordRequest {
     language: string;
     english: string;
     translation: string;
+    knowledgeSource?: string;
 }
 
 interface PostWordResponse {

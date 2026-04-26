@@ -14,13 +14,14 @@ The vocabulary is persisted in a MongoDB collection named **`vocabulary`**.
 
 Each vocabulary entry represents a single word translation.
 
-| Field         | Type     | Description                                                        |
-|---------------|----------|--------------------------------------------------------------------|
-| `id`          | string   | MongoDB ObjectId, generated on insert                              |
-| `language`    | string   | Target language code (e.g. `"danish"`)                             |
-| `english`     | string   | The English source word                                            |
-| `translation` | string   | The TL translation of the English word                             |
-| `createdAt`   | string   | ISO 8601 timestamp of when the entry was created                   |
+| Field             | Type     | Description                                                        |
+|-------------------|----------|--------------------------------------------------------------------|
+| `id`              | string   | MongoDB ObjectId, generated on insert                              |
+| `language`        | string   | Target language code (e.g. `"danish"`)                             |
+| `english`         | string   | The English source word                                            |
+| `translation`     | string   | The TL translation of the English word                             |
+| `createdAt`       | string   | ISO 8601 timestamp of when the entry was created                   |
+| `knowledgeSource` | string   | Optional. Tracks where this vocabulary entry originates from (e.g. the name of a book, course, or external resource that introduced this word). Helps users remember the context in which they learned a word. |
 
 *Note*: there can be multiple translations of a given word. This is normal, considering that some languages can be more or less expressive. 
 
@@ -64,7 +65,8 @@ Returns all vocabulary entries for the specified target language.
       "id": "664abc123def456789abcdef",
       "english": "dog",
       "translation": "hund",
-      "createdAt": "2026-04-01T10:00:00.000Z"
+      "createdAt": "2026-04-01T10:00:00.000Z",
+      "knowledgeSource": "Danish for Beginners"
     }
   ]
 }
@@ -93,14 +95,16 @@ Adds a single word translation to the vocabulary.
 ```json
 {
   "english": "dog",
-  "translation": "hund"
+  "translation": "hund",
+  "knowledgeSource": "Danish for Beginners"
 }
 ```
 
-| Field         | Required | Description                          |
-|---------------|----------|--------------------------------------|
-| `english`     | Yes      | The English source word              |
-| `translation` | Yes      | The TL translation                   |
+| Field             | Required | Description                          |
+|-------------------|----------|--------------------------------------|
+| `english`         | Yes      | The English source word              |
+| `translation`     | Yes      | The TL translation                   |
+| `knowledgeSource` | No       | Origin of the vocabulary entry (e.g. book or course name) |
 
 #### Response — `201 Created`
 
@@ -134,7 +138,7 @@ Inserts multiple word translations in one request.
 ```json
 {
   "words": [
-    { "english": "dog", "translation": "hund" },
+    { "english": "dog", "translation": "hund", "knowledgeSource": "Danish for Beginners" },
     { "english": "cat", "translation": "kat" }
   ]
 }
@@ -144,7 +148,7 @@ Inserts multiple word translations in one request.
 |---------|----------|-----------------------------------------|
 | `words` | Yes      | Array of word objects (min length: 1)   |
 
-Each word object follows the same rules as `PostWord` (both fields required).
+Each word object follows the same rules as `PostWord` (`english` and `translation` required; `knowledgeSource` optional).
 
 #### Batch Behaviour
 
@@ -195,14 +199,16 @@ At least one field must be provided.
 
 ```json
 {
-  "translation": "hund (updated)"
+  "translation": "hund (updated)",
+  "knowledgeSource": "Danish for Beginners"
 }
 ```
 
-| Field         | Required | Description                                  |
-|---------------|----------|----------------------------------------------|
-| `english`     | No       | Updated English word                         |
-| `translation` | No       | Updated TL translation                       |
+| Field             | Required | Description                                  |
+|-------------------|----------|----------------------------------------------|
+| `english`         | No       | Updated English word                         |
+| `translation`     | No       | Updated TL translation                       |
+| `knowledgeSource` | No       | Updated origin of the vocabulary entry       |
 
 #### Response — `200 OK`
 

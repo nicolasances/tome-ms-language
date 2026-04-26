@@ -7,20 +7,21 @@ export class PutWord extends TotoDelegate<PutWordRequest, PutWordResponse> {
 
     parseRequest(req: Request): PutWordRequest {
         const { id } = req.params;
-        const { english, translation } = req.body;
-        if (!english && !translation) {
+        const { english, translation, knowledgeSource } = req.body;
+        if (!english && !translation && knowledgeSource === undefined) {
             throw new ValidationError(400, "No updatable fields provided");
         }
-        return { id, english, translation };
+        return { id, english, translation, knowledgeSource };
     }
 
     async do(req: PutWordRequest, userContext?: UserContext): Promise<PutWordResponse> {
         const config = this.config as ControllerConfig;
         const db = await config.getMongoDb(config.getDBName());
 
-        const fields: { english?: string; translation?: string } = {};
+        const fields: { english?: string; translation?: string; knowledgeSource?: string } = {};
         if (req.english) fields.english = req.english;
         if (req.translation) fields.translation = req.translation;
+        if (req.knowledgeSource !== undefined) fields.knowledgeSource = req.knowledgeSource;
 
         const store = new VocabularyStore(db, config);
         const found = await store.updateWord(req.id, fields);
@@ -35,6 +36,7 @@ interface PutWordRequest {
     id: string;
     english?: string;
     translation?: string;
+    knowledgeSource?: string;
 }
 
 interface PutWordResponse {

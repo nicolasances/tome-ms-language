@@ -35,7 +35,7 @@ export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse>
                 continue;
             }
 
-            validWords.push(new Word(req.language, item.english, item.translation, new Date().toISOString()));
+            validWords.push(new Word(req.language, item.english, item.translation, new Date().toISOString(), undefined, item.knowledgeSource));
             validWordIndexes.push(index);
             validEnglishValues.push(item.english);
         }
@@ -52,7 +52,7 @@ export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse>
 
 interface PostWordsRequest {
     language: string;
-    words: Array<{ english?: string; translation?: string }>;
+    words: Array<{ english?: string; translation?: string; knowledgeSource?: string }>;
 }
 
 interface PostWordsResponse {
