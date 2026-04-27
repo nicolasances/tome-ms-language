@@ -19,9 +19,10 @@ export class PutWord extends TotoDelegate<PutWordRequest, PutWordResponse> {
         const db = await config.getMongoDb(config.getDBName());
 
         const fields: { english?: string; translation?: string; knowledgeSource?: string } = {};
+        
         if (req.english) fields.english = req.english;
         if (req.translation) fields.translation = req.translation;
-        if (req.knowledgeSource !== undefined) fields.knowledgeSource = req.knowledgeSource;
+        if (req.knowledgeSource) fields.knowledgeSource = req.knowledgeSource;
 
         const store = new VocabularyStore(db, config);
         const found = await store.updateWord(req.id, fields);

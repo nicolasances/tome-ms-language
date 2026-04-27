@@ -45,6 +45,6 @@ interface GetVocabularyResponse {
         english: string;
         translation: string;
         createdAt: string;
-        knowledgeSource?: string;
+        knowledgeSource: string;
     }>;
 }
