@@ -1,6 +1,10 @@
-# Coding Standards
+# Project Conventions & Coding Standards
 
 This document defines the coding standards and architectural conventions for all microservices in this repository. The reference implementation is [`nicolasances/tome-ms-topics`](https://github.com/nicolasances/tome-ms-topics).
+
+## Coding Standards
+
+- I prefer that class constructors take as argument an object rather than flat parameters. So `constructor({param1, param2}: {param1: string, param2: number, ...})` **rather than** `constructor(param1: string, param2: number)`. 
 
 ---
 

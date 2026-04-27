@@ -14,13 +14,14 @@ The vocabulary is persisted in a MongoDB collection named **`vocabulary`**.
 
 Each vocabulary entry represents a single word translation.
 
-| Field         | Type     | Description                                                        |
-|---------------|----------|--------------------------------------------------------------------|
-| `id`          | string   | MongoDB ObjectId, generated on insert                              |
-| `language`    | string   | Target language code (e.g. `"danish"`)                             |
-| `english`     | string   | The English source word                                            |
-| `translation` | string   | The TL translation of the English word                             |
-| `createdAt`   | string   | ISO 8601 timestamp of when the entry was created                   |
+| Field             | Type     | Description                                                        |
+|-------------------|----------|--------------------------------------------------------------------|
+| `id`              | string   | MongoDB ObjectId, generated on insert                              |
+| `language`        | string   | Target language code (e.g. `"danish"`)                             |
+| `english`         | string   | The English source word                                            |
+| `translation`     | string   | The TL translation of the English word                             |
+| `createdAt`       | string   | ISO 8601 timestamp of when the entry was created                   |
+| `knowledgeSource` | string   | The ID of the data source this vocabulary entry was imported or derived from. Used for tracking and auditing the origin of vocabulary data (e.g. a source dataset ID, an import job ID, or an external resource identifier). |
 
 *Note*: there can be multiple translations of a given word. This is normal, considering that some languages can be more or less expressive. 
 
@@ -64,7 +65,8 @@ Returns all vocabulary entries for the specified target language.
       "id": "664abc123def456789abcdef",
       "english": "dog",
       "translation": "hund",
-      "createdAt": "2026-04-01T10:00:00.000Z"
+      "createdAt": "2026-04-01T10:00:00.000Z",
+      "knowledgeSource": "src-dataset-42"
     }
   ]
 }
@@ -93,14 +95,16 @@ Adds a single word translation to the vocabulary.
 ```json
 {
   "english": "dog",
-  "translation": "hund"
+  "translation": "hund",
+  "knowledgeSource": "src-dataset-42"
 }
 ```
 
-| Field         | Required | Description                          |
-|---------------|----------|--------------------------------------|
-| `english`     | Yes      | The English source word              |
-| `translation` | Yes      | The TL translation                   |
+| Field             | Required | Description                          |
+|-------------------|----------|--------------------------------------|
+| `english`         | Yes      | The English source word              |
+| `translation`     | Yes      | The TL translation                   |
+| `knowledgeSource` | Yes      | ID of the data source this entry originates from |
 
 #### Response — `201 Created`
 
@@ -112,10 +116,10 @@ Adds a single word translation to the vocabulary.
 
 #### Error Cases
 
-| Condition                              | Status | Description                            |
-|----------------------------------------|--------|----------------------------------------|
-| Missing `english` or `translation`     | `400`  | Required fields not provided           |
-| Unknown / unsupported `language`       | `400`  | Language is not in the supported list  |
+| Condition                                           | Status | Description                            |
+|-----------------------------------------------------|--------|----------------------------------------|
+| Missing `english`, `translation`, or `knowledgeSource` | `400`  | Required fields not provided           |
+| Unknown / unsupported `language`                    | `400`  | Language is not in the supported list  |
 
 ---
 
@@ -134,8 +138,8 @@ Inserts multiple word translations in one request.
 ```json
 {
   "words": [
-    { "english": "dog", "translation": "hund" },
-    { "english": "cat", "translation": "kat" }
+    { "english": "dog", "translation": "hund", "knowledgeSource": "src-dataset-42" },
+    { "english": "cat", "translation": "kat", "knowledgeSource": "src-dataset-42" }
   ]
 }
 ```
@@ -144,7 +148,7 @@ Inserts multiple word translations in one request.
 |---------|----------|-----------------------------------------|
 | `words` | Yes      | Array of word objects (min length: 1)   |
 
-Each word object follows the same rules as `PostWord` (both fields required).
+Each word object follows the same rules as `PostWord` (`english`, `translation`, and `knowledgeSource` all required).
 
 #### Batch Behaviour
 
@@ -195,14 +199,16 @@ At least one field must be provided.
 
 ```json
 {
-  "translation": "hund (updated)"
+  "translation": "hund (updated)",
+  "knowledgeSource": "src-dataset-99"
 }
 ```
 
-| Field         | Required | Description                                  |
-|---------------|----------|----------------------------------------------|
-| `english`     | No       | Updated English word                         |
-| `translation` | No       | Updated TL translation                       |
+| Field             | Required | Description                                  |
+|-------------------|----------|----------------------------------------------|
+| `english`         | No       | Updated English word                         |
+| `translation`     | No       | Updated TL translation                       |
+| `knowledgeSource` | No       | Updated data source ID for this entry        |
 
 #### Response — `200 OK`
 

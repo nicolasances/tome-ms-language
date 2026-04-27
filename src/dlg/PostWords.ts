@@ -8,7 +8,9 @@ import { SUPPORTED_LANGUAGES } from "../util/Languages";
 export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse> {
 
     parseRequest(req: Request): PostWordsRequest {
+        
         const language = req.params.language;
+        
         if (!SUPPORTED_LANGUAGES.includes(language)) {
             throw new ValidationError(400, `Unsupported language: ${language}`);
         }
@@ -16,26 +18,31 @@ export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse>
         if (!words || !Array.isArray(words) || words.length === 0) {
             throw new ValidationError(400, "No words provided");
         }
+     
         return { language, words };
     }
 
     async do(req: PostWordsRequest, userContext?: UserContext): Promise<PostWordsResponse> {
+     
         const config = this.config as ControllerConfig;
         const db = await config.getMongoDb(config.getDBName());
 
         const store = new VocabularyStore(db, config);
+     
         const results: PostWordsResponse["results"] = [];
+     
         const validWords: Word[] = [];
         const validWordIndexes: number[] = [];
         const validEnglishValues: string[] = [];
 
         for (const [index, item] of req.words.entries()) {
-            if (!item.english || !item.translation) {
+     
+            if (!item.english || !item.translation || !item.knowledgeSource) {
                 results[index] = { english: item.english ?? "", status: "error", reason: "missing_field" };
                 continue;
             }
 
-            validWords.push(new Word(req.language, item.english, item.translation, new Date().toISOString()));
+            validWords.push(new Word({ language: req.language, english: item.english, translation: item.translation, createdAt: new Date().toISOString(), id: undefined, knowledgeSource: item.knowledgeSource }));
             validWordIndexes.push(index);
             validEnglishValues.push(item.english);
         }
@@ -52,7 +59,7 @@ export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse>
 
 interface PostWordsRequest {
     language: string;
-    words: Array<{ english?: string; translation?: string }>;
+    words: Array<{ english?: string; translation?: string; knowledgeSource?: string }>;
 }
 
 interface PostWordsResponse {

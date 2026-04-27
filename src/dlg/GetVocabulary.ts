@@ -28,6 +28,7 @@ export class GetVocabulary extends TotoDelegate<GetVocabularyRequest, GetVocabul
                 english: w.english,
                 translation: w.translation,
                 createdAt: w.createdAt,
+                knowledgeSource: w.knowledgeSource,
             })),
         };
     }
@@ -44,5 +45,6 @@ interface GetVocabularyResponse {
         english: string;
         translation: string;
         createdAt: string;
+        knowledgeSource: string;
     }>;
 }

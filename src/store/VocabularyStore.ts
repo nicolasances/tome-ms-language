@@ -111,7 +111,7 @@ export class VocabularyStore {
         return `${word.language}::${word.english}::${word.translation}`;
     }
 
-    async updateWord(id: string, fields: { english?: string; translation?: string }): Promise<boolean> {
+    async updateWord(id: string, fields: { english?: string; translation?: string; knowledgeSource?: string }): Promise<boolean> {
 
         const result = await this.db.collection(VOCABULARY_COLLECTION).updateOne(
             { _id: new ObjectId(id) },
