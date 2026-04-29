@@ -18,6 +18,18 @@ export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse>
         if (!words || !Array.isArray(words) || words.length === 0) {
             throw new ValidationError(400, "No words provided");
         }
+
+        // Validate that all words have required fields
+        for (const [index, word] of words.entries()) {
+            const missingFields: string[] = [];
+            if (!word.english) missingFields.push("english");
+            if (!word.translation) missingFields.push("translation");
+            if (!word.knowledgeSource) missingFields.push("knowledgeSource");
+            
+            if (missingFields.length > 0) {
+                throw new ValidationError(400, `Word at index ${index} is missing required fields: ${missingFields.join(", ")}`);
+            }
+        }
      
         return { language, words };
     }
@@ -32,25 +44,15 @@ export class PostWords extends TotoDelegate<PostWordsRequest, PostWordsResponse>
         const results: PostWordsResponse["results"] = [];
      
         const validWords: Word[] = [];
-        const validWordIndexes: number[] = [];
-        const validEnglishValues: string[] = [];
 
         for (const [index, item] of req.words.entries()) {
-     
-            if (!item.english || !item.translation || !item.knowledgeSource) {
-                results[index] = { english: item.english ?? "", status: "error", reason: "missing_field" };
-                continue;
-            }
-
-            validWords.push(new Word({ language: req.language, english: item.english, translation: item.translation, createdAt: new Date().toISOString(), id: undefined, knowledgeSource: item.knowledgeSource }));
-            validWordIndexes.push(index);
-            validEnglishValues.push(item.english);
+            validWords.push(new Word({ language: req.language, english: item.english!, translation: item.translation!, createdAt: new Date().toISOString(), id: undefined, knowledgeSource: item.knowledgeSource! }));
         }
 
         const ids = await store.insertWords(validWords);
 
         for (let i = 0; i < ids.length; i++) {
-            results[validWordIndexes[i]] = { english: validEnglishValues[i], status: "created", id: ids[i] };
+            results[i] = { english: validWords[i].english, status: "created", id: ids[i] };
         }
 
         return { results };
@@ -63,8 +65,5 @@ interface PostWordsRequest {
 }
 
 interface PostWordsResponse {
-    results: Array<
-        | { english: string; status: "created"; id: string }
-        | { english: string; status: "error"; reason: string }
-    >;
+    results: Array<{ english: string; status: "created"; id: string }>;
 }
