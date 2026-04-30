@@ -23,6 +23,7 @@ export class GetVocabulary extends TotoDelegate<GetVocabularyRequest, GetVocabul
 
         return {
             language: req.language,
+            wordCount: words.length,
             words: words.map(w => ({
                 id: w.id!,
                 english: w.english,
@@ -40,6 +41,7 @@ interface GetVocabularyRequest {
 
 interface GetVocabularyResponse {
     language: string;
+    wordCount: number;
     words: Array<{
         id: string;
         english: string;
