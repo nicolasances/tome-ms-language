@@ -1,13 +1,13 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
-import { ControllerConfig } from "../Config";
-import { Session, VocabularySessionPayload } from "../model/Session";
-import { SessionsStore } from "../store/SessionsStore";
-import { SettingsStore } from "../store/SettingsStore";
-import { VocabularyStore } from "../store/VocabularyStore";
-import { WordStatsStore } from "../store/WordStatsStore";
-import { SUPPORTED_LANGUAGES } from "../util/Languages";
-import { weightedSample } from "../util/WeightedSampler";
+import { ControllerConfig } from "../../Config";
+import { Session, VocabularySessionPayload } from "../../model/Session";
+import { SessionsStore } from "../../store/SessionsStore";
+import { SettingsStore } from "../../store/SettingsStore";
+import { VocabularyStore } from "../../store/VocabularyStore";
+import { WordStatsStore } from "../../store/WordStatsStore";
+import { SUPPORTED_LANGUAGES } from "../../util/Languages";
+import { weightedSample } from "../../util/WeightedSampler";
 
 export class StartSession extends TotoDelegate<StartSessionRequest, StartSessionResponse> {
 

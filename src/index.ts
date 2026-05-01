@@ -1,14 +1,14 @@
 import { getHyperscalerConfiguration, SupportedHyperscalers, TotoMicroservice, TotoMicroserviceConfiguration } from 'totoms';
 import { ControllerConfig } from "./Config";
-import { CompleteSession } from './dlg/CompleteSession';
+import { CompleteSession } from './dlg/session/CompleteSession';
 import { DeleteWord } from './dlg/DeleteWord';
-import { GetActiveSession } from './dlg/GetActiveSession';
+import { GetActiveSession } from './dlg/session/GetActiveSession';
 import { GetVocabulary } from './dlg/GetVocabulary';
 import { PostWord } from './dlg/PostWord';
 import { PostWords } from './dlg/PostWords';
 import { PutWord } from './dlg/PutWord';
-import { StartSession } from './dlg/StartSession';
-import { SubmitAnswer } from './dlg/SubmitAnswer';
+import { StartSession } from './dlg/session/StartSession';
+import { SubmitAnswer } from './dlg/session/SubmitAnswer';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",

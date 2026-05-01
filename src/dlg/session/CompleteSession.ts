@@ -1,8 +1,8 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
-import { ControllerConfig } from "../Config";
-import { SessionsStore } from "../store/SessionsStore";
-import { WordStatsStore } from "../store/WordStatsStore";
+import { ControllerConfig } from "../../Config";
+import { SessionsStore } from "../../store/SessionsStore";
+import { WordStatsStore } from "../../store/WordStatsStore";
 
 export class CompleteSession extends TotoDelegate<CompleteSessionRequest, CompleteSessionResponse> {
 

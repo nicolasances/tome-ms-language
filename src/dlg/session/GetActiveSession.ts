@@ -1,7 +1,7 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
-import { ControllerConfig } from "../Config";
-import { SessionsStore } from "../store/SessionsStore";
+import { ControllerConfig } from "../../Config";
+import { SessionsStore } from "../../store/SessionsStore";
 
 export class GetActiveSession extends TotoDelegate<GetActiveSessionRequest, GetActiveSessionResponse> {
 
