@@ -142,9 +142,9 @@ Starts a new practice session for the authenticated user.
 4. Load all `word_stats` documents for the user + language from the `word_stats` collection.
 5. Compute a **selection weight** for each vocabulary word:
    - If the word has existing stats: `weight = word_stats.failureRatio`
-   - If the word has no stats (never practiced): `weight = defaultFailureRatio` (see Config)
-6. Sample `sessionWordCount` words from the vocabulary using **weighted random sampling without replacement** (see [Word Selection Algorithm](#word-selection-algorithm)).
-7. Create a session document with `status = "active"` and a `payload` containing the selected `words`, `totalWords = sessionWordCount`, and `answers = []`.
+   - If the word has no stats (never practiced): `weight = settings.config.defaultFailureRatio` (from the `settings` collection)
+6. Sample `settings.config.wordCount` words from the vocabulary using **weighted random sampling without replacement** (see [Word Selection Algorithm](#word-selection-algorithm)).
+7. Create a session document with `status = "active"` and a `payload` containing the selected `words`, `totalWords = settings.config.wordCount`, and `answers = []`.
 8. Return the session.
 
 #### Response — `201 Created`
@@ -171,7 +171,7 @@ Starts a new practice session for the authenticated user.
 | Unsupported `language`                   | `400`  | Language is not in the supported list               |
 | Unknown or unsupported `practiceType`    | `400`  | Only `"vocabulary"` is currently supported          |
 | User already has an active session       | `409`  | Caller should resume or complete the existing session |
-| Fewer words in vocabulary than `sessionWordCount` | `400` | Not enough words to start a session — indicates the vocabulary needs to be populated first |
+| Fewer words in vocabulary than `settings.config.wordCount` | `400` | Not enough words to start a session — indicates the vocabulary needs to be populated first |
 
 ---
 
@@ -331,13 +331,13 @@ Marks the session as completed and updates word statistics for all words in the 
 
 ## Word Selection Algorithm
 
-The goal is to select `sessionWordCount` words from the vocabulary such that words the user struggles with most (high failure ratio) are selected with higher probability.
+The goal is to select `settings.config.wordCount` words from the vocabulary such that words the user struggles with most (high failure ratio) are selected with higher probability.
 
 ### Steps
 
-1. Build a weight list: for each vocabulary word, assign `weight = failureRatio` if stats exist, else `weight = defaultFailureRatio`.
+1. Build a weight list: for each vocabulary word, assign `weight = failureRatio` if stats exist, else `weight = settings.config.defaultFailureRatio`.
 2. Apply **weighted random sampling without replacement**: each word's probability of being selected at each draw is proportional to its weight relative to the remaining candidates.
-3. A practical implementation is the **exponential-key method** (Efraimidis-Spirakis): assign each word a key `k = -log(U) / weight` where `U` is drawn from `Uniform(0, 1)`, then select the `sessionWordCount` words with the lowest `k` values. This is efficient and avoids iterative re-normalisation.
+3. A practical implementation is the **exponential-key method** (Efraimidis-Spirakis): assign each word a key `k = -log(U) / weight` where `U` is drawn from `Uniform(0, 1)`, then select the `settings.config.wordCount` words with the lowest `k` values. This is efficient and avoids iterative re-normalisation.
 
 ### Edge Cases
 
@@ -345,18 +345,38 @@ The goal is to select `sessionWordCount` words from the vocabulary such that wor
 |-----------|----------|
 | All words have `failureRatio = 0` | All weights equal `0`. Fall back to uniform random sampling (equal probability for all words). |
 | A word has `totalAttempts > 0` and `failureRatio = 0` (always answered correctly) | Weight = `0`. Such words are effectively excluded from weighted selection; they may still appear via the fallback uniform round if needed to fill the session. |
-| Fewer vocabulary words than `sessionWordCount` | Return `400` — session cannot be started. |
+| Fewer vocabulary words than `settings.config.wordCount` | Return `400` — session cannot be started. |
 
 ---
 
-## Configuration
+## Configuration — `settings` Collection
 
-The following values are configurable via environment variables or service configuration (see `Config.ts`).
+Practice-type-specific configuration parameters are stored in the `settings` MongoDB collection. This allows parameters to be changed at runtime without a deployment.
 
-| Config Key             | Default | Description                                                            |
-|------------------------|---------|------------------------------------------------------------------------|
-| `sessionWordCount`     | `10`    | Number of words per session                                            |
-| `defaultFailureRatio`  | `0.5`   | Weight assigned to words with no prior practice history                |
+Each document represents the settings for one practice type:
+
+```json
+{
+  "practiceType": "vocabulary",
+  "config": {
+    "wordCount": 10,
+    "defaultFailureRatio": 0.5
+  }
+}
+```
+
+**Index**: unique on `practiceType` — only one settings document per practice type.
+
+### Vocabulary Settings (`practiceType = "vocabulary"`)
+
+| Setting               | Default | Description                                                              |
+|-----------------------|---------|--------------------------------------------------------------------------|
+| `config.wordCount`    | `10`    | Number of words selected per session                                     |
+| `config.defaultFailureRatio` | `0.5` | Weight assigned to words with no prior practice history           |
+
+If no settings document exists for `"vocabulary"`, the service falls back to the above defaults.
+
+**Note**: The `SettingsStore.getOrDefault()` method centralises this fallback behaviour — no defaults are scattered through delegates.
 
 ---
 

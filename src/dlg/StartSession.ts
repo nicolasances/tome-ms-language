@@ -3,6 +3,7 @@ import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { ControllerConfig } from "../Config";
 import { Session, VocabularySessionPayload } from "../model/Session";
 import { SessionsStore } from "../store/SessionsStore";
+import { SettingsStore } from "../store/SettingsStore";
 import { VocabularyStore } from "../store/VocabularyStore";
 import { WordStatsStore } from "../store/WordStatsStore";
 import { SUPPORTED_LANGUAGES } from "../util/Languages";
@@ -31,10 +32,15 @@ export class StartSession extends TotoDelegate<StartSessionRequest, StartSession
         const existing = await sessionsStore.findActiveSession({ userId });
         if (existing) throw new ValidationError(409, "User already has an active session");
 
+        const settingsStore = new SettingsStore({ db, config });
+        const practiceSettings = await settingsStore.getOrDefault({ practiceType: "vocabulary" });
+        const wordCount = (practiceSettings.config as { wordCount: number }).wordCount;
+        const defaultFailureRatio = (practiceSettings.config as { defaultFailureRatio: number }).defaultFailureRatio;
+
         const vocabularyStore = new VocabularyStore(db, config);
         const allWords = await vocabularyStore.findByLanguage(req.language);
-        if (allWords.length < config.sessionWordCount) {
-            throw new ValidationError(400, `Not enough words in vocabulary: ${allWords.length} available, ${config.sessionWordCount} required`);
+        if (allWords.length < wordCount) {
+            throw new ValidationError(400, `Not enough words in vocabulary: ${allWords.length} available, ${wordCount} required`);
         }
 
         const wordStatsStore = new WordStatsStore({ db, config });
@@ -43,8 +49,8 @@ export class StartSession extends TotoDelegate<StartSessionRequest, StartSession
 
         const selectedWords = weightedSample(
             allWords,
-            word => statsMap.has(word.id!) ? statsMap.get(word.id!)! : config.defaultFailureRatio,
-            config.sessionWordCount
+            word => statsMap.has(word.id!) ? statsMap.get(word.id!)! : defaultFailureRatio,
+            wordCount
         );
 
         const payload: VocabularySessionPayload = {
