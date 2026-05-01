@@ -19,4 +19,12 @@ export class ControllerConfig extends TotoControllerConfig {
         return {}
     }
 
+    get sessionWordCount(): number {
+        return parseInt(process.env.SESSION_WORD_COUNT ?? "10", 10);
+    }
+
+    get defaultFailureRatio(): number {
+        return parseFloat(process.env.DEFAULT_FAILURE_RATIO ?? "0.5");
+    }
+
 }
