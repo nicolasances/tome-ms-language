@@ -38,13 +38,25 @@ Stores practice sessions. One document per session.
 | `language`    | string            | Target language code (e.g. `"danish"`)                                    |
 | `practiceType`| string            | Practice type identifier (e.g. `"vocabulary"`)                            |
 | `status`      | string            | `"active"` or `"completed"`                                               |
-| `words`       | array of objects  | The words assigned to this session (see below)                            |
-| `totalWords`  | number            | Total number of words in the session                                      |
-| `answers`     | array of objects  | All answers submitted during the session, in order (see below)            |
+| `payload`     | object            | Type-specific session data. Shape depends on `practiceType` (see below)   |
 | `createdAt`   | string (ISO 8601) | Session creation timestamp                                                |
 | `completedAt` | string or null    | ISO 8601 timestamp when the session was completed; `null` if still active |
 
-#### `words` Array Entry
+Generic session operations (finding an active session, validating ownership, marking completed) never need to read inside `payload`. All type-specific logic reads and writes `payload` fields exclusively.
+
+**Index**: `{ userId: 1, status: 1 }` — supports fast lookup of the active session for a user.
+
+#### Vocabulary Session Payload (`practiceType = "vocabulary"`)
+
+The `payload` sub-document for a vocabulary session has the following shape:
+
+| Field        | Type             | Description                                                        |
+|--------------|------------------|--------------------------------------------------------------------|
+| `words`      | array of objects | The words assigned to this session (see `words` entry below)       |
+| `totalWords` | number           | Total number of words in the session                               |
+| `answers`    | array of objects | All answers submitted during the session, in order (see below)     |
+
+##### `payload.words` Entry
 
 | Field         | Type   | Description                                   |
 |---------------|--------|-----------------------------------------------|
@@ -52,15 +64,15 @@ Stores practice sessions. One document per session.
 | `english`     | string | The English source word                       |
 | `translation` | string | The Target Language translation               |
 
-#### `answers` Array Entry
+##### `payload.answers` Entry
 
-| Field         | Type    | Description                                      |
-|---------------|---------|--------------------------------------------------|
-| `wordId`      | string  | The vocabulary entry this answer relates to      |
-| `isCorrect`   | boolean | Whether the answer was marked correct            |
-| `submittedAt` | string  | ISO 8601 timestamp of when the answer was submitted |
+| Field         | Type    | Description                                              |
+|---------------|---------|----------------------------------------------------------|
+| `entityId`    | string  | The `wordId` of the vocabulary entry this answer relates to |
+| `isCorrect`   | boolean | Whether the answer was marked correct                    |
+| `submittedAt` | string  | ISO 8601 timestamp of when the answer was submitted      |
 
-**Index**: `{ userId: 1, status: 1 }` — supports fast lookup of the active session for a user.
+The field name `entityId` is used (rather than `wordId`) to keep the answer schema generic across practice types. In a vocabulary session, `entityId` always maps to a `wordId`.
 
 ---
 
@@ -132,7 +144,7 @@ Starts a new practice session for the authenticated user.
    - If the word has existing stats: `weight = word_stats.failureRatio`
    - If the word has no stats (never practiced): `weight = defaultFailureRatio` (see Config)
 6. Sample `sessionWordCount` words from the vocabulary using **weighted random sampling without replacement** (see [Word Selection Algorithm](#word-selection-algorithm)).
-7. Create a session document with `status = "active"`, `answers = []`, and the selected words.
+7. Create a session document with `status = "active"` and a `payload` containing the selected `words`, `totalWords = sessionWordCount`, and `answers = []`.
 8. Return the session.
 
 #### Response — `201 Created`
@@ -142,11 +154,13 @@ Starts a new practice session for the authenticated user.
   "sessionId": "664abc123def456789abcdef",
   "language": "danish",
   "practiceType": "vocabulary",
-  "words": [
-    { "wordId": "664abc123def456789aaaaaa", "english": "dog", "translation": "hund" },
-    { "wordId": "664abc123def456789bbbbbb", "english": "cat", "translation": "kat" }
-  ],
-  "totalWords": 10
+  "payload": {
+    "words": [
+      { "wordId": "664abc123def456789aaaaaa", "english": "dog", "translation": "hund" },
+      { "wordId": "664abc123def456789bbbbbb", "english": "cat", "translation": "kat" }
+    ],
+    "totalWords": 10
+  }
 }
 ```
 
@@ -178,10 +192,12 @@ Same structure as the `StartSession` response.
   "sessionId": "664abc123def456789abcdef",
   "language": "danish",
   "practiceType": "vocabulary",
-  "words": [
-    { "wordId": "664abc123def456789aaaaaa", "english": "dog", "translation": "hund" }
-  ],
-  "totalWords": 10
+  "payload": {
+    "words": [
+      { "wordId": "664abc123def456789aaaaaa", "english": "dog", "translation": "hund" }
+    ],
+    "totalWords": 10
+  }
 }
 ```
 
@@ -207,22 +223,22 @@ Records a single answer for a word within the session. Called by the frontend ea
 
 ```json
 {
-  "wordId": "664abc123def456789aaaaaa",
+  "entityId": "664abc123def456789aaaaaa",
   "isCorrect": false
 }
 ```
 
-| Field       | Required | Description                                  |
-|-------------|----------|----------------------------------------------|
-| `wordId`    | Yes      | The vocabulary entry being answered          |
-| `isCorrect` | Yes      | Whether the answer was correct               |
+| Field       | Required | Description                                                                    |
+|-------------|----------|--------------------------------------------------------------------------------|
+| `entityId`  | Yes      | The ID of the item being answered. For vocabulary sessions, this is a `wordId` |
+| `isCorrect` | Yes      | Whether the answer was correct                                                 |
 
 #### Behaviour
 
 1. Load the session by `sessionId`.
 2. Validate: session must exist, belong to the authenticated user, and be `"active"`.
-3. Validate: `wordId` must be present in `session.words`.
-4. Append `{ wordId, isCorrect, submittedAt: now() }` to `session.answers`.
+3. Validate: `entityId` must match the `wordId` of an entry in `session.payload.words`.
+4. Append `{ entityId, isCorrect, submittedAt: now() }` to `session.payload.answers`.
 
 #### Response — `200 OK`
 
@@ -237,7 +253,7 @@ Records a single answer for a word within the session. Called by the frontend ea
 | Session not found                      | `404`  | No session with this ID                        |
 | Session does not belong to the user    | `403`  | Authenticated user is not the session owner    |
 | Session already completed              | `400`  | Cannot submit answers to a completed session   |
-| `wordId` not in session                | `400`  | The word is not part of this session's word list |
+| `entityId` not in session              | `400`  | The entity is not part of this session's item list |
 
 ---
 
@@ -259,9 +275,9 @@ Marks the session as completed and updates word statistics for all words in the 
 
 1. Load the session by `sessionId`.
 2. Validate: session must exist, belong to the authenticated user, and be `"active"`.
-3. For each word in `session.words`, compute from `session.answers`:
-   - `sessionAttempts` = number of answer entries for this `wordId`
-   - `sessionFailures` = number of incorrect answers for this `wordId`
+3. For each word in `session.payload.words`, compute from `session.payload.answers`:
+   - `sessionAttempts` = number of answer entries where `entityId === word.wordId`
+   - `sessionFailures` = number of incorrect answers where `entityId === word.wordId`
    - `firstAttemptCorrect` = `true` if the first answer entry for this `wordId` is correct (i.e. `sessionFailures === 0`)
 4. Upsert a `word_stats` document for each `(userId, wordId)` pair:
    - `totalAttempts += sessionAttempts`
@@ -350,7 +366,25 @@ The following values are configurable via environment variables or service confi
 2. **Answer accumulation, not replacement**: Multiple answers for the same `wordId` within a session are all stored. The full history is needed to accurately compute `firstAttemptCorrect` and `failedAttempts`.
 3. **Stats updated only at session completion**: `word_stats` is not updated incrementally during a session. Stats are updated atomically (as a batch) when `CompleteSession` is called. This simplifies rollback scenarios and avoids partial updates.
 4. **`failureRatio` pre-computed**: `failureRatio` is stored as a pre-computed field on each `word_stats` document and updated at `CompleteSession` time. This avoids computing it at query time when loading words for a new session.
-5. **Word ownership check in SubmitAnswer**: The backend validates that the submitted `wordId` belongs to the session's word list. This prevents stale frontend state from writing incorrect answer records.
+5. **Entity ownership check in SubmitAnswer**: The backend validates that the submitted `entityId` belongs to the session's item list (i.e. it is a `wordId` present in `session.payload.words`). This prevents stale frontend state from writing incorrect answer records.
+
+---
+
+## Extending to New Practice Types
+
+When adding a new `practiceType`, define a dedicated `payload` shape and document it in a separate spec. The generic session header fields (`userId`, `language`, `practiceType`, `status`, `createdAt`, `completedAt`) remain unchanged across all practice types.
+
+For example, a future `"grammar"` session might define its payload as:
+
+```json
+{
+  "sentences": [ { "sentenceId": "...", "prompt": "...", "answer": "..." } ],
+  "totalSentences": 5,
+  "answers": [ { "entityId": "...", "isCorrect": true, "submittedAt": "..." } ]
+}
+```
+
+The `StartSession`, `GetActiveSession`, `SubmitAnswer`, and `CompleteSession` endpoints are shared across all practice types. Where a new type requires different business logic (item selection, stats tracking, summary computation), that logic is encapsulated in type-specific handlers within each delegate — selected by a `switch` on `practiceType`.
 
 ---
 
