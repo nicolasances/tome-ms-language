@@ -3,7 +3,9 @@ import { ControllerConfig } from "./Config";
 import { CompleteSession } from './dlg/session/CompleteSession';
 import { DeleteWord } from './dlg/DeleteWord';
 import { GetActiveSession } from './dlg/session/GetActiveSession';
+import { GetRollingSessionStats } from './dlg/session/GetRollingSessionStats';
 import { GetVocabulary } from './dlg/GetVocabulary';
+import { GetWeeklySessionStats } from './dlg/session/GetWeeklySessionStats';
 import { PostWord } from './dlg/PostWord';
 import { PostWords } from './dlg/PostWords';
 import { PutWord } from './dlg/PutWord';
@@ -27,6 +29,8 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'DELETE', path: '/vocabulary/:language/words/:id', delegate: DeleteWord },
             { method: 'POST', path: '/languages/:language/sessions', delegate: StartSession },
             { method: 'GET', path: '/sessions/active', delegate: GetActiveSession },
+            { method: 'GET', path: '/sessions/stats/weekly', delegate: GetWeeklySessionStats },
+            { method: 'GET', path: '/sessions/stats/rolling', delegate: GetRollingSessionStats },
             { method: 'POST', path: '/sessions/:sessionId/answers', delegate: SubmitAnswer },
             { method: 'POST', path: '/sessions/:sessionId/completion', delegate: CompleteSession },
         ],

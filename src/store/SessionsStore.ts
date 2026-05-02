@@ -48,4 +48,45 @@ export class SessionsStore {
             { $set: { status: "completed", completedAt: new Date().toISOString() } }
         );
     }
+
+    /**
+     * Aggregates completed sessions per day within [from, to] (UTC).
+     * Returns only days that have at least one session; zero-filling is the caller's responsibility.
+     */
+    async countCompletedByDateRange({ userId, from, to }: {
+        userId: string;
+        from: Date;
+        to: Date;
+    }): Promise<Array<{ date: string; count: number }>> {
+        const results = await this.db.collection(SESSIONS_COLLECTION).aggregate([
+            {
+                $match: {
+                    userId,
+                    status: "completed",
+                    completedAt: { $gte: from.toISOString(), $lte: to.toISOString() },
+                }
+            },
+            {
+                $addFields: {
+                    dateStr: {
+                        $dateToString: {
+                            format: "%Y%m%d",
+                            timezone: "UTC",
+                            date: {
+                                $dateFromString: {
+                                    dateString: "$completedAt",
+                                    onError: null,
+                                    onNull: null,
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            { $match: { dateStr: { $ne: null } } },
+            { $group: { _id: "$dateStr", count: { $sum: 1 } } },
+        ]).toArray();
+
+        return results.map(r => ({ date: r._id as string, count: r.count as number }));
+    }
 }
