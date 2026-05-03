@@ -14,3 +14,4 @@ Resources:
 |----------|-------------|
 | [Vocabulary Management](docs/specs/vocabulary-management.md) | CRUD API for managing word-translation pairs per target language (e.g. Danish). |
 | [Practice Sessions](docs/specs/practice-sessions.md) | Generic session lifecycle API (start, resume, submit answers, complete) with probabilistic word selection based on per-user failure ratios. |
+| [Session Stats](docs/specs/session-stats.md) | Stats endpoints returning per-day completed session counts: ISO week view and rolling N-day window. |
