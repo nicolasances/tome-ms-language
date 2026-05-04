@@ -246,7 +246,7 @@ The sample is **random** — there is no ordering guarantee. Each call may retur
 ## Business Rules
 
 1. **Supported languages:** Same as vocabulary — defined in service configuration. Currently only `"danish"`.
-2. **Sentence uniqueness:** There is no uniqueness constraint on `(language, sentence)`. The same sentence may be inserted more than once (e.g. extracted from multiple sources or generated multiple times). Deduplication is out of scope.
+2. **Sentence uniqueness:** There is uniqueness constraint on `(language, sentence)`. The same sentence may NOT be inserted more than once. A Deduplication check must happen. It can happen before or after insertion, based on a performance evaluation to be done before implementing. 
 3. **`knowledgeSource` is always required:** Even for AI-generated sentences, the value must be `"tome-agent"`. Empty strings are rejected.
 4. **`createdAt`:** Set server-side at insert time. Not updatable.
 5. **`userId` is not stored** on sentences (unlike `sources`). Sentences are shared knowledge for the language; they are not user-scoped.
