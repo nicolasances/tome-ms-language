@@ -12,6 +12,7 @@ Resources:
 ### Specs
 | Document | Description |
 |----------|-------------|
-| [Vocabulary Management](docs/specs/vocabulary-management.md) | CRUD API for managing word-translation pairs per target language (e.g. Danish). |
+| [Vocabulary Management](docs/specs/vocabulary-management.md) | CRUD API for managing word-translation pairs per target language (e.g. Danish). Includes random word sampling endpoint used by sentence generation. |
+| [Sentence Management](docs/specs/sentence-management.md) | API for storing and retrieving sentences (extracted from sources or AI-generated). Includes batch insert and random word sampling for LLM generation. |
 | [Practice Sessions](docs/specs/practice-sessions.md) | Generic session lifecycle API (start, resume, submit answers, complete) with probabilistic word selection based on per-user failure ratios. |
 | [Session Stats](docs/specs/session-stats.md) | Stats endpoints returning per-day completed session counts: ISO week view and rolling N-day window. |
