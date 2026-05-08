@@ -28,7 +28,11 @@ export class PostSentences extends TotoDelegate<PostSentencesRequest, PostSenten
 
         const results: PostSentencesResponse["results"] = [];
 
-        for (const item of req.sentences) {
+        // Validate each item first; collect valid sentences for the batch upsert
+        const validSentences: Array<{ index: number; sentence: Sentence }> = [];
+
+        for (let i = 0; i < req.sentences.length; i++) {
+            const item = req.sentences[i];
             const missing: string[] = [];
             if (!item.sentence) missing.push("sentence");
             if (!item.translation) missing.push("translation");
@@ -39,18 +43,31 @@ export class PostSentences extends TotoDelegate<PostSentencesRequest, PostSenten
                 continue;
             }
 
-            try {
-                const sentenceDoc = new Sentence({
+            validSentences.push({
+                index: i,
+                sentence: new Sentence({
                     language: req.language,
                     sentence: item.sentence!,
                     translation: item.translation!,
                     createdAt: new Date().toISOString(),
                     knowledgeSource: item.knowledgeSource!,
-                });
-                const id = await store.insertSentence(sentenceDoc);
-                results.push({ sentence: item.sentence!, status: "created", id });
+                }),
+            });
+            // placeholder — will be replaced after the batch call
+            results.push({ sentence: item.sentence!, status: "pending" });
+        }
+
+        if (validSentences.length > 0) {
+            try {
+                const ids = await store.insertSentences(validSentences.map(v => v.sentence));
+                for (let j = 0; j < validSentences.length; j++) {
+                    const { index } = validSentences[j];
+                    results[index] = { sentence: req.sentences[index].sentence!, status: "created", id: ids[j] };
+                }
             } catch {
-                results.push({ sentence: item.sentence ?? "", status: "error", reason: "insert_failed" });
+                for (const { index } of validSentences) {
+                    results[index] = { sentence: req.sentences[index].sentence ?? "", status: "error", reason: "insert_failed" };
+                }
             }
         }
 
