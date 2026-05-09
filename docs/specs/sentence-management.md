@@ -259,5 +259,4 @@ The sample is **random** — there is no ordering guarantee. Each call may retur
 - Pagination of `GetSentences` results.
 - Filtering sentences by `knowledgeSource`.
 - Soft deletes.
-- Sentence practice / flashcard sessions (may be specified separately).
 - Audio pronunciation or TTS for sentences.
