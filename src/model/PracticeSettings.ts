@@ -1,15 +1,18 @@
 import { WithId } from "mongodb";
 
-export type PracticeType = "vocabulary";
+export type PracticeType = "vocabulary" | "sentences";
 
 export interface VocabularyPracticeConfig {
     wordCount: number;
     defaultFailureRatio: number;
 }
 
-// When new practice types are added, extend this union:
-// export type PracticeConfig = VocabularyPracticeConfig | NewTypePracticeConfig;
-export type PracticeConfig = VocabularyPracticeConfig;
+export interface SentencePracticeConfig {
+    sentenceCount: number;
+    defaultFailureRatio: number;
+}
+
+export type PracticeConfig = VocabularyPracticeConfig | SentencePracticeConfig;
 
 export class PracticeSettings {
 
@@ -39,6 +42,20 @@ export class PracticeSettings {
             }
 
             return new PracticeSettings({ practiceType, config: { wordCount, defaultFailureRatio } });
+        }
+
+        if (practiceType === "sentences") {
+            const sentenceCount = config.sentenceCount;
+            const defaultFailureRatio = config.defaultFailureRatio;
+
+            if (typeof sentenceCount !== "number" || !Number.isInteger(sentenceCount) || sentenceCount <= 0) {
+                throw new Error(`PracticeSettings: invalid sentenceCount: ${sentenceCount}`);
+            }
+            if (typeof defaultFailureRatio !== "number" || !isFinite(defaultFailureRatio) || defaultFailureRatio < 0 || defaultFailureRatio > 1) {
+                throw new Error(`PracticeSettings: invalid defaultFailureRatio: ${defaultFailureRatio}`);
+            }
+
+            return new PracticeSettings({ practiceType, config: { sentenceCount, defaultFailureRatio } });
         }
 
         throw new Error(`PracticeSettings: unsupported practiceType: ${practiceType}`);

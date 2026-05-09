@@ -1,7 +1,7 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { ControllerConfig } from "../../Config";
-import { SessionAnswer } from "../../model/Session";
+import { SentenceSessionPayload, SessionAnswer, VocabularySessionPayload } from "../../model/Session";
 import { SessionsStore } from "../../store/SessionsStore";
 
 export class SubmitAnswer extends TotoDelegate<SubmitAnswerRequest, SubmitAnswerResponse> {
@@ -26,8 +26,17 @@ export class SubmitAnswer extends TotoDelegate<SubmitAnswerRequest, SubmitAnswer
         if (session.userId !== userId) throw new ValidationError(403, "Session does not belong to the authenticated user");
         if (session.status === "completed") throw new ValidationError(400, "Session is already completed");
 
-        const wordExists = session.payload.words.some(w => w.wordId === req.entityId);
-        if (!wordExists) throw new ValidationError(400, `entityId ${req.entityId} is not part of this session`);
+        if (session.practiceType === "vocabulary") {
+            const vocabPayload = session.payload as VocabularySessionPayload;
+            const wordExists = vocabPayload.words.some(w => w.wordId === req.entityId);
+            if (!wordExists) throw new ValidationError(400, `entityId ${req.entityId} is not part of this session`);
+        } else if (session.practiceType === "sentences") {
+            const sentencePayload = session.payload as SentenceSessionPayload;
+            const sentenceExists = sentencePayload.sentences.some(s => s.sentenceId === req.entityId);
+            if (!sentenceExists) throw new ValidationError(400, `entityId ${req.entityId} is not part of this session`);
+        } else {
+            throw new ValidationError(400, `Unsupported practiceType: ${session.practiceType}`);
+        }
 
         const answer: SessionAnswer = {
             entityId: req.entityId,

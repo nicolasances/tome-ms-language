@@ -6,6 +6,12 @@ export interface SessionWord {
     translation: string;
 }
 
+export interface SessionSentence {
+    sentenceId: string;
+    sentence: string;
+    translation: string;
+}
+
 export interface SessionAnswer {
     entityId: string;
     isCorrect: boolean;
@@ -18,6 +24,14 @@ export interface VocabularySessionPayload {
     answers: SessionAnswer[];
 }
 
+export interface SentenceSessionPayload {
+    sentences: SessionSentence[];
+    totalSentences: number;
+    answers: SessionAnswer[];
+}
+
+export type SessionPayload = VocabularySessionPayload | SentenceSessionPayload;
+
 export class Session {
 
     id?: string;
@@ -25,7 +39,7 @@ export class Session {
     language: string;
     practiceType: string;
     status: string;
-    payload: VocabularySessionPayload;
+    payload: SessionPayload;
     createdAt: string;
     completedAt: string | null;
 
@@ -35,7 +49,7 @@ export class Session {
         language: string;
         practiceType: string;
         status: string;
-        payload: VocabularySessionPayload;
+        payload: SessionPayload;
         createdAt: string;
         completedAt: string | null;
     }) {
