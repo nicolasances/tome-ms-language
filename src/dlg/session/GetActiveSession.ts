@@ -1,6 +1,7 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { ControllerConfig } from "../../Config";
+import { SentenceSessionPayload, VocabularySessionPayload } from "../../model/Session";
 import { SessionsStore } from "../../store/SessionsStore";
 
 export class GetActiveSession extends TotoDelegate<GetActiveSessionRequest, GetActiveSessionResponse> {
@@ -19,13 +20,28 @@ export class GetActiveSession extends TotoDelegate<GetActiveSessionRequest, GetA
 
         if (!session) throw new ValidationError(404, "No active session found");
 
+        if (session.practiceType === "vocabulary") {
+            const vocabPayload = session.payload as VocabularySessionPayload;
+            return {
+                sessionId: session.id!,
+                language: session.language,
+                practiceType: session.practiceType,
+                payload: {
+                    words: vocabPayload.words,
+                    totalWords: vocabPayload.totalWords,
+                },
+            };
+        }
+
+        // sentences
+        const sentencePayload = session.payload as SentenceSessionPayload;
         return {
             sessionId: session.id!,
             language: session.language,
             practiceType: session.practiceType,
             payload: {
-                words: session.payload.words,
-                totalWords: session.payload.totalWords,
+                sentences: sentencePayload.sentences,
+                totalSentences: sentencePayload.totalSentences,
             },
         };
     }
@@ -38,7 +54,9 @@ interface GetActiveSessionResponse {
     language: string;
     practiceType: string;
     payload: {
-        words: Array<{ wordId: string; english: string; translation: string }>;
-        totalWords: number;
+        words?: Array<{ wordId: string; english: string; translation: string }>;
+        totalWords?: number;
+        sentences?: Array<{ sentenceId: string; sentence: string; translation: string }>;
+        totalSentences?: number;
     };
 }

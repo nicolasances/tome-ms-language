@@ -1,11 +1,12 @@
 import { Db } from "mongodb";
 import { ControllerConfig } from "../Config";
-import { PracticeSettings, PracticeType, VocabularyPracticeConfig } from "../model/PracticeSettings";
+import { PracticeConfig, PracticeSettings, PracticeType, SentencePracticeConfig, VocabularyPracticeConfig } from "../model/PracticeSettings";
 
 const SETTINGS_COLLECTION = "settings";
 
-const DEFAULTS: Record<PracticeType, VocabularyPracticeConfig> = {
-    vocabulary: { wordCount: 10, defaultFailureRatio: 0.5 },
+const DEFAULTS: Record<PracticeType, PracticeConfig> = {
+    vocabulary: { wordCount: 10, defaultFailureRatio: 0.5 } as VocabularyPracticeConfig,
+    sentences: { sentenceCount: 5, defaultFailureRatio: 0.5 } as SentencePracticeConfig,
 };
 
 export class SettingsStore {
