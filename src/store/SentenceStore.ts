@@ -3,6 +3,26 @@ import { ControllerConfig } from "../Config";
 import { Sentence } from "../model/Sentence";
 
 const SENTENCES_COLLECTION = "sentences";
+const SENTENCE_STATS_COLLECTION = "sentence_stats";
+
+export interface SentenceWithStats {
+    id: string;
+    sentence: string;
+    translation: string;
+    createdAt: string;
+    knowledgeSource: string;
+    stats: {
+        failureRatio: number;
+        totalAttempts: number;
+        totalFailures: number;
+        lastPracticed: string;
+    } | null;
+}
+
+export interface SentencesWithStatsResult {
+    sentences: SentenceWithStats[];
+    totalCount: number;
+}
 
 export class SentenceStore {
 
@@ -125,5 +145,119 @@ export class SentenceStore {
 
     private getSentenceKey(s: Pick<Sentence, "language" | "sentence">): string {
         return `${s.language}::${s.sentence}`;
+    }
+
+    /**
+     * Finds sentences by language with user-specific stats using a LEFT OUTER JOIN.
+     * Sentences with stats are sorted by failureRatio descending (hardest first).
+     * Sentences without stats appear at the end.
+     * 
+     * @param language - The language to filter by
+     * @param userId - The user ID to join stats for
+     * @param page - 1-indexed page number
+     * @param pageSize - Number of items per page
+     */
+    async findByLanguageWithStats({ language, userId, page, pageSize }: {
+        language: string;
+        userId: string;
+        page: number;
+        pageSize: number;
+    }): Promise<SentencesWithStatsResult> {
+
+        const skip = (page - 1) * pageSize;
+
+        // First, get the total count for the language
+        const totalCount = await this.db.collection(SENTENCES_COLLECTION).countDocuments({ language });
+
+        // Aggregation pipeline for LEFT OUTER JOIN with sentence_stats
+        const pipeline = [
+            // Match sentences by language
+            { $match: { language } },
+            // Convert _id to string for joining
+            {
+                $addFields: {
+                    sentenceIdStr: { $toString: "$_id" }
+                }
+            },
+            // LEFT OUTER JOIN with sentence_stats filtered by userId
+            {
+                $lookup: {
+                    from: SENTENCE_STATS_COLLECTION,
+                    let: { sentenceId: "$sentenceIdStr" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$sentenceId", "$$sentenceId"] },
+                                        { $eq: ["$userId", userId] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: "statsArray"
+                }
+            },
+            // Unwind the stats array (preserving nulls for sentences without stats)
+            {
+                $addFields: {
+                    stats: { $arrayElemAt: ["$statsArray", 0] }
+                }
+            },
+            // Add a sort key: 1 for items without stats (to sort them at the end)
+            // For items with stats, use negative failureRatio so higher ratios come first
+            {
+                $addFields: {
+                    sortKey: {
+                        $cond: {
+                            if: { $ifNull: ["$stats", false] },
+                            then: { $multiply: ["$stats.failureRatio", -1] },
+                            else: 1 // Items without stats get a high value to sort at the end
+                        }
+                    }
+                }
+            },
+            // Sort: items with stats (by failureRatio desc) first, then items without stats
+            { $sort: { sortKey: 1 as const } },
+            // Pagination
+            { $skip: skip },
+            { $limit: pageSize },
+            // Project final shape
+            {
+                $project: {
+                    _id: 1,
+                    sentence: 1,
+                    translation: 1,
+                    createdAt: 1,
+                    knowledgeSource: 1,
+                    stats: {
+                        $cond: {
+                            if: { $ifNull: ["$stats", false] },
+                            then: {
+                                failureRatio: "$stats.failureRatio",
+                                totalAttempts: "$stats.totalAttempts",
+                                totalFailures: "$stats.totalFailures",
+                                lastPracticed: "$stats.lastPracticed"
+                            },
+                            else: null
+                        }
+                    }
+                }
+            }
+        ];
+
+        const results = await this.db.collection(SENTENCES_COLLECTION).aggregate(pipeline).toArray();
+
+        const sentences: SentenceWithStats[] = results.map(doc => ({
+            id: doc._id.toString(),
+            sentence: doc.sentence,
+            translation: doc.translation,
+            createdAt: doc.createdAt,
+            knowledgeSource: doc.knowledgeSource,
+            stats: doc.stats
+        }));
+
+        return { sentences, totalCount };
     }
 }
