@@ -8,7 +8,7 @@
 
     /* Modules */
     "module": "commonjs",
-    "rootDir": "src",
+    "rootDir": ".",
     "resolveJsonModule": true,
 
     /* JavaScript Support */
@@ -26,6 +26,10 @@
     "noImplicitAny": true,
 
     /* Completeness */
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+
+    /* Types */
+    "types": ["mocha", "node"]
+  },
+  "include": ["src/**/*", "test/**/*"]
 }
