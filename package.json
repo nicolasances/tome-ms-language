@@ -7,7 +7,7 @@
     "dev": "npx nodemon",
     "build": "rm -rf ./build && tsc",
     "start": "node build/index.js",
-    "test": "mocha --require ts-node/register \"src/__tests__/**/*.test.ts\" --timeout 10000"
+    "test": "mocha --require ts-node/register \"test/**/*.test.ts\" --timeout 10000"
   },
   "author": "",
   "license": "ISC",
