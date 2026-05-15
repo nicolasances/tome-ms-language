@@ -33,7 +33,24 @@ export class GetVocabularyWithStats extends TotoDelegate<GetVocabularyWithStatsR
             }
         }
 
-        return { language, page, pageSize };
+        const sortByParam = req.query.sortBy as string | undefined;
+        const sortDirParam = req.query.sortDir as string | undefined;
+
+        const VALID_SORT_BY = ["difficulty"];
+        const VALID_SORT_DIR = ["asc", "desc"];
+
+        if (sortByParam !== undefined && !VALID_SORT_BY.includes(sortByParam)) {
+            throw new ValidationError(400, `Invalid sortBy value: "${sortByParam}". Accepted values: ${VALID_SORT_BY.join(", ")}`);
+        }
+
+        if (sortDirParam !== undefined && !VALID_SORT_DIR.includes(sortDirParam)) {
+            throw new ValidationError(400, `Invalid sortDir value: "${sortDirParam}". Accepted values: ${VALID_SORT_DIR.join(", ")}`);
+        }
+
+        const sortBy = sortByParam as "difficulty" | undefined;
+        const sortDir = sortDirParam as "asc" | "desc" | undefined;
+
+        return { language, page, pageSize, sortBy, sortDir };
     }
 
     async do(req: GetVocabularyWithStatsRequest, userContext?: UserContext): Promise<GetVocabularyWithStatsResponse> {
@@ -49,7 +66,9 @@ export class GetVocabularyWithStats extends TotoDelegate<GetVocabularyWithStatsR
             language: req.language,
             userId: userContext.email,
             page: req.page,
-            pageSize: req.pageSize
+            pageSize: req.pageSize,
+            sortBy: req.sortBy,
+            sortDir: req.sortDir,
         });
 
         return {
@@ -66,6 +85,8 @@ interface GetVocabularyWithStatsRequest {
     language: string;
     page: number;
     pageSize: number;
+    sortBy?: "difficulty";
+    sortDir?: "asc" | "desc";
 }
 
 interface GetVocabularyWithStatsResponse {
