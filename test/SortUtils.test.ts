@@ -21,8 +21,8 @@ describe("buildDifficultySortStage", () => {
             assert.equal(stages[0].$addFields.sortKey.$cond.else, 1);
         });
 
-        it("second stage sorts ascending on sortKey", () => {
-            assert.deepEqual(stages[1].$sort, { sortKey: 1 });
+        it("second stage sorts ascending on sortKey with _id tiebreaker", () => {
+            assert.deepEqual(stages[1].$sort, { sortKey: 1, _id: 1 });
         });
 
         it("sentinel value 1 is greater than any negated failureRatio in [-1, 0]", () => {
@@ -48,8 +48,8 @@ describe("buildDifficultySortStage", () => {
             assert.equal(stages[0].$addFields.sortKey.$cond.else, Number.MAX_VALUE);
         });
 
-        it("second stage sorts ascending on sortKey", () => {
-            assert.deepEqual(stages[1].$sort, { sortKey: 1 });
+        it("second stage sorts ascending on sortKey with _id tiebreaker", () => {
+            assert.deepEqual(stages[1].$sort, { sortKey: 1, _id: 1 });
         });
 
         it("sentinel Number.MAX_VALUE is greater than any failureRatio in [0, 1]", () => {
