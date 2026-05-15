@@ -1,6 +1,7 @@
 import { Db, ObjectId } from "mongodb";
 import { ControllerConfig } from "../Config";
 import { Sentence } from "../model/Sentence";
+import { buildDifficultySortStage } from "../util/SortUtils";
 
 const SENTENCES_COLLECTION = "sentences";
 const SENTENCE_STATS_COLLECTION = "sentence_stats";
@@ -149,37 +150,35 @@ export class SentenceStore {
 
     /**
      * Finds sentences by language with user-specific stats using a LEFT OUTER JOIN.
-     * Sentences with stats are sorted by failureRatio descending (hardest first).
-     * Sentences without stats appear at the end.
-     * 
-     * @param language - The language to filter by
-     * @param userId - The user ID to join stats for
-     * @param page - 1-indexed page number
-     * @param pageSize - Number of items per page
+     *
+     * Default sort: alphabetical by `sentence`.
+     * When sortBy=difficulty: sort by failureRatio (sortDir controls direction).
+     * Items without stats always appear at the end when sorting by difficulty.
      */
-    async findByLanguageWithStats({ language, userId, page, pageSize }: {
+    async findByLanguageWithStats({ language, userId, page, pageSize, sortBy, sortDir }: {
         language: string;
         userId: string;
         page: number;
         pageSize: number;
+        sortBy?: "difficulty";
+        sortDir?: "asc" | "desc";
     }): Promise<SentencesWithStatsResult> {
 
         const skip = (page - 1) * pageSize;
 
-        // First, get the total count for the language
         const totalCount = await this.db.collection(SENTENCES_COLLECTION).countDocuments({ language });
 
-        // Aggregation pipeline for LEFT OUTER JOIN with sentence_stats
+        const sortStage = sortBy === "difficulty"
+            ? this.buildDifficultySortStage(sortDir ?? "asc")
+            : [{ $sort: { sentence: 1 as const } }];
+
         const pipeline = [
-            // Match sentences by language
             { $match: { language } },
-            // Convert _id to string for joining
             {
                 $addFields: {
                     sentenceIdStr: { $toString: "$_id" }
                 }
             },
-            // LEFT OUTER JOIN with sentence_stats filtered by userId
             {
                 $lookup: {
                     from: SENTENCE_STATS_COLLECTION,
@@ -199,31 +198,14 @@ export class SentenceStore {
                     as: "statsArray"
                 }
             },
-            // Unwind the stats array (preserving nulls for sentences without stats)
             {
                 $addFields: {
                     stats: { $arrayElemAt: ["$statsArray", 0] }
                 }
             },
-            // Add a sort key: 1 for items without stats (to sort them at the end)
-            // For items with stats, use negative failureRatio so higher ratios come first
-            {
-                $addFields: {
-                    sortKey: {
-                        $cond: {
-                            if: { $ifNull: ["$stats", false] },
-                            then: { $multiply: ["$stats.failureRatio", -1] },
-                            else: 1 // Items without stats get a high value to sort at the end
-                        }
-                    }
-                }
-            },
-            // Sort: items with stats (by failureRatio desc) first, then items without stats
-            { $sort: { sortKey: 1 as const } },
-            // Pagination
+            ...sortStage,
             { $skip: skip },
             { $limit: pageSize },
-            // Project final shape
             {
                 $project: {
                     _id: 1,
@@ -259,5 +241,13 @@ export class SentenceStore {
         }));
 
         return { sentences, totalCount };
+    }
+
+    /**
+     * Builds the aggregation sort stage for difficulty sorting.
+     * Items without stats always sort to the end regardless of direction.
+     */
+    private buildDifficultySortStage(sortDir: "asc" | "desc"): object[] {
+        return buildDifficultySortStage(sortDir);
     }
 }

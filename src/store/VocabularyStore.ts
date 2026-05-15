@@ -1,6 +1,7 @@
 import { Db, ObjectId } from "mongodb";
 import { ControllerConfig } from "../Config";
 import { Word } from "../model/Word";
+import { buildDifficultySortStage } from "../util/SortUtils";
 
 const VOCABULARY_COLLECTION = "vocabulary";
 const WORD_STATS_COLLECTION = "word_stats";
@@ -147,39 +148,30 @@ export class VocabularyStore {
         return result.deletedCount > 0;
     }
 
-    /**
-     * Finds vocabulary by language with user-specific stats using a LEFT OUTER JOIN.
-     * Words with stats are sorted by failureRatio descending (hardest first).
-     * Words without stats appear at the end.
-     * 
-     * @param language - The language to filter by
-     * @param userId - The user ID to join stats for
-     * @param page - 1-indexed page number
-     * @param pageSize - Number of items per page
-     */
-    async findByLanguageWithStats({ language, userId, page, pageSize }: {
+    async findByLanguageWithStats({ language, userId, page, pageSize, sortBy, sortDir }: {
         language: string;
         userId: string;
         page: number;
         pageSize: number;
+        sortBy?: "difficulty";
+        sortDir?: "asc" | "desc";
     }): Promise<VocabularyWithStatsResult> {
 
         const skip = (page - 1) * pageSize;
 
-        // First, get the total count for the language
         const totalCount = await this.db.collection(VOCABULARY_COLLECTION).countDocuments({ language });
 
-        // Aggregation pipeline for LEFT OUTER JOIN with word_stats
+        const sortStage = sortBy === "difficulty"
+            ? this.buildDifficultySortStage(sortDir ?? "asc")
+            : [{ $sort: { translation: 1 as const } }];
+
         const pipeline = [
-            // Match vocabulary by language
             { $match: { language } },
-            // Convert _id to string for joining
             {
                 $addFields: {
                     wordIdStr: { $toString: "$_id" }
                 }
             },
-            // LEFT OUTER JOIN with word_stats filtered by userId
             {
                 $lookup: {
                     from: WORD_STATS_COLLECTION,
@@ -199,31 +191,14 @@ export class VocabularyStore {
                     as: "statsArray"
                 }
             },
-            // Unwind the stats array (preserving nulls for words without stats)
             {
                 $addFields: {
                     stats: { $arrayElemAt: ["$statsArray", 0] }
                 }
             },
-            // Add a sort key: -1 for items without stats (to sort them at the end)
-            // For items with stats, use negative failureRatio so higher ratios come first
-            {
-                $addFields: {
-                    sortKey: {
-                        $cond: {
-                            if: { $ifNull: ["$stats", false] },
-                            then: { $multiply: ["$stats.failureRatio", -1] },
-                            else: 1 // Items without stats get a high value to sort at the end
-                        }
-                    }
-                }
-            },
-            // Sort: items with stats (by failureRatio desc) first, then items without stats
-            { $sort: { sortKey: 1 as const } },
-            // Pagination
+            ...sortStage,
             { $skip: skip },
             { $limit: pageSize },
-            // Project final shape
             {
                 $project: {
                     _id: 1,
@@ -259,5 +234,17 @@ export class VocabularyStore {
         }));
 
         return { words, totalCount };
+    }
+
+    /**
+     * Builds the aggregation sort stage for difficulty sorting.
+     * Items without stats always sort to the end regardless of direction.
+     *
+     * For desc: negate failureRatio so higher ratios sort first when sorting asc on sortKey.
+     *   Items without stats get sortKey=1, which is > any value in [-1,0].
+     * For asc: use failureRatio directly. Items without stats get sortKey=Number.MAX_VALUE.
+     */
+    private buildDifficultySortStage(sortDir: "asc" | "desc"): object[] {
+        return buildDifficultySortStage(sortDir);
     }
 }
