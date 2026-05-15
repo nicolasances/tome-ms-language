@@ -23,7 +23,7 @@ export function buildDifficultySortStage(sortDir: "asc" | "desc"): object[] {
                     }
                 }
             },
-            { $sort: { sortKey: 1 as const } }
+            { $sort: { sortKey: 1 as const, _id: 1 as const } }
         ];
     } else {
         return [
@@ -38,7 +38,7 @@ export function buildDifficultySortStage(sortDir: "asc" | "desc"): object[] {
                     }
                 }
             },
-            { $sort: { sortKey: 1 as const } }
+            { $sort: { sortKey: 1 as const, _id: 1 as const } }
         ];
     }
 }
