@@ -2,7 +2,7 @@
 
 ## Overview
 
-This spec defines two new **paginated endpoints** that expose vocabulary and sentences enriched with per-user practice statistics. These endpoints enable the Tome App to display words and sentences sorted by user-specific difficulty (e.g., hardest words first) without leaking database join concerns to the frontend.
+This spec defines two **paginated endpoints** that expose vocabulary and sentences enriched with per-user practice statistics. These endpoints enable the Tome App to display words and sentences optionally sorted by user-specific difficulty without leaking database join concerns to the frontend.
 
 **Problem solved**: Words and sentences are stored in shared collections (`vocabulary`, `sentences`), while practice statistics are stored in per-user collections (`word_stats`, `sentence_stats`). Without server-side joins, the frontend would have to fetch both collections and join them client-side — inefficient and coupling the UI to backend data concerns.
 
@@ -75,10 +75,12 @@ Returns vocabulary entries for the specified language, enriched with per-user pr
 
 #### Query Parameters
 
-| Parameter  | Required | Default | Description                        |
-|------------|----------|---------|------------------------------------|
-| `page`     | No       | 1       | Page number (1-indexed)            |
-| `pageSize` | No       | 100     | Number of items per page           |
+| Parameter  | Required | Default | Description                                        |
+|------------|----------|---------|----------------------------------------------------|
+| `page`     | No       | 1       | Page number (1-indexed)                            |
+| `pageSize` | No       | 100     | Number of items per page                           |
+| `sortBy`   | No       | —       | Sort field. Only accepted value: `"difficulty"`    |
+| `sortDir`  | No       | `"asc"` | Sort direction: `"asc"` or `"desc"`                |
 
 #### Authentication
 
@@ -120,25 +122,25 @@ This endpoint **requires authentication**. The user's email from the authenticat
 
 #### Sorting Logic
 
-1. **Words with stats**: Sorted by `failureRatio` descending (highest failure ratio = hardest word = first)
-2. **Words without stats** (`stats: null`): Appear at the end of the results
-
-This ensures that users see their most challenging words first, with unpracticed words at the end.
+- **Default (no `sortBy`)**: Alphabetical by `translation` field ascending.
+- **`sortBy=difficulty`**: Sort by `failureRatio`. Direction is controlled by `sortDir` (`"asc"` = lowest failure ratio first, `"desc"` = highest failure ratio first). Items without stats (`stats: null`) always appear **at the end**, regardless of `sortDir`.
 
 #### Error Cases
 
-| Condition                       | Status | Description                           |
-|---------------------------------|--------|---------------------------------------|
-| Unknown / unsupported `language`| `400`  | Language is not in the supported list |
-| Invalid `page` parameter        | `400`  | Must be a positive integer            |
-| Invalid `pageSize` parameter    | `400`  | Must be a positive integer            |
-| Missing authentication          | `401`  | User context required                 |
+| Condition                       | Status | Description                                        |
+|---------------------------------|--------|----------------------------------------------------|
+| Unknown / unsupported `language`| `400`  | Language is not in the supported list              |
+| Invalid `page` parameter        | `400`  | Must be a positive integer                         |
+| Invalid `pageSize` parameter    | `400`  | Must be a positive integer                         |
+| Invalid `sortBy` value          | `400`  | Only `"difficulty"` is accepted                    |
+| Invalid `sortDir` value         | `400`  | Only `"asc"` or `"desc"` are accepted              |
+| Missing authentication          | `401`  | User context required                              |
 
 ---
 
 ### GET `/sentences/{language}/with-stats` — GetSentencesWithStats
 
-Returns sentence entries for the specified language, enriched with per-user practice statistics. Results are paginated and sorted by difficulty (hardest first).
+Returns sentence entries for the specified language, enriched with per-user practice statistics. Results are paginated.
 
 #### Path Parameters
 
@@ -148,10 +150,12 @@ Returns sentence entries for the specified language, enriched with per-user prac
 
 #### Query Parameters
 
-| Parameter  | Required | Default | Description                        |
-|------------|----------|---------|------------------------------------|
-| `page`     | No       | 1       | Page number (1-indexed)            |
-| `pageSize` | No       | 100     | Number of items per page           |
+| Parameter  | Required | Default | Description                                        |
+|------------|----------|---------|----------------------------------------------------|
+| `page`     | No       | 1       | Page number (1-indexed)                            |
+| `pageSize` | No       | 100     | Number of items per page                           |
+| `sortBy`   | No       | —       | Sort field. Only accepted value: `"difficulty"`    |
+| `sortDir`  | No       | `"asc"` | Sort direction: `"asc"` or `"desc"`                |
 
 #### Authentication
 
@@ -193,9 +197,8 @@ This endpoint **requires authentication**. The user's email from the authenticat
 
 #### Sorting Logic
 
-Same as vocabulary endpoint:
-1. **Sentences with stats**: Sorted by `failureRatio` descending
-2. **Sentences without stats**: Appear at the end
+- **Default (no `sortBy`)**: Alphabetical by `sentence` field ascending.
+- **`sortBy=difficulty`**: Sort by `failureRatio`. Direction controlled by `sortDir`. Items without stats always appear **at the end**.
 
 #### Error Cases
 
@@ -213,10 +216,19 @@ Both endpoints use the same aggregation pattern:
 2. **AddFields** — Convert `_id` to string for joining (MongoDB stores IDs as ObjectId, stats store them as strings)
 3. **Lookup** — LEFT OUTER JOIN with stats collection, filtering by userId
 4. **AddFields** — Extract first (and only) stats document from array
-5. **AddFields** — Compute sort key: `-failureRatio` for items with stats, `1` for items without (ensures unpracticed items sort last)
-6. **Sort** — By sort key ascending
-7. **Skip/Limit** — Pagination
-8. **Project** — Shape final response
+5. **Sort** — Determined by `sortBy` / `sortDir` params:
+   - **Default (no `sortBy`)**: Sort alphabetically by `translation` (words) or `sentence` (sentences)
+   - **`sortBy=difficulty, sortDir=desc`**: Sort by `failureRatio` descending; items without stats get a sentinel value of `-1` so they sort last
+   - **`sortBy=difficulty, sortDir=asc`**: Sort by `failureRatio` ascending; items without stats get a sentinel value of `Infinity` (`Number.MAX_VALUE` in BSON) so they sort last
+6. **Skip/Limit** — Pagination
+7. **Project** — Shape final response
+
+### Sort Key Computation (difficulty mode)
+
+To ensure items without stats always appear last regardless of sort direction:
+
+- `sortDir=desc`: `sortKey = stats ? -failureRatio : 1` → sort ascending on key (negation inverts order; `1` > any valid `-failureRatio` in `[−1, 0]`)
+- `sortDir=asc`: `sortKey = stats ? failureRatio : MAX_VALUE` → sort ascending on key (`MAX_VALUE` > any valid `failureRatio` in `[0, 1]`)
 
 ### Count Query
 
@@ -239,13 +251,15 @@ Both delegates:
 
 ### Store Methods
 
-- `VocabularyStore.findByLanguageWithStats({ language, userId, page, pageSize })`
-- `SentenceStore.findByLanguageWithStats({ language, userId, page, pageSize })`
+- `VocabularyStore.findByLanguageWithStats({ language, userId, page, pageSize, sortBy?, sortDir? })`
+- `SentenceStore.findByLanguageWithStats({ language, userId, page, pageSize, sortBy?, sortDir? })`
 
 Both methods:
 1. Execute aggregation pipeline for LEFT OUTER JOIN
 2. Execute count query for total
 3. Return `{ words/sentences, totalCount }`
+
+The `sortBy` and `sortDir` params are optional. When absent, the pipeline defaults to alphabetical order.
 
 ### Types
 
@@ -263,7 +277,7 @@ The following are explicitly **not** included in this implementation:
 
 | Item                              | Reason                                              |
 |-----------------------------------|-----------------------------------------------------|
-| Secondary sort options            | Start simple; add if users request                  |
+| Sort fields other than difficulty | Start simple; add if users request                  |
 | Cursor-based pagination           | Skip/limit sufficient for expected scale (2000 items) |
 | Filtering by difficulty bucket    | YAGNI — start simple                                |
 | Caching layer                     | Premature optimization                              |
@@ -273,4 +287,6 @@ The following are explicitly **not** included in this implementation:
 
 ## References
 
-- Parent issue: [#20 - Expose vocabulary and sentences enriched with per-user stats](https://github.com/nicolasances/tome-ms-language/issues/20)
+- Parent issue: [#24 - Sorting of Vocabulary and Sentences by Difficulty](https://github.com/nicolasances/tome-ms-language/issues/24)
+- Task issue (words): [#25 - Add sort-by-difficulty to Words vocabulary with-stats endpoint](https://github.com/nicolasances/tome-ms-language/issues/25)
+- Task issue (sentences): [#26 - Add sort-by-difficulty to Sentences with-stats endpoint](https://github.com/nicolasances/tome-ms-language/issues/26)
