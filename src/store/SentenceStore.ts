@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import { randomUUID } from "crypto";
 import { ControllerConfig } from "../Config";
 import { Sentence } from "../model/Sentence";
 import { buildDifficultySortStage } from "../util/SortUtils";
@@ -102,6 +103,36 @@ export class SentenceStore {
         }
 
         return resolvedIds;
+    }
+
+    async findById(id: string): Promise<Sentence | null> {
+        let oid: ObjectId;
+        try { oid = new ObjectId(id); } catch { return null; }
+        const doc = await this.db.collection(SENTENCES_COLLECTION).findOne({ _id: oid });
+        if (!doc) return null;
+        return Sentence.fromBSON(doc as any);
+    }
+
+    async addAlternative(sentenceId: string, translation: string): Promise<{ id: string; translation: string } | null> {
+        let oid: ObjectId;
+        try { oid = new ObjectId(sentenceId); } catch { return null; }
+        const normalised = translation.toLowerCase();
+        const existing = await this.db.collection(SENTENCES_COLLECTION).findOne({ _id: oid, "alternativeTranslations.translation": normalised });
+        if (existing) {
+            const alt = (existing.alternativeTranslations as Array<{ id: string; translation: string }>).find(a => a.translation === normalised);
+            return alt ?? null;
+        }
+        const newAlt = { id: randomUUID(), translation: normalised };
+        const result = await this.db.collection(SENTENCES_COLLECTION).updateOne({ _id: oid }, { $push: { alternativeTranslations: newAlt } as any });
+        if (result.matchedCount === 0) return null;
+        return newAlt;
+    }
+
+    async removeAlternative(sentenceId: string, altId: string): Promise<boolean> {
+        let oid: ObjectId;
+        try { oid = new ObjectId(sentenceId); } catch { return false; }
+        const result = await this.db.collection(SENTENCES_COLLECTION).updateOne({ _id: oid }, { $pull: { alternativeTranslations: { id: altId } } as any });
+        return result.matchedCount > 0;
     }
 
     /**
