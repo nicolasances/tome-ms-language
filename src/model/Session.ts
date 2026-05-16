@@ -4,12 +4,14 @@ export interface SessionWord {
     wordId: string;
     english: string;
     translation: string;
+    alternativeTranslations: Array<{ id: string; translation: string }>;
 }
 
 export interface SessionSentence {
     sentenceId: string;
     sentence: string;
     translation: string;
+    alternativeTranslations: Array<{ id: string; translation: string }>;
 }
 
 export interface SessionAnswer {

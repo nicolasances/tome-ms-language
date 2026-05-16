@@ -12,6 +12,7 @@ export interface SentenceWithStats {
     translation: string;
     createdAt: string;
     knowledgeSource: string;
+    alternativeTranslations: Array<{ id: string; translation: string }>;
     stats: {
         failureRatio: number;
         totalAttempts: number;
@@ -213,6 +214,7 @@ export class SentenceStore {
                     translation: 1,
                     createdAt: 1,
                     knowledgeSource: 1,
+                    alternativeTranslations: { $ifNull: ["$alternativeTranslations", []] },
                     stats: {
                         $cond: {
                             if: { $ifNull: ["$stats", false] },
@@ -237,6 +239,7 @@ export class SentenceStore {
             translation: doc.translation,
             createdAt: doc.createdAt,
             knowledgeSource: doc.knowledgeSource,
+            alternativeTranslations: doc.alternativeTranslations ?? [],
             stats: doc.stats
         }));
 
