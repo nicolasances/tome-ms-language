@@ -106,10 +106,11 @@ export class SentenceStore {
     }
 
     async findById(id: string): Promise<Sentence | null> {
-        let oid: ObjectId;
-        try { oid = new ObjectId(id); } catch { return null; }
-        const doc = await this.db.collection(SENTENCES_COLLECTION).findOne({ _id: oid });
+        
+        const doc = await this.db.collection(SENTENCES_COLLECTION).findOne({ _id: new ObjectId(id) });
+        
         if (!doc) return null;
+        
         return Sentence.fromBSON(doc as any);
     }
 
