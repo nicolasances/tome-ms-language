@@ -7,14 +7,18 @@ import { SUPPORTED_LANGUAGES } from "../util/Languages";
 export class GetVocabulary extends TotoDelegate<GetVocabularyRequest, GetVocabularyResponse> {
 
     parseRequest(req: Request): GetVocabularyRequest {
+
         const language = req.params.language;
+        
         if (!SUPPORTED_LANGUAGES.includes(language)) {
             throw new ValidationError(400, `Unsupported language: ${language}`);
         }
+        
         return { language };
     }
 
     async do(req: GetVocabularyRequest, userContext?: UserContext): Promise<GetVocabularyResponse> {
+        
         const config = this.config as ControllerConfig;
         const db = await config.getMongoDb(config.getDBName());
 

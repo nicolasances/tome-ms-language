@@ -60,7 +60,7 @@ export class StartSession extends TotoDelegate<StartSessionRequest, StartSession
             );
 
             const payload: VocabularySessionPayload = {
-                words: selectedWords.map(w => ({ wordId: w.id!, english: w.english, translation: w.translation })),
+                words: selectedWords.map(w => ({ wordId: w.id!, english: w.english, translation: w.translation, alternativeTranslations: w.alternativeTranslations })),
                 totalWords: selectedWords.length,
                 answers: [],
             };
@@ -109,7 +109,7 @@ export class StartSession extends TotoDelegate<StartSessionRequest, StartSession
         );
 
         const payload: SentenceSessionPayload = {
-            sentences: selectedSentences.map(s => ({ sentenceId: s.id!, sentence: s.sentence, translation: s.translation })),
+            sentences: selectedSentences.map(s => ({ sentenceId: s.id!, sentence: s.sentence, translation: s.translation, alternativeTranslations: s.alternativeTranslations })),
             totalSentences: selectedSentences.length,
             answers: [],
         };
@@ -149,10 +149,10 @@ interface StartSessionResponse {
     practiceType: string;
     payload: {
         // vocabulary
-        words?: Array<{ wordId: string; english: string; translation: string }>;
+        words?: Array<{ wordId: string; english: string; translation: string; alternativeTranslations: Array<{ id: string; translation: string }> }>;
         totalWords?: number;
         // sentences
-        sentences?: Array<{ sentenceId: string; sentence: string; translation: string }>;
+        sentences?: Array<{ sentenceId: string; sentence: string; translation: string; alternativeTranslations: Array<{ id: string; translation: string }> }>;
         totalSentences?: number;
     };
 }

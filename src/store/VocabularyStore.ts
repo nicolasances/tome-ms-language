@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import { randomUUID } from "crypto";
 import { ControllerConfig } from "../Config";
 import { Word } from "../model/Word";
 import { buildDifficultySortStage } from "../util/SortUtils";
@@ -12,6 +13,7 @@ export interface WordWithStats {
     translation: string;
     createdAt: string;
     knowledgeSource: string;
+    alternativeTranslations: Array<{ id: string; translation: string }>;
     stats: {
         failureRatio: number;
         totalAttempts: number;
@@ -148,6 +150,36 @@ export class VocabularyStore {
         return result.deletedCount > 0;
     }
 
+    async findById(id: string): Promise<Word | null> {
+        let oid: ObjectId;
+        try { oid = new ObjectId(id); } catch { return null; }
+        const doc = await this.db.collection(VOCABULARY_COLLECTION).findOne({ _id: oid });
+        if (!doc) return null;
+        return Word.fromBSON(doc as any);
+    }
+
+    async addAlternative(wordId: string, translation: string): Promise<{ id: string; translation: string } | null> {
+        let oid: ObjectId;
+        try { oid = new ObjectId(wordId); } catch { return null; }
+        const normalised = translation.toLowerCase();
+        const existing = await this.db.collection(VOCABULARY_COLLECTION).findOne({ _id: oid, "alternativeTranslations.translation": normalised });
+        if (existing) {
+            const alt = (existing.alternativeTranslations as Array<{ id: string; translation: string }>).find(a => a.translation === normalised);
+            return alt ?? null;
+        }
+        const newAlt = { id: randomUUID(), translation: normalised };
+        const result = await this.db.collection(VOCABULARY_COLLECTION).updateOne({ _id: oid }, { $push: { alternativeTranslations: newAlt } as any });
+        if (result.matchedCount === 0) return null;
+        return newAlt;
+    }
+
+    async removeAlternative(wordId: string, altId: string): Promise<boolean> {
+        let oid: ObjectId;
+        try { oid = new ObjectId(wordId); } catch { return false; }
+        const result = await this.db.collection(VOCABULARY_COLLECTION).updateOne({ _id: oid }, { $pull: { alternativeTranslations: { id: altId } } as any });
+        return result.matchedCount > 0;
+    }
+
     async findByLanguageWithStats({ language, userId, page, pageSize, sortBy, sortDir }: {
         language: string;
         userId: string;
@@ -206,6 +238,7 @@ export class VocabularyStore {
                     translation: 1,
                     createdAt: 1,
                     knowledgeSource: 1,
+                    alternativeTranslations: { $ifNull: ["$alternativeTranslations", []] },
                     stats: {
                         $cond: {
                             if: { $ifNull: ["$stats", false] },
@@ -230,6 +263,7 @@ export class VocabularyStore {
             translation: doc.translation,
             createdAt: doc.createdAt,
             knowledgeSource: doc.knowledgeSource,
+            alternativeTranslations: doc.alternativeTranslations ?? [],
             stats: doc.stats
         }));
 

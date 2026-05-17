@@ -9,15 +9,20 @@ const DEFAULT_PAGE_SIZE = 100;
 export class GetSentencesWithStats extends TotoDelegate<GetSentencesWithStatsRequest, GetSentencesWithStatsResponse> {
 
     parseRequest(req: Request): GetSentencesWithStatsRequest {
+        
         const language = req.params.language;
+        const pageParam = req.query.page;
+        const pageSizeParam = req.query.pageSize;
+        const sortByParam = req.query.sortBy as string | undefined;
+        const sortDirParam = req.query.sortDir as string | undefined;
+        
+        let page = 1;
+        let pageSize = DEFAULT_PAGE_SIZE;
+        
         if (!SUPPORTED_LANGUAGES.includes(language)) {
             throw new ValidationError(400, `Unsupported language: ${language}`);
         }
 
-        const pageParam = req.query.page;
-        const pageSizeParam = req.query.pageSize;
-
-        let page = 1;
         if (pageParam !== undefined) {
             page = parseInt(pageParam as string, 10);
             if (isNaN(page) || page < 1) {
@@ -25,16 +30,12 @@ export class GetSentencesWithStats extends TotoDelegate<GetSentencesWithStatsReq
             }
         }
 
-        let pageSize = DEFAULT_PAGE_SIZE;
         if (pageSizeParam !== undefined) {
             pageSize = parseInt(pageSizeParam as string, 10);
             if (isNaN(pageSize) || pageSize < 1) {
                 throw new ValidationError(400, "pageSize must be a positive integer");
             }
         }
-
-        const sortByParam = req.query.sortBy as string | undefined;
-        const sortDirParam = req.query.sortDir as string | undefined;
 
         const VALID_SORT_BY = ["difficulty"];
         const VALID_SORT_DIR = ["asc", "desc"];

@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import { randomUUID } from "crypto";
 import { ControllerConfig } from "../Config";
 import { Sentence } from "../model/Sentence";
 import { buildDifficultySortStage } from "../util/SortUtils";
@@ -12,6 +13,7 @@ export interface SentenceWithStats {
     translation: string;
     createdAt: string;
     knowledgeSource: string;
+    alternativeTranslations: Array<{ id: string; translation: string }>;
     stats: {
         failureRatio: number;
         totalAttempts: number;
@@ -101,6 +103,44 @@ export class SentenceStore {
         }
 
         return resolvedIds;
+    }
+
+    async findById(id: string): Promise<Sentence | null> {
+        
+        const doc = await this.db.collection(SENTENCES_COLLECTION).findOne({ _id: new ObjectId(id) });
+        
+        if (!doc) return null;
+        
+        return Sentence.fromBSON(doc as any);
+    }
+
+    async addAlternative(sentenceId: string, translation: string): Promise<{ id: string; translation: string } | null> {
+        
+        let oid = new ObjectId(sentenceId);
+        
+        const normalised = translation.toLowerCase();
+        
+        const existing = await this.db.collection(SENTENCES_COLLECTION).findOne({ _id: oid, "alternativeTranslations.translation": normalised });
+        
+        if (existing) {
+            const alt = (existing.alternativeTranslations as Array<{ id: string; translation: string }>).find(a => a.translation === normalised);
+            return alt ?? null;
+        }
+        
+        const newAlt = { id: randomUUID(), translation: normalised };
+        
+        const result = await this.db.collection(SENTENCES_COLLECTION).updateOne({ _id: oid }, { $push: { alternativeTranslations: newAlt } as any });
+        
+        if (result.matchedCount === 0) return null;
+        
+        return newAlt;
+    }
+
+    async removeAlternative(sentenceId: string, altId: string): Promise<boolean> {
+        
+        const result = await this.db.collection(SENTENCES_COLLECTION).updateOne({ _id: new ObjectId(sentenceId) }, { $pull: { alternativeTranslations: { id: altId } } as any });
+        
+        return result.matchedCount > 0;
     }
 
     /**
@@ -213,6 +253,7 @@ export class SentenceStore {
                     translation: 1,
                     createdAt: 1,
                     knowledgeSource: 1,
+                    alternativeTranslations: { $ifNull: ["$alternativeTranslations", []] },
                     stats: {
                         $cond: {
                             if: { $ifNull: ["$stats", false] },
@@ -237,6 +278,7 @@ export class SentenceStore {
             translation: doc.translation,
             createdAt: doc.createdAt,
             knowledgeSource: doc.knowledgeSource,
+            alternativeTranslations: doc.alternativeTranslations ?? [],
             stats: doc.stats
         }));
 
