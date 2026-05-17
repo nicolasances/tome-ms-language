@@ -13,11 +13,16 @@ export class RemoveWordAlternative extends TotoDelegate<RemoveWordAlternativeReq
     }
 
     async do(req: RemoveWordAlternativeRequest, userContext?: UserContext): Promise<RemoveWordAlternativeResponse> {
+
         const config = this.config as ControllerConfig;
         const db = await config.getMongoDb(config.getDBName());
+        
         const store = new VocabularyStore(db, config);
+        
         const found = await store.removeAlternative(req.wordId, req.altId);
+        
         if (!found) throw new ValidationError(404, `Word not found: ${req.wordId}`);
+        
         return { id: req.altId, removed: true };
     }
 }
