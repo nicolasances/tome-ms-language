@@ -114,24 +114,31 @@ export class SentenceStore {
     }
 
     async addAlternative(sentenceId: string, translation: string): Promise<{ id: string; translation: string } | null> {
-        let oid: ObjectId;
-        try { oid = new ObjectId(sentenceId); } catch { return null; }
+        
+        let oid = new ObjectId(sentenceId);
+        
         const normalised = translation.toLowerCase();
+        
         const existing = await this.db.collection(SENTENCES_COLLECTION).findOne({ _id: oid, "alternativeTranslations.translation": normalised });
+        
         if (existing) {
             const alt = (existing.alternativeTranslations as Array<{ id: string; translation: string }>).find(a => a.translation === normalised);
             return alt ?? null;
         }
+        
         const newAlt = { id: randomUUID(), translation: normalised };
+        
         const result = await this.db.collection(SENTENCES_COLLECTION).updateOne({ _id: oid }, { $push: { alternativeTranslations: newAlt } as any });
+        
         if (result.matchedCount === 0) return null;
+        
         return newAlt;
     }
 
     async removeAlternative(sentenceId: string, altId: string): Promise<boolean> {
-        let oid: ObjectId;
-        try { oid = new ObjectId(sentenceId); } catch { return false; }
-        const result = await this.db.collection(SENTENCES_COLLECTION).updateOne({ _id: oid }, { $pull: { alternativeTranslations: { id: altId } } as any });
+        
+        const result = await this.db.collection(SENTENCES_COLLECTION).updateOne({ _id: new ObjectId(sentenceId) }, { $pull: { alternativeTranslations: { id: altId } } as any });
+        
         return result.matchedCount > 0;
     }
 
