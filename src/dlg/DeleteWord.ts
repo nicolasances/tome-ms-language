@@ -10,10 +10,12 @@ export class DeleteWord extends TotoDelegate<DeleteWordRequest, DeleteWordRespon
     }
 
     async do(req: DeleteWordRequest, userContext?: UserContext): Promise<DeleteWordResponse> {
+        
         const config = this.config as ControllerConfig;
         const db = await config.getMongoDb(config.getDBName());
 
         const store = new VocabularyStore(db, config);
+        
         const deleted = await store.deleteWord(req.id);
 
         if (!deleted) throw new ValidationError(404, `Word not found: ${req.id}`);
