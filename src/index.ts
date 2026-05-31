@@ -2,6 +2,7 @@ import { getHyperscalerConfiguration, SupportedHyperscalers, TotoMicroservice, T
 import { ControllerConfig } from "./Config";
 import { AddSentenceAlternative } from './dlg/AddSentenceAlternative';
 import { GetGrammarConcept } from './dlg/GetGrammarConcept';
+import { GetGrammarConcepts } from './dlg/GetGrammarConcepts';
 import { PostGrammarConcept } from './dlg/PostGrammarConcept';
 import { PostGrammarConceptBatch } from './dlg/PostGrammarConceptBatch';
 import { CompleteSession } from './dlg/session/CompleteSession';
@@ -35,6 +36,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/grammarConcepts', delegate: PostGrammarConcept },
             { method: 'POST', path: '/grammarConcepts/batch', delegate: PostGrammarConceptBatch },
             { method: 'GET', path: '/grammarConcepts/:id', delegate: GetGrammarConcept },
+            { method: 'GET', path: '/grammarConcepts', delegate: GetGrammarConcepts },
             { method: 'POST', path: '/vocabularyItems', delegate: PostVocabularyItem },
             { method: 'POST', path: '/vocabularyItems/batch', delegate: PostVocabularyItemBatch },
             { method: 'POST', path: '/vocabularyItems/lookup', delegate: LookupVocabularyItems },

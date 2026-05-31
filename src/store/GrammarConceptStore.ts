@@ -43,6 +43,18 @@ export class GrammarConceptStore {
         return { status: "created", concept };
     }
 
+    async list(cefrLevel?: string, category?: string): Promise<GrammarConcept[]> {
+
+        const filter: Record<string, any> = {};
+
+        if (cefrLevel) filter.cefrLevelIntroduced = cefrLevel;
+        if (category) filter.category = category;
+
+        const docs = await this.db.collection(GRAMMAR_COLLECTION).find(filter).sort({ name: 1 }).toArray();
+
+        return docs.map(doc => GrammarConcept.fromBSON(doc as any));
+    }
+
     async findById(id: string): Promise<GrammarConcept | null> {
 
         const doc = await this.db.collection(GRAMMAR_COLLECTION).findOne({ id });
