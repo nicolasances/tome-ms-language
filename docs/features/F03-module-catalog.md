@@ -32,7 +32,7 @@ Modules are created by an **external tool** (a seeding script or a custom module
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
-| id | ObjectId | Unique identifier | Auto-generated |
+| id | string | Caller-provided unique identifier (e.g. `"danish-A1-01"`) | Required; provided by the caller; must be unique across all modules; distinct from MongoDB's internal `_id` |
 | title | string | Module title | Required |
 | theme | string | Thematic topic | Required |
 | communicationGoal | string | What the learner can do after completing the module | Required |
@@ -56,6 +56,7 @@ Modules are created by an **external tool** (a seeding script or a custom module
 #### 2.2.4. Business Logic
 
 - A dedicated store is the sole DB accessor for the modules collection. Supports: insert, find by id, list by `cefrLevel`, list default modules by level (for dashboard ordering), find user-generated modules by `createdByUserId`.
+- Inserting a module that duplicates an existing `id` is rejected.
 - On `POST /modules`, the referenced `vocabularyItemIds` and `grammarConceptIds` are validated against the F01 and F02 stores respectively; the request is rejected if any id does not resolve.
 - Configurable parameters default to the values in idea §3.1.2 when not provided; each can be overridden per module.
 

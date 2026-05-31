@@ -32,7 +32,7 @@ Grammar concepts (including their explanation text and examples) are authored an
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
-| id | ObjectId | Unique identifier | Auto-generated |
+| id | string | Caller-provided unique identifier (e.g. `"A1-01-g-present-tense-nutid-6604"`) | Required; provided by the caller; must be unique across all grammar concepts; distinct from MongoDB's internal `_id` |
 | name | string | Canonical name of the concept | Required; used as matching key in content analysis |
 | category | string | Concept grouping | Must be one of: tenses, sentence_structure, verbs, nouns, pronouns, adjectives, connectors, advanced |
 | cefrLevelIntroduced | string | Earliest level the concept appears | Must be one of: A1, A2, B1, B2, C1, C2 |
@@ -50,7 +50,7 @@ Grammar concepts (including their explanation text and examples) are authored an
 #### 2.2.4. Business Logic
 
 - A dedicated store is the only place that reads/writes the grammar concept collection. Supports: insert one, insert many (batch), find by id, find by ids (bulk lookup for modules), list by category, list by `cefrLevelIntroduced`.
-- Duplicate detection on `name` — batch insert skips a concept whose name already exists and reports which were inserted vs. skipped.
+- Inserting a concept that duplicates an existing `id` is rejected. Additionally, duplicate detection on `name` — batch insert skips a concept whose name already exists and reports which were inserted vs. skipped.
 - The `?cefrLevel=A1` filter on `GET /grammarConcepts` returns concepts introduced at or below the given level (i.e. all concepts available to an A1 learner).
 
 ---
