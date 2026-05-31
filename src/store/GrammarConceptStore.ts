@@ -43,6 +43,15 @@ export class GrammarConceptStore {
         return { status: "created", concept };
     }
 
+    async findById(id: string): Promise<GrammarConcept | null> {
+
+        const doc = await this.db.collection(GRAMMAR_COLLECTION).findOne({ id });
+
+        if (!doc) return null;
+
+        return GrammarConcept.fromBSON(doc as any);
+    }
+
     async insertBatch(concepts: GrammarConcept[]): Promise<InsertBatchResult> {
 
         if (concepts.length === 0) {
