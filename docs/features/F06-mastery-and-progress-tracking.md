@@ -24,7 +24,9 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 
 ### 2.2. Requirements
 
-### Requirement: ExerciseResult sub-model
+#### 2.2.1. Data Models
+
+**ExerciseResult** (sub-model, embedded in progress records)
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -37,7 +39,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 | timestamp | Date | When the attempt occurred | Required |
 | moduleId | string | Module context of the attempt | Nullable for level tests |
 
-### Requirement: UserVocabularyProgress data model
+**UserVocabularyProgress**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -47,7 +49,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 | lastReviewed | Date | Last time the item appeared in a test | Nullable |
 | exerciseHistory | ExerciseResult[] | History of test attempts | Appended only at test time (F11/F21) |
 
-### Requirement: UserGrammarConceptProgress data model
+**UserGrammarConceptProgress**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -57,38 +59,36 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 | lastReviewed | Date | Last time the concept appeared in a test | Nullable |
 | exerciseHistory | ExerciseResult[] | History of test attempts | Appended only at test time (F11/F21) |
 
-### Requirement: SRS mastery algorithm (shared, pure, testable)
-- A correct answer increases the score; less weight if a hint was used (`wasPrompted = true`).
-- An incorrect answer decreases the score.
-- Items not reviewed for a long time decay gently (computed at read time or via a maintenance pass).
-- Threshold: ≥ 0.8 = mastered.
-- The algorithm is a self-contained, unit-testable component independent of storage. Exact tuning is configurable.
-
-### Requirement: Store progress
-- Dedicated store(s), sole DB access.
-- Support: get progress for a user across a set of vocab item ids / grammar concept ids (bulk read for F08), upsert a progress record, append an ExerciseResult and recompute masteryScore + lastReviewed.
-
-### Requirement: Apply-results operation
+#### 2.2.2. Endpoints
 
 - `POST /users/:userId/vocabularyProgress/applyResults` — given a batch of ExerciseResults from a completed Module Test or Level Test, update the relevant vocab progress records via the SRS algorithm.
 - `POST /users/:userId/grammarProgress/applyResults` — same for grammar concept progress.
-
-### Requirement: Read endpoints
-
 - `GET /users/:userId/vocabularyProgress` — list all vocab mastery records for a user.
 - `GET /users/:userId/vocabularyProgress/:vocabularyItemId` — get mastery for a specific vocab item.
 - `GET /users/:userId/grammarProgress` — list all grammar mastery records for a user.
 - `GET /users/:userId/grammarProgress/:grammarConceptId` — get mastery for a specific grammar concept.
 
+#### 2.2.4. Business Logic
+
+- Dedicated store(s), sole DB access. Supports: get progress for a user across a set of vocab item ids / grammar concept ids (bulk read for F08), upsert a progress record, append an ExerciseResult and recompute masteryScore + lastReviewed.
+- SRS algorithm (shared, pure, testable, self-contained):
+  - A correct answer increases the score; less weight if a hint was used (`wasPrompted = true`).
+  - An incorrect answer decreases the score.
+  - Items not reviewed for a long time decay gently (computed at read time or via a maintenance pass).
+  - Mastery threshold: ≥ 0.8 = mastered.
+  - Exact tuning is configurable; the algorithm must be independently unit-testable.
+- `applyResults` processes all results in the batch atomically per item; each item's history is appended and its score recomputed in one operation.
+
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | See my mastery score per vocabulary item | I know which words I've truly learned (idea US-05) |
-| US-02 | Have words I get right repeatedly stop appearing as often | practice focuses on my weak spots |
-| US-03 | Have words I haven't seen in a while resurface | I don't forget what I learned (decay) |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Submit a batch of exercise results after a test to update mastery | the SRS scores reflect the user's latest performance |
+| CS-02 | Bulk-read mastery scores for a set of vocab item ids | the exercise selection engine (F08) can weight exercises without N+1 queries |
+| CS-03 | Bulk-read mastery scores for a set of grammar concept ids | the selection engine and weak-areas report have full coverage of the user's grammar state |
+| CS-04 | Read the mastery score for a single vocabulary item | the app can display the user's mastery per item |
 
 ---
 

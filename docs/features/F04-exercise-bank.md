@@ -27,7 +27,9 @@ Exercises are created by an **external tool** and submitted via POST endpoints. 
 
 ### 2.2. Requirements
 
-### Requirement: Exercise data model
+#### 2.2.1. Data Models
+
+**Exercise**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -45,9 +47,7 @@ Exercises are created by an **external tool** and submitted via POST endpoints. 
 | grammarConceptId | string | Linked grammar concept | Exactly one of vocabularyItemId / grammarConceptId must be set |
 | timesShown | number | How many times shown to users | Default: 0 |
 
-**Per-type linkage rule**: `vocabularyItemId` is set for multiple_choice, fill_blank, conjugation_drill, translation_active. `grammarConceptId` is set for sentence_reorder, error_correction.
-
-### Requirement: ExerciseBank data model
+**ExerciseBank**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -57,34 +57,33 @@ Exercises are created by an **external tool** and submitted via POST endpoints. 
 | generatedAt | Date | When the bank was last updated | Auto-set on insert/append |
 | totalGenerated | number | Cumulative count of exercises ever added | Incremented on each append |
 
-### Requirement: Store exercises & banks
-- Dedicated store, sole DB access.
-- Support: insert exercises (batch), find bank by moduleId, list exercises by moduleId, count exercises in a bank, increment an exercise's `timesShown`, append a string to `userContributedAnswers`, append exercise ids to a bank and update `generatedAt` / `totalGenerated`.
-
-### Requirement: Write endpoints
+#### 2.2.2. Endpoints
 
 - `POST /exerciseBanks` — create an exercise bank for a module with an initial set of exercises.
 - `POST /exerciseBanks/:moduleId/exercises` — append additional exercises to an existing bank (body: array of exercise objects).
-
-### Requirement: Read endpoints
-
 - `GET /exerciseBanks/:moduleId` — get the exercise bank for a module (returns bank metadata + exercise ids).
 - `GET /exercises/:id` — get a single exercise by id.
 - `GET /exercises` — list exercises by module; query param `?moduleId=<id>` required.
-
-### Requirement: Runtime mutation endpoints
-
 - `PATCH /exercises/:id/timesShown` — increment `timesShown` by 1 (called after each exercise is shown).
 - `PATCH /exercises/:id/userContributedAnswers` — append a validated user translation (body: `{ answer: string }`); called by F13.
 
+#### 2.2.4. Business Logic
+
+- A dedicated store is the sole DB accessor for exercises and banks. Supports: insert exercises (batch), find bank by moduleId, list exercises by moduleId, count exercises in a bank, increment an exercise's `timesShown`, append a string to `userContributedAnswers`, append exercise ids to a bank and update `generatedAt` / `totalGenerated`.
+- Per-type linkage rule: `vocabularyItemId` is set for multiple_choice, fill_blank, conjugation_drill, translation_active; `grammarConceptId` is set for sentence_reorder, error_correction. Exactly one of the two must be set per exercise; the other must be null.
+- Creating a bank also creates and stores the initial exercise documents, returning the bank with its full exercise id list.
+- Appending exercises increments `totalGenerated` and updates `generatedAt` on the bank.
+
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Practice with varied, well-formed exercises | I encounter vocabulary and grammar in multiple ways |
-| US-02 | Have my accepted alternative translations remembered | a phrasing I proved valid is accepted next time |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Create an exercise bank with an initial set of exercises for a module | the module has a content pool ready for sessions and tests |
+| CS-02 | Append additional exercises to an existing bank | the bank can be topped up asynchronously when it runs low |
+| CS-03 | Fetch the exercise bank for a module | the selection engine (F08) can draw from the full pool |
+| CS-04 | Append a user-validated translation to an exercise's accepted answers | valid paraphrases are remembered and accepted in future attempts |
 
 ---
 

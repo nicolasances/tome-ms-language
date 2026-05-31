@@ -26,7 +26,9 @@ Actions the app can surface from a report — add unknown vocabulary to the pool
 
 ### 2.2. Requirements
 
-### Requirement: GrammarPatternResult sub-model
+#### 2.2.1. Data Models
+
+**GrammarPatternResult** (sub-model, embedded in ContentReport)
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -34,7 +36,7 @@ Actions the app can surface from a report — add unknown vocabulary to the pool
 | status | string | Coverage classification | Must be one of: covered, ahead_in_curriculum, not_in_curriculum |
 | coveredByModule | string | Module id that covers this concept | Nullable |
 
-### Requirement: ContentReport data model
+**ContentReport**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -49,24 +51,27 @@ Actions the app can surface from a report — add unknown vocabulary to the pool
 | readinessNote | string | Short note on what the user would need to tackle the text | Nullable |
 | createdAt | Date | When the report was created | Auto-set |
 
-### Requirement: Write endpoint
+#### 2.2.2. Endpoints
 
 - `POST /contentReports` — store a content analysis report submitted by the external analysis tool. Returns the stored report with its id.
-
-### Requirement: Read endpoints
-
 - `GET /contentReports/:id` — get a content report by id.
 - `GET /users/:userId/contentReports` — list a user's content reports, ordered by recency.
 
+#### 2.2.4. Business Logic
+
+- On `POST /contentReports`, optionally validate that all `suggestedModules` ids exist in F03 (referential integrity check — see OQ-01).
+- Reports are ordered by `createdAt` descending in the list endpoint.
+- `newVocabularyItems` in the report are transient candidates; the user explicitly adds them via F22 if they choose to.
+
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | See a curriculum gap report after pasting a Danish text | I know what to master to understand/produce content like it (idea US-09) |
-| US-02 | See which existing modules cover the gaps | the app routes me through its curriculum (idea US-11) |
-| US-03 | Add unknown words from the report to my pool | I act on gaps immediately (idea US-10) |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Submit a completed content analysis report for a user | the report is persisted and can be retrieved by the app |
+| CS-02 | Fetch a content report by id | the app can display the full gap analysis and curriculum routing |
+| CS-03 | List a user's content reports ordered by recency | the app can show a history of past analyses |
 
 ---
 

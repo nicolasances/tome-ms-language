@@ -24,7 +24,9 @@ Module status is per-user: one learner may have completed a module another hasn'
 
 ### 2.2. Requirements
 
-### Requirement: ModuleTestAttempt sub-model
+#### 2.2.1. Data Models
+
+**ModuleTestAttempt** (sub-model, embedded in UserModuleProgress)
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -33,7 +35,7 @@ Module status is per-user: one learner may have completed a module another hasn'
 | passed | boolean | Whether the attempt passed | Required |
 | takenAt | Date | When the test was submitted | Required |
 
-### Requirement: UserModuleProgress data model
+**UserModuleProgress**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -44,36 +46,31 @@ Module status is per-user: one learner may have completed a module another hasn'
 | completedAt | Date | When the module was passed | Nullable |
 | testAttempts | ModuleTestAttempt[] | All module test attempts | Appended by F11 |
 
-### Requirement: Status lifecycle rules
-- A module is `available` when its prerequisites are met (at the user's current level, and prior ordering rules satisfied); otherwise `locked`.
-- Transitions: `available` → `in_progress` when practice (Step 2) starts; `in_progress` → `completed` when the Module Test is passed.
-- `completed` is terminal for progression purposes.
-
-### Requirement: Store progress
-- Dedicated store, sole DB access.
-- Support: get progress for a user+module, list a user's progress across all modules at a level (dashboard + completion gate), upsert status with timestamps, append a ModuleTestAttempt.
-
-### Requirement: Read endpoints
+#### 2.2.2. Endpoints
 
 - `GET /users/:userId/moduleProgress` — list the user's progress across modules; optional query param `?cefrLevel=A1`.
 - `GET /users/:userId/moduleProgress/:moduleId` — get progress for a specific module (status + attempts).
 - `GET /users/:userId/levelProgress` — completion-gate query: returns whether all modules at the user's current level are `completed`, consumed by F21.
-
-### Requirement: Write endpoints
-
 - `POST /users/:userId/moduleProgress/:moduleId` — initialize a progress record (sets status to `available` or `in_progress`).
 - `PATCH /users/:userId/moduleProgress/:moduleId` — update status and timestamps (transitions: in_progress, completed).
 - `POST /users/:userId/moduleProgress/:moduleId/testAttempts` — append a ModuleTestAttempt record; called by F11.
 
+#### 2.2.4. Business Logic
+
+- A dedicated store is the sole DB accessor. Supports: get progress for a user+module, list a user's progress across all modules at a level (dashboard + completion gate), upsert status with timestamps, append a ModuleTestAttempt.
+- Status lifecycle: a module is `available` when its prerequisites are met (at the user's current level, and prior ordering rules satisfied); otherwise `locked`. Valid transitions: `available` → `in_progress` when practice (Step 2) starts; `in_progress` → `completed` when the Module Test is passed. `completed` is terminal for progression purposes.
+- `GET /users/:userId/levelProgress` checks all modules at the user's current CEFR level and returns a boolean plus per-module status summary.
+
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | See my module progress within my current level | I know how far I am (idea §3.5) |
-| US-02 | Have modules unlock as I progress | the path is structured, not overwhelming |
-| US-03 | See which modules I've completed | I know what's left before a Level Test |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | List a user's module progress at a given CEFR level | the app can render the dashboard with accurate per-module status |
+| CS-02 | Query whether all modules at the user's current level are completed | the Level Test feature (F21) can gate test eligibility |
+| CS-03 | Append a test attempt record to a module's progress | F11 can persist the attempt outcome without owning the progress store |
+| CS-04 | Transition a module's status | session and test features can drive the lifecycle without direct DB access |
 
 ---
 

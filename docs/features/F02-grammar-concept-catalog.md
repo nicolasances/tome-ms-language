@@ -26,7 +26,9 @@ Grammar concepts (including their explanation text and examples) are authored an
 
 ### 2.2. Requirements
 
-### Requirement: GrammarConcept data model
+#### 2.2.1. Data Models
+
+**GrammarConcept**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -37,28 +39,29 @@ Grammar concepts (including their explanation text and examples) are authored an
 | explanation | string | Instructional text for Step 1 | Required |
 | examples | object[] | Illustrative examples | Array of `{ danish: string, english: string }`; min 1, max 2 |
 
-### Requirement: Store the catalog
-- Dedicated store is the only place that reads/writes the grammar concept collection.
-- Support: insert one, insert many (batch), find by id, find by ids (bulk lookup for modules), list by category, list by `cefrLevelIntroduced`.
-
-### Requirement: Write endpoints
+#### 2.2.2. Endpoints
 
 - `POST /grammarConcepts` — insert a single grammar concept.
 - `POST /grammarConcepts/batch` — insert many grammar concepts; skips duplicates by `name`.
-
-### Requirement: Read endpoints
-
 - `GET /grammarConcepts/:id` — get a single grammar concept by id (returns explanation + examples).
 - `GET /grammarConcepts` — list concepts; optional query params `?cefrLevel=A1` (at-or-below filter) and `?category=tenses`.
 - `POST /grammarConcepts/lookup` — resolve a set of ids in bulk; body: `{ ids: string[] }`.
 
+#### 2.2.4. Business Logic
+
+- A dedicated store is the only place that reads/writes the grammar concept collection. Supports: insert one, insert many (batch), find by id, find by ids (bulk lookup for modules), list by category, list by `cefrLevelIntroduced`.
+- Duplicate detection on `name` — batch insert skips a concept whose name already exists and reports which were inserted vs. skipped.
+- The `?cefrLevel=A1` filter on `GET /grammarConcepts` returns concepts introduced at or below the given level (i.e. all concepts available to an A1 learner).
+
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | See a clear explanation and examples for each grammar concept in a module | I learn the rule, not just memorize answers |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Submit grammar concepts individually or in batch | the catalog can be seeded incrementally and idempotently |
+| CS-02 | Bulk-resolve a set of grammar concept ids | modules and exercises can hydrate their referenced concepts in one round-trip |
+| CS-03 | List concepts filtered by CEFR level and/or category | the seeding tool and exercise generator can scope content to a level |
 
 ---
 

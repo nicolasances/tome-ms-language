@@ -25,7 +25,9 @@ The Level Test is the comprehensive assessment that unlocks the next CEFR level.
 
 ### 2.2. Requirements
 
-### Requirement: LevelTestAttempt data model
+#### 2.2.1. Data Models
+
+**LevelTestAttempt**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -39,37 +41,35 @@ The Level Test is the comprehensive assessment that unlocks the next CEFR level.
 | takenAt | Date | When the attempt was submitted | Auto-set |
 | exerciseResults | ExerciseResult[] | Full per-exercise detail | Used by F06 apply-results and weak-areas summary |
 
-### Requirement: Eligibility check
+#### 2.2.2. Endpoints
 
-- `GET /users/:userId/levelTest/eligibility` — report whether the Level Test is available; requires all current-level modules to be completed (F07 completion-gate query).
+- `GET /users/:userId/levelTest/eligibility` — report whether the Level Test is available for the user's current level.
+- `POST /users/:userId/levelTests` — start a new Level Test attempt; returns questions without answers.
+- `POST /users/:userId/levelTests/:attemptId/submit` — accept all answers; body: array of `{ exerciseId, userAnswer }`.
+- `GET /users/:userId/levelTests/:attemptId` — return the full result: score, per-question review, and weak-areas summary.
 
-### Requirement: Start test
+#### 2.2.4. Business Logic
 
-- `POST /users/:userId/levelTests` — verify eligibility. Draw 20–30 exercises from the level's LevelTestBank (F20) via F08, across the full level vocab/grammar scope. Return questions **without** answers.
-
-### Requirement: Submit test
-
-- `POST /users/:userId/levelTests/:attemptId/submit` — accept all answers (body: array of `{ exerciseId, userAnswer }`). Grade all answers (normalized matching). Compute score; pass if ≥ 75%.
-  - **Update mastery**: call F06 apply-results with the attempt's ExerciseResults.
-  - Record the LevelTestAttempt.
-  - On pass: invoke F05 to advance the user to the next CEFR level.
-
-### Requirement: Results & weak-areas read
-
-- `GET /users/:userId/levelTests/:attemptId` — return: final score, all questions with correct answers (incorrect ones alongside the user's answer), and a weak-areas summary (underperformed grammar concepts + vocab items derived from exerciseResults). "Explain my mistake" (F12) is available per incorrect item.
-
-### Requirement: Free retry
-- On fail, the user may retry with no cooldown in v2.0; a new selection is drawn from the bank.
+- Eligibility check: requires all modules at the user's current CEFR level to be `completed` (query F07's completion-gate endpoint). Returns `{ eligible: boolean, reason?: string }`.
+- Starting a test: draw 20–30 exercises from the level's LevelTestBank (F20) via F08, scoped to the full level's vocabulary and grammar. Return questions **without** answers.
+- Submitting: grade all answers via normalized matching. Compute score; pass if ≥ 75%.
+  - **Update mastery**: call F06 apply-results with the attempt's ExerciseResults (vocab + grammar).
+  - Persist the LevelTestAttempt.
+  - On pass: invoke F05's advance-level operation to promote the user to the next CEFR level.
+- Results (`GET …/:attemptId`): return final score, all questions with correct answers (incorrect ones alongside the user's answer), and a weak-areas summary. Weak areas are derived from `exerciseResults`: items where the user answered incorrectly, grouped by grammar concept and vocabulary item.
+- Free retry: on fail, the user may retry with no cooldown; a new selection is drawn from the bank on each attempt.
+- "Explain my mistake" (F12) is available per incorrect item in the review.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Take a Level Test when I feel ready | I can unlock the next CEFR level (idea US-06) |
-| US-02 | See my weaknesses after a Level Test | I know exactly what to study next (idea US-08) |
-| US-03 | Retry freely if I fail | I'm not blocked from progressing |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Check level test eligibility for a user | the app shows or hides the Level Test CTA based on module completion state |
+| CS-02 | Start a Level Test and receive questions without answers | the app presents a comprehensive cross-module assessment |
+| CS-03 | Submit all answers and receive a score with pass/fail outcome | mastery is updated and the user is promoted to the next level on a pass |
+| CS-04 | Fetch the full result with a weak-areas summary | the app shows the user exactly what to study next |
 
 ---
 

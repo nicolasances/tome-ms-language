@@ -22,7 +22,9 @@ Every learner has exactly one active CEFR level (A1–C2) at a time, defaulting 
 
 ### 2.2. Requirements
 
-### Requirement: User data model
+#### 2.2.1. Data Models
+
+**User**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -33,33 +35,28 @@ Every learner has exactly one active CEFR level (A1–C2) at a time, defaulting 
 | createdAt | Date | When the profile was created | Auto-set |
 | lastActiveAt | Date | Timestamp of the last request | Updated on each authenticated request |
 
-### Requirement: Store the user
-- Dedicated store, sole DB access for the user collection.
-- Support: find by id, upsert/create, update `cefrLevel`, update `lastActiveAt`.
-
-### Requirement: Get current profile / level
+#### 2.2.2. Endpoints
 
 - `GET /users/:id` — return the user's profile including current CEFR level.
-
-### Requirement: Create / upsert user
-
 - `POST /users` — create or upsert the user's language-learning profile. Called on first authenticated access or explicit onboarding.
+- `PUT /users/:id/cefrLevel` — set the user's CEFR level to the next tier. Invoked only by the Level Test feature (F21) on a pass.
 
-### Requirement: Advance level operation
+#### 2.2.4. Business Logic
 
-- `PUT /users/:id/cefrLevel` — set the user's CEFR level to the next tier. Invoked only by the Level Test feature (F21) on a pass. Validates the requested level is exactly the next tier (no skipping in v2.0).
-
-### Requirement: Level ordering utility
-- A shared, testable helper that knows the ordered sequence of levels (next level, comparison). Reused by F21.
+- A dedicated store is the sole DB accessor for the user collection. Supports: find by id, upsert/create, update `cefrLevel`, update `lastActiveAt`.
+- `PUT /users/:id/cefrLevel` validates that the requested level is exactly the next tier in the ordered sequence (no level-skipping in v2.0); rejects the request if the level is not the immediate successor.
+- A shared, testable level-ordering utility knows the ordered sequence (A1 → A2 → B1 → B2 → C1 → C2) and exposes next-level and comparison operations. Reused by F21.
+- `lastActiveAt` is updated on each authenticated request to this microservice.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | See my current CEFR level on the home screen | I always know where I stand (idea US-01) |
-| US-02 | Start at A1 by default | I have a clear beginning |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Fetch a user's profile including their current CEFR level | the app can display level-appropriate content and dashboard info |
+| CS-02 | Create or upsert a user profile on first access | the user's language-learning state is initialised when they first arrive |
+| CS-03 | Advance a user's CEFR level to the next tier | the Level Test feature can promote the user after a passing score |
 
 ---
 

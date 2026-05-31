@@ -25,7 +25,9 @@ Step 2 is the interactive practice phase of a module. The user works through a f
 
 ### 2.2. Requirements
 
-### Requirement: PracticeSession data model
+#### 2.2.1. Data Models
+
+**PracticeSession**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -40,40 +42,34 @@ Step 2 is the interactive practice phase of a module. The user works through a f
 | startedAt | Date | Session start timestamp | Auto-set |
 | completedAt | Date | Session completion timestamp | Nullable; set on complete |
 
-### Requirement: Start session
+#### 2.2.2. Endpoints
 
-- `POST /users/:userId/modules/:moduleId/practiceSessions` — draw `practiceSessionSize` exercises via F08 (using current mastery + most recent session misses), order them by type progression, create and return the PracticeSession. Transitions UserModuleProgress to `in_progress`.
-
-### Requirement: Get session state
-
+- `POST /users/:userId/modules/:moduleId/practiceSessions` — start a new practice session; draws `practiceSessionSize` exercises via F08 and orders them by type progression; creates and returns the PracticeSession.
 - `GET /users/:userId/practiceSessions/:sessionId` — return the current session state (for resume after app close).
+- `POST /users/:userId/practiceSessions/:sessionId/answers` — submit an answer for one exercise; body: `{ exerciseId, userAnswer }`.
+- `POST /users/:userId/practiceSessions/:sessionId/complete` — mark the session complete; record completion timestamp.
 
-### Requirement: Submit answer
+#### 2.2.4. Business Logic
 
-- `POST /users/:userId/practiceSessions/:sessionId/answers` — normalize and check the user's answer against the exercise's accepted answer set (canonical + alternativeAnswers + userContributedAnswers), with optional fuzzy match. Body: `{ exerciseId, userAnswer }`.
-  - If correct → advance. If wrong → return the correct answer, add to retry queue, advance. Increment the exercise's `timesShown`.
-  - Records the result in the session state (not in mastery/progress history).
-
-### Requirement: Missed-retry loop
-- When the primary pass is done, present missed exercises again until all are answered correctly. Then the session is complete.
-
-### Requirement: Complete session
-
-- `POST /users/:userId/practiceSessions/:sessionId/complete` — mark the session complete; record completion timestamp (this starts the `testUnlockDelayHours` countdown for the Module Test, F11 reads it).
-
-### Requirement: No mastery update
-- This feature must not call F06's mastery update. It only records transient session results.
+- Starting a practice session transitions UserModuleProgress to `in_progress` (via F07).
+- Answer checking: normalize userAnswer (lowercase, strip punctuation) then compare against the exercise's `answer`, `alternativeAnswers`, and `userContributedAnswers`. Optional fuzzy match (Levenshtein) for additional tolerance.
+- If correct: advance to the next exercise. If wrong: return the correct answer, add the exercise id to `retryQueue`, advance.
+- Increment the exercise's `timesShown` (via F04) after each exercise is shown.
+- Missed-retry loop: when the primary pass is done (all `exerciseIds` visited), present the `retryQueue` exercises repeatedly until the user answers all correctly. Then the session is complete.
+- Completing the session records `completedAt`; this timestamp starts the `testUnlockDelayHours` countdown consumed by F11.
+- This feature must not call F06's mastery update; it only records transient session results.
+- Only one active practice session per user per module at a time.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Run through a module's exercises step by step | I learn vocabulary and grammar in context (idea US-03) |
-| US-02 | See the correct answer when I'm wrong and move on | I keep momentum |
-| US-03 | Retry the ones I missed until I get them right | I don't leave gaps in the session |
-| US-04 | Resume an active practice session | I don't lose progress if I leave |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Start a practice session for a user and module | the app receives an ordered exercise list personalised to the user's mastery state |
+| CS-02 | Submit a user's answer and receive immediate feedback | the app knows whether to advance or add the exercise to the retry queue |
+| CS-03 | Fetch the current session state | the app can resume a session after the user closes and reopens the app |
+| CS-04 | Mark a session complete | the test unlock timer starts and the module progress is updated |
 
 ---
 

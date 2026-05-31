@@ -22,25 +22,24 @@ A user can manually add a Danish word they encountered (e.g. while reading), pro
 
 ### 2.2. Requirements
 
-### Requirement: Add-word endpoint
+#### 2.2.2. Endpoints
 
 - `POST /vocabularyItems` — reuses the F01 endpoint with `source: "user_added"` and `addedByUserId` set. Input: Danish word + English translation (and optionally a type; otherwise defaults to "noun"). Dedup against `(danish, type, context)` to avoid duplicates.
+- `GET /users/:userId/addedVocabulary` — return the vocabulary items added by the user (filtered by `source = user_added` and `addedByUserId = userId`).
 
-### Requirement: List user's added words
+#### 2.2.4. Business Logic
 
-- `GET /users/:userId/addedVocabulary` — return the vocabulary items added by the user (filtered by `source = user_added` and `addedByUserId = userId`), so the app can show a "collected words" list.
-
-### Requirement: No exercise linkage
-- Items with `source = user_added` must not be selected by any session or test (F08/F10/F11/F21) and must not be referenced by modules in v2.0.
+- Items with `source = user_added` must not be selected by any session or test (F08/F10/F11/F21) and must not be referenced by modules in v2.0. The selection engine (F08) must exclude them from the exercise pool.
+- The Analyze Content "add unknown vocabulary" action (F23) writes through this feature's `POST /vocabularyItems` endpoint.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Add a Danish word I encountered with its translation | it's captured for future learning (idea §3.2.3) |
-| US-02 | See the words I've collected | I have a personal vocabulary list |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Submit a user-added vocabulary item with a Danish word and translation | the word is captured in the user's collected pool for future use |
+| CS-02 | List the vocabulary items a user has added | the app can display the user's personal collected-words list |
 
 ---
 

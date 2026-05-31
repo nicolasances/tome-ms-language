@@ -26,11 +26,13 @@ Vocabulary items are created by an **external tool** (a seeding script or a cont
 
 ### 2.2. Requirements
 
-### Requirement: VocabularyItem data model
+#### 2.2.1. Data Models
+
+**VocabularyItem**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
-| id | ObjectId | Unique identifier | Auto-generated |
+| id | string | Caller-provided unique identifier (e.g. `"A1-01-v-jeg-5325"`) | Required; provided by the caller; must be unique across all vocabulary items; distinct from MongoDB's internal `_id` |
 | danish | string | Danish word or phrase | Required |
 | english | string | English translation | Required |
 | type | string | Word type | Must be one of: noun, verb, adjective, adverb, phrase, pattern, connector, pronoun, number |
@@ -40,30 +42,30 @@ Vocabulary items are created by an **external tool** (a seeding script or a cont
 | source | string | How the item entered the system | Must be: `curriculum` or `user_added` |
 | addedByUserId | string | Id of the user who added it | Required when source = user_added; null otherwise |
 
-### Requirement: Store the catalog
-- A dedicated store is the only place that reads/writes the vocabulary collection.
-- Support: insert one, insert many (batch), find by id, find by ids (bulk lookup used by modules/exercises), find by `danish` text (dedup check), list by `cefrLevel`.
-- Inserting an item that duplicates an existing `(danish, type, context)` triple is rejected — dedup on canonical key to prevent seeding duplicates.
-
-### Requirement: Write endpoints
+#### 2.2.2. Endpoints
 
 - `POST /vocabularyItems` — insert a single vocabulary item; rejects duplicates on `(danish, type, context)`.
 - `POST /vocabularyItems/batch` — insert many vocabulary items in one call; skips duplicates and reports which were inserted vs. already present.
-
-### Requirement: Read endpoints
-
 - `GET /vocabularyItems/:id` — get a single vocabulary item by id.
 - `GET /vocabularyItems` — list vocabulary items; optional query param `?cefrLevel=A1`.
 - `POST /vocabularyItems/lookup` — resolve a set of ids in bulk; body: `{ ids: string[] }`.
 
+#### 2.2.4. Business Logic
+
+- A dedicated store is the only place that reads/writes the vocabulary collection. Supports: insert one, insert many (batch), find by id, find by ids (bulk lookup used by modules/exercises), find by `danish` text (dedup check), list by `cefrLevel`.
+- Inserting an item that duplicates an existing `id` is rejected (id uniqueness is the primary guard). Additionally, inserting an item that duplicates an existing `(danish, type, context)` triple is rejected — dedup on canonical key to prevent seeding duplicates.
+- Batch insert skips duplicates silently and returns a summary of inserted vs. already-present items.
+
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Have each Danish word stored once with its translation and metadata | the app can show consistent definitions everywhere |
-| US-02 | Reuse the same word across multiple modules | my mastery of it is tracked globally, not per module |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Submit a single vocabulary item via POST | the catalog grows incrementally as items are authored |
+| CS-02 | Batch-submit a set of vocabulary items in one call | seeding a module's vocabulary is efficient and idempotent |
+| CS-03 | Bulk-resolve a set of vocabulary item ids | modules and exercises can hydrate their referenced items in one round-trip |
+| CS-04 | List vocabulary items filtered by CEFR level | the seeding tool can verify what is already present at a given level |
 
 ---
 

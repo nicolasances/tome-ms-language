@@ -26,7 +26,9 @@ Step 3 is the graded assessment that completes a module. It is **time-locked** u
 
 ### 2.2. Requirements
 
-### Requirement: ModuleTestAttempt data model
+#### 2.2.1. Data Models
+
+**ModuleTestAttempt**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -40,36 +42,34 @@ Step 3 is the graded assessment that completes a module. It is **time-locked** u
 | takenAt | Date | When the attempt was submitted | Auto-set |
 | exerciseResults | ExerciseResult[] | Full per-exercise detail for mastery update | Used by F06 apply-results |
 
-### Requirement: Test availability / unlock check
+#### 2.2.2. Endpoints
 
-- `GET /users/:userId/modules/:moduleId/testEligibility` — report whether the test is unlocked. Checks: `testUnlockDelayHours` have passed since practice completion, and after a failed attempt, `testRetryDelayMinutes` have passed. Returns remaining time when locked.
+- `GET /users/:userId/modules/:moduleId/testEligibility` — report whether the test is unlocked, with remaining time when locked.
+- `POST /users/:userId/modules/:moduleId/tests` — start a new test attempt; returns questions without answers.
+- `POST /users/:userId/moduleTests/:attemptId/submit` — accept all answers at once; body: array of `{ exerciseId, userAnswer }`.
+- `GET /users/:userId/moduleTests/:attemptId/review` — return score and per-question answers; for incorrect items, include the user's answer alongside the correct answer.
 
-### Requirement: Start test
+#### 2.2.4. Business Logic
 
-- `POST /users/:userId/modules/:moduleId/tests` — verify unlock conditions. Draw 20 exercises from the module bank, enforcing the fresh/repeat split (≥50% fresh = not shown to this user during practice), using F08 weighting within each subset. Return the questions **without** answers.
-
-### Requirement: Submit test
-
-- `POST /users/:userId/moduleTests/:attemptId/submit` — accept all answers at once (body: array of `{ exerciseId, userAnswer }`). Check each via normalized matching. Compute score; determine pass/fail vs `testPassThreshold`.
-  - **Update mastery**: call F06 apply-results with the attempt's ExerciseResults (vocab + grammar).
-  - Record the ModuleTestAttempt to the UserModuleProgress test history (F07).
-  - On pass: transition UserModuleProgress to `completed`.
-
-### Requirement: Review read
-
-- `GET /users/:userId/moduleTests/:attemptId/review` — return score + per-question answers: for incorrect items, include the user's answer alongside the correct answer. Enables "Explain my mistake" (F12) per incorrect item.
+- Eligibility check (`GET …/testEligibility`): `testUnlockDelayHours` must have passed since the practice session's `completedAt`; and if there is a prior failed attempt, `testRetryDelayMinutes` must have passed since that attempt's `takenAt`.
+- Starting a test (`POST …/tests`): verify unlock conditions. Draw 20 exercises from the module bank via F08, enforcing the fresh/repeat split: at least `testFreshExercisePercent`% of selected exercises must be exercises the user has not seen during practice for this module. Return the questions **without** answers.
+- Submitting (`POST …/submit`): check each answer via normalized matching (same logic as F10). Compute score. Determine pass/fail against `testPassThreshold`.
+  - **Update mastery**: call F06 apply-results with the attempt's ExerciseResults (vocab + grammar items).
+  - Record the attempt score and outcome in UserModuleProgress test history (F07).
+  - On pass: transition UserModuleProgress to `completed` (F07).
+- Review (`GET …/review`): return score, all exercises with correct answers; incorrect ones show the user's answer alongside the correct answer. Enables "Explain my mistake" (F12) per incorrect item.
+- All attempts are persisted regardless of outcome.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Take a test only after a delay | spaced repetition helps me actually remember (idea §3.1.1) |
-| US-02 | Answer all questions before seeing results | it's a real assessment, not guided practice |
-| US-03 | See my score and every correct answer afterward | I learn from the test |
-| US-04 | Retry the test if I fail | I'm not blocked (idea US-07) |
-| US-05 | Have my mastery scores reflect my test performance | the app tracks what I truly know |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Check test eligibility for a user and module | the app shows or hides the test CTA with an accurate unlock countdown |
+| CS-02 | Start a test and receive questions without answers | the app presents a true assessment where answers are revealed only at the end |
+| CS-03 | Submit all answers at once and receive a score | mastery is updated and the module is marked completed on a pass |
+| CS-04 | Fetch the test review for a completed attempt | the app shows the full result with per-question correctness for the review screen |
 
 ---
 

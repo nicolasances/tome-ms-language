@@ -23,32 +23,27 @@ This feature is the personalization engine: given a pool of exercises (a module 
 
 ### 2.2. Requirements
 
-### Requirement: Selection algorithm
-Given a pool, a target count, and the user's mastery state, draw a weighted random sample:
-1. Each exercise links to exactly one item — vocab (`vocabularyItemId` → UserVocabularyProgress) or grammar (`grammarConceptId` → UserGrammarConceptProgress).
-2. Exercises whose linked item has mastery > 0.85 are deprioritized (skipped unless the pool is nearly empty).
-3. Remaining exercises are weighted by `(1 − masteryScore)`.
-4. Exercises answered incorrectly in the most recent session get an additional priority boost.
-5. When multiple exercises test the same item/concept, pick one at random among them (avoid testing the same item twice unless needed to fill the session).
-6. Draw a weighted random sample to fill the target count.
+#### 2.2.4. Business Logic
 
-### Requirement: Pure, testable component
-- Implemented as a self-contained function/utility taking the pool + mastery map + parameters and returning the selected exercises. No direct DB or HTTP access inside the algorithm (callers fetch the inputs).
-
-### Requirement: Inputs from other features
-- Mastery map comes from F06 (bulk read of vocab + grammar progress for the linked items).
-- "Most recent session misses" come from the caller (F10/F11 know the user's last session results).
-- Pool comes from F04 (module bank) or F20 (level test bank).
+- Implemented as a self-contained function/utility taking the pool + mastery map + parameters and returning the selected exercises. No direct DB or HTTP access inside the algorithm; callers fetch the inputs and pass them in.
+- Selection algorithm — given a pool, a target count, and the user's mastery state:
+  1. Each exercise links to exactly one item — vocab (`vocabularyItemId` → UserVocabularyProgress) or grammar (`grammarConceptId` → UserGrammarConceptProgress).
+  2. Exercises whose linked item has mastery > 0.85 are deprioritized (skipped unless the pool is nearly empty).
+  3. Remaining exercises are weighted by `(1 − masteryScore)`.
+  4. Exercises answered incorrectly in the most recent session get an additional priority boost.
+  5. When multiple exercises test the same item/concept, pick one at random among them (avoid testing the same item twice unless needed to fill the session).
+  6. Draw a weighted random sample to fill the target count.
+- Inputs come from callers: mastery map from F06 (bulk read), recent session misses from the caller (F10/F11 know their last session), pool from F04 or F20.
+- Thresholds (0.85 deprioritize, boost magnitude) are tunable parameters.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Be shown exercises focused on what I haven't mastered | I don't waste time on words I already know |
-| US-02 | See exercises I recently got wrong come back | I get a chance to fix mistakes |
-| US-03 | Have retries feel fresh after a failed test | the bank + mastery weighting vary the selection |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Call the selection engine with a pool, mastery map, and target count to get a weighted sample | practice sessions and tests get a personalized, weakness-focused exercise set |
+| CS-02 | Pass recent session misses as input to boost their weight | the selection engine re-surfaces exercises the user just got wrong |
 
 ---
 

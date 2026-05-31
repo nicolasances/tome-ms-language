@@ -22,26 +22,26 @@ After any exercise answered **incorrectly** (in practice or in a test review), t
 
 ### 2.2. Requirements
 
-### Requirement: Explain-mistake endpoint
+#### 2.2.2. Endpoints
 
 - `POST /exercises/:exerciseId/explainMistake` — request an AI explanation for a wrong answer.
   - Body: `{ userAnswer: string, cefrLevel: string }`.
-  - Output: correct answer, why it is correct (grammar rule or vocab note), the rule stated simply in English, and a second Danish example demonstrating the same rule.
-  - Calls the AI client; the prompt includes the exercise, the user's wrong answer, the linked vocab item or grammar concept, and the **user's current CEFR level**.
+  - Returns: correct answer, why it is correct (grammar rule or vocab note), the rule stated simply in English, and a second Danish example demonstrating the same rule.
 
-### Requirement: AI client usage
-- Goes through the shared AI API client (mockable). No new persistent data model required; the explanation is returned, not stored.
+#### 2.2.4. Business Logic
 
-### Requirement: Stateless w.r.t. mastery
-- Requesting an explanation does not change mastery or the exercise's correctness.
+- The AI call includes the exercise content, the user's wrong answer, the linked vocabulary item or grammar concept, and the user's current CEFR level.
+- Goes through the shared AI API client (mockable for testing).
+- No new persistent data model required; the explanation is returned in the response and not stored.
+- Requesting an explanation does not change mastery or the exercise's correctness for the current session.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Ask for an explanation when I get something wrong | I understand the rule, not just the right answer (idea US-04) |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Request an AI explanation for a wrong answer on demand | the app can show the user the rule behind the mistake without storing any session state |
 
 ---
 

@@ -21,22 +21,25 @@ On request during a translation exercise, the user can ask for a hint that nudge
 
 ### 2.2. Requirements
 
-### Requirement: Hint endpoint
+#### 2.2.2. Endpoints
 
 - `POST /exercises/:exerciseId/hint` — request a hint for a translation exercise.
   - Body: `{ sessionId: string, cefrLevel: string }`.
-  - Output: a short hint that helps without revealing the full answer, pitched at the user's CEFR level. Generated via the AI client (mockable).
+  - Returns: a short hint that helps without revealing the full answer, pitched at the user's CEFR level.
 
-### Requirement: Mark attempt as prompted
-- When a hint is used for an exercise in the current session, set `wasPrompted = true` for that exercise's entry in the PracticeSession (F10) or test state (F11). This flag is forwarded to F06's apply-results so a subsequent correct answer on the same item carries reduced weight.
+#### 2.2.4. Business Logic
+
+- The hint is generated via the AI client (mockable). It must not reveal the full canonical answer.
+- When a hint is used, set `wasPrompted = true` for that exercise's entry in the active PracticeSession (F10) or test state (F11). This flag is forwarded to F06's apply-results so that a subsequent correct answer on the same item carries reduced SRS weight.
+- Scoped to `translation_active` exercise types in v2.0; a request for any other type is rejected.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Get a hint when I'm stuck on a translation | I can make progress without just being shown the answer |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Request a hint for a translation exercise on behalf of the user | the app receives a partial clue to display without giving away the answer |
 
 ---
 

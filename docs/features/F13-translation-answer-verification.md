@@ -21,29 +21,28 @@ For `translation_active` exercises only, after an answer is marked wrong by the 
 
 ### 2.2. Requirements
 
-### Requirement: Verify-translation endpoint
+#### 2.2.2. Endpoints
 
 - `POST /exercises/:exerciseId/verifyAnswer` — request AI verification of a translation that was marked wrong.
   - Body: `{ userAnswer: string, sessionId: string, cefrLevel: string }`.
-  - The AI checks validity scoped by the exercise prompt and any `context` note on the linked vocab item, and the user's CEFR level.
-  - **Valid** outcome: mark the exercise correct for this attempt; append the user's answer to that exercise's `userContributedAnswers` via F04's mutation endpoint.
-  - **Invalid** outcome: return an AI explanation of why the translation is not valid.
+  - Returns: `{ valid: boolean, explanation?: string }`.
 
-### Requirement: One-per-attempt guard
-- Allow only one verification per exercise attempt. Track using `sessionId` + `exerciseId`.
+#### 2.2.4. Business Logic
 
-### Requirement: Effect on session state
-- A "valid" result flips the in-session correctness of that exercise (removes it from the retry queue in practice; adjusts score calculation if invoked before scoring is finalized in a test).
+- The AI checks validity scoped by the exercise prompt and any `context` note on the linked vocabulary item, and pitched at the user's CEFR level.
+- **Valid** outcome: the exercise is marked correct for this attempt (update session state to remove it from the retry queue in practice, or adjust score calculation if in a test); append the user's answer to `userContributedAnswers` via F04's mutation endpoint.
+- **Invalid** outcome: return an AI explanation of why the translation is not valid; session state is unchanged.
+- One-per-attempt guard: only one verification is allowed per (sessionId, exerciseId) combination. Subsequent calls for the same pair are rejected.
+- Goes through the shared AI API client (mockable for testing).
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Ask the AI to check a translation it marked wrong | valid paraphrases I write are accepted |
-| US-02 | Have my accepted phrasing remembered | it's accepted automatically next time (added to userContributedAnswers) |
-| US-03 | Get told why my translation was wrong when it really is | I learn from it |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Submit a user's disputed translation for AI verification | the app can flip the exercise to correct and persist the validated phrasing if the AI confirms it |
+| CS-02 | Receive an AI explanation when a translation is invalid | the app can show the user why their phrasing does not work |
 
 ---
 

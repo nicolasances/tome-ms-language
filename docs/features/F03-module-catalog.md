@@ -26,7 +26,9 @@ Modules are created by an **external tool** (a seeding script or a custom module
 
 ### 2.2. Requirements
 
-### Requirement: Module data model
+#### 2.2.1. Data Models
+
+**Module**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -45,27 +47,27 @@ Modules are created by an **external tool** (a seeding script or a custom module
 | testFreshExercisePercent | number | % of fresh exercises required in the test | Default: 50 |
 | testPassThreshold | number | % correct needed to pass the test | Default: 80 |
 
-### Requirement: Store modules
-- Dedicated store, sole DB access for the modules collection.
-- Support: insert, find by id, list by `cefrLevel`, list default modules by level (for dashboard ordering), find user-generated modules by `createdByUserId`.
+#### 2.2.2. Endpoints
 
-### Requirement: Write endpoints
-
-- `POST /modules` — insert a module (default or user-generated); links are validated against F01 and F02 stores.
-
-### Requirement: Read endpoints
-
+- `POST /modules` — insert a module (default or user-generated).
 - `GET /modules/:id` — get a module by id (returns ids of vocab/grammar; app resolves via F01/F02).
 - `GET /modules` — list modules; optional query params `?cefrLevel=A1` and `?isUserGenerated=false`.
 
+#### 2.2.4. Business Logic
+
+- A dedicated store is the sole DB accessor for the modules collection. Supports: insert, find by id, list by `cefrLevel`, list default modules by level (for dashboard ordering), find user-generated modules by `createdByUserId`.
+- On `POST /modules`, the referenced `vocabularyItemIds` and `grammarConceptIds` are validated against the F01 and F02 stores respectively; the request is rejected if any id does not resolve.
+- Configurable parameters default to the values in idea §3.1.2 when not provided; each can be overridden per module.
+
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | See the modules available at my current CEFR level | I know my learning path |
-| US-02 | Open a module and see its theme and communication goal | I understand what I'll be able to do after it |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Submit a new module with its vocabulary and grammar concept references | the catalog grows as the curriculum is seeded or as users generate custom modules |
+| CS-02 | Fetch a module by id | session and test features can resolve module configuration and content references |
+| CS-03 | List modules filtered by CEFR level | the app can display the module catalog for the user's current level |
 
 ---
 

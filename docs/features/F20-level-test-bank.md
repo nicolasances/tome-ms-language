@@ -21,7 +21,9 @@ Each CEFR level has a dedicated exercise bank (~60 exercises) purpose-built for 
 
 ### 2.2. Requirements
 
-### Requirement: LevelTestBank data model
+#### 2.2.1. Data Models
+
+**LevelTestBank**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
@@ -31,25 +33,28 @@ Each CEFR level has a dedicated exercise bank (~60 exercises) purpose-built for 
 | generatedAt | Date | When the bank was last updated | Required |
 | totalGenerated | number | Cumulative count of exercises ever added | Incremented on each append |
 
-### Requirement: Store the bank
-- Dedicated store, sole DB access; support find by cefrLevel, insert, append exercise ids + update counts.
-
-### Requirement: Write endpoints
+#### 2.2.2. Endpoints
 
 - `POST /levelTestBanks` — create a level test bank (body includes cefrLevel + array of exercise objects with `moduleId = null`).
 - `POST /levelTestBanks/:cefrLevel/exercises` — append additional exercises to an existing bank.
-
-### Requirement: Read endpoints
-
 - `GET /levelTestBanks/:cefrLevel` — get the level test bank for a given level (returns bank metadata + exerciseIds).
+
+#### 2.2.4. Business Logic
+
+- A dedicated store is the sole DB accessor. Supports: find by cefrLevel, insert, append exercise ids and update `generatedAt` / `totalGenerated`.
+- Level test exercises carry `moduleId = null`; this is enforced on insert.
+- One bank per CEFR level — attempting to create a second bank for an existing level is rejected.
+- Appending exercises increments `totalGenerated` and updates `generatedAt`.
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | Be tested across everything at my level, not one module at a time | the Level Test really proves I'm ready to advance |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Submit a level test bank with an initial set of cross-module exercises | the Level Test feature (F21) has a pool to draw from at test time |
+| CS-02 | Append additional exercises to an existing level bank | the bank can be topped up if free retries deplete the unique exercise pool |
+| CS-03 | Fetch the level test bank for a given CEFR level | the selection engine (F08) can draw from the full pool for level tests |
 
 ---
 

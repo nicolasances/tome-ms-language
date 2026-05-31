@@ -20,21 +20,23 @@ Step 1 of a module run is purely instructional: for each grammar concept in the 
 
 ### 2.2. Requirements
 
-### Requirement: Get module grammar introduction
+#### 2.2.2. Endpoints
 
-- `GET /modules/:moduleId/grammarIntroduction` — return the module's grammar concepts (resolved from `grammarConceptIds`) each with `name`, `explanation`, and `examples`, in the intended presentation order (order of `grammarConceptIds` on the module).
-- Read-only; reuses F02 and F03 stores; no new data model.
+- `GET /modules/:moduleId/grammarIntroduction` — return the module's grammar concepts (resolved from `grammarConceptIds`) each with `name`, `explanation`, and `examples`, in the intended presentation order (order of `grammarConceptIds` on the module). Read-only; reuses F02 and F03 stores; no new data model.
 
-### Requirement: Mark Step 1 reached (optional)
-- Optionally, opening a module transitions UserModuleProgress to `in_progress` (or that transition can be deferred to when practice starts in F10 — pick one and be consistent).
+#### 2.2.4. Business Logic
+
+- Presentation order follows the order of `grammarConceptIds` on the module document; no additional sorting is applied.
+- No mastery scores are updated as a result of this call.
+- Optionally, opening a module (first call to this endpoint) transitions UserModuleProgress to `in_progress` — or that transition can be deferred to when practice starts in F10. Pick one and be consistent; this is an open question (OQ-01).
 
 ---
 
-## 3. Key User Stories
+## 3. Key Consumer Stories
 
-| # | As a user, I want to… | So that… |
-|---|----------------------|----------|
-| US-01 | See a short explanation and examples for each grammar concept before practicing | I learn the rule in context (idea US-03) |
+| # | As a Consumer, I want to… | So that… |
+|---|--------------------------|----------|
+| CS-01 | Fetch a module's grammar concepts with their explanations and examples in order | the app can present Step 1 of the module without additional API calls |
 
 ---
 
