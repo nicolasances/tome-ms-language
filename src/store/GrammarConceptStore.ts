@@ -84,22 +84,13 @@ export class GrammarConceptStore {
         const existingById = await collection.find({ id: { $in: inputIds } }).toArray();
         const existingIdSet = new Set(existingById.map(doc => doc.id as string));
 
-        const batchResults: BatchItemResult[] = [];
-        const toInsert: GrammarConcept[] = [];
+        // Only insert Grammar Concepts whose id does not exist
+        const toInsert: GrammarConcept[] = concepts.filter((c) => !existingIdSet.has(c.id))
 
-        for (const concept of concepts) {
-
-            if (existingIdSet.has(concept.id)) {
-                batchResults.push({ id: concept.id, status: "duplicate_id" });
-                continue;
-            }
-
-            toInsert.push(concept);
-            batchResults.push({ id: concept.id, status: "created" });
-        }
+        // Compute the batch results
+        const batchResults: BatchItemResult[] = concepts.map((c) => { return { id: c.id, status: existingIdSet.has(c.id) ? "duplicate_id" : "created" } })
 
         if (toInsert.length > 0) {
-
             await collection.insertMany(toInsert.map(c => c.toBSON()), { ordered: false });
         }
 
