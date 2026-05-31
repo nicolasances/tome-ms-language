@@ -7,9 +7,14 @@ import { GetRollingSessionStats } from './dlg/session/GetRollingSessionStats';
 import { GetSentence } from './dlg/GetSentence';
 import { GetSentences } from './dlg/GetSentences';
 import { GetSentencesWithStats } from './dlg/GetSentencesWithStats';
+import { GetVocabularyItem } from './dlg/GetVocabularyItem';
+import { GetVocabularyItems } from './dlg/GetVocabularyItems';
 import { GetWeeklySessionStats } from './dlg/session/GetWeeklySessionStats';
+import { LookupVocabularyItems } from './dlg/LookupVocabularyItems';
 import { PostSentence } from './dlg/PostSentence';
 import { PostSentences } from './dlg/PostSentences';
+import { PostVocabularyItem } from './dlg/PostVocabularyItem';
+import { PostVocabularyItemBatch } from './dlg/PostVocabularyItemBatch';
 import { RemoveSentenceAlternative } from './dlg/RemoveSentenceAlternative';
 import { StartSession } from './dlg/session/StartSession';
 import { SubmitAnswer } from './dlg/session/SubmitAnswer';
@@ -24,6 +29,11 @@ const config: TotoMicroserviceConfiguration = {
     customConfiguration: ControllerConfig,
     apiConfiguration: {
         apiEndpoints: [
+            { method: 'POST', path: '/vocabularyItems', delegate: PostVocabularyItem },
+            { method: 'POST', path: '/vocabularyItems/batch', delegate: PostVocabularyItemBatch },
+            { method: 'POST', path: '/vocabularyItems/lookup', delegate: LookupVocabularyItems },
+            { method: 'GET', path: '/vocabularyItems', delegate: GetVocabularyItems },
+            { method: 'GET', path: '/vocabularyItems/:id', delegate: GetVocabularyItem },
             { method: 'GET', path: '/sentences/:language', delegate: GetSentences },
             { method: 'GET', path: '/sentences/:language/with-stats', delegate: GetSentencesWithStats },
             { method: 'POST', path: '/sentences/:language', delegate: PostSentence },
