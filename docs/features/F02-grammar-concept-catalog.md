@@ -44,14 +44,14 @@ Grammar concepts (including their explanation text and examples) are authored an
 - `POST /grammarConcepts` — insert a single grammar concept.
 - `POST /grammarConcepts/batch` — insert many grammar concepts; skips duplicates by `name`.
 - `GET /grammarConcepts/:id` — get a single grammar concept by id (returns explanation + examples).
-- `GET /grammarConcepts` — list concepts; optional query params `?cefrLevel=A1` (at-or-below filter) and `?category=tenses`.
+- `GET /grammarConcepts` — list concepts; optional query params `?cefrLevel=A1` (exact-match filter) and `?category=tenses`.
 - `POST /grammarConcepts/lookup` — resolve a set of ids in bulk; body: `{ ids: string[] }`.
 
 #### 2.2.4. Business Logic
 
 - A dedicated store is the only place that reads/writes the grammar concept collection. Supports: insert one, insert many (batch), find by id, find by ids (bulk lookup for modules), list by category, list by `cefrLevelIntroduced`.
 - Inserting a concept that duplicates an existing `id` is rejected. Additionally, duplicate detection on `name` — batch insert skips a concept whose name already exists and reports which were inserted vs. skipped.
-- The `?cefrLevel=A1` filter on `GET /grammarConcepts` returns concepts introduced at or below the given level (i.e. all concepts available to an A1 learner).
+- The `?cefrLevel=A1` filter on `GET /grammarConcepts` is an exact match on `cefrLevelIntroduced`. It returns only concepts introduced at that specific level, not at lower levels.
 
 ---
 
