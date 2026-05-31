@@ -1,12 +1,5 @@
 import { WithId } from "mongodb";
 
-export interface SessionWord {
-    wordId: string;
-    english: string;
-    translation: string;
-    alternativeTranslations: Array<{ id: string; translation: string }>;
-}
-
 export interface SessionSentence {
     sentenceId: string;
     sentence: string;
@@ -20,19 +13,13 @@ export interface SessionAnswer {
     submittedAt: string;
 }
 
-export interface VocabularySessionPayload {
-    words: SessionWord[];
-    totalWords: number;
-    answers: SessionAnswer[];
-}
-
 export interface SentenceSessionPayload {
     sentences: SessionSentence[];
     totalSentences: number;
     answers: SessionAnswer[];
 }
 
-export type SessionPayload = VocabularySessionPayload | SentenceSessionPayload;
+export type SessionPayload = SentenceSessionPayload;
 
 export class Session {
 
@@ -45,16 +32,7 @@ export class Session {
     createdAt: string;
     completedAt: string | null;
 
-    constructor({ id, userId, language, practiceType, status, payload, createdAt, completedAt }: {
-        id?: string;
-        userId: string;
-        language: string;
-        practiceType: string;
-        status: string;
-        payload: SessionPayload;
-        createdAt: string;
-        completedAt: string | null;
-    }) {
+    constructor({ id, userId, language, practiceType, status, payload, createdAt, completedAt }: { id?: string; userId: string; language: string; practiceType: string; status: string; payload: SessionPayload; createdAt: string; completedAt: string | null; }) {
         this.id = id;
         this.userId = userId;
         this.language = language;
