@@ -23,31 +23,41 @@ Step 3 is the graded assessment that completes a module. It is **time-locked** u
 | Fresh split | `testFreshExercisePercent` (50%) of questions must be unseen in practice |
 | Pass threshold | `testPassThreshold` (80%) correct to pass |
 | Retry delay | `testRetryDelayMinutes` (20) after a failed attempt before retry |
-| ModuleTestAttempt | Recorded attempt: id, userId, moduleId, score, passed, takenAt |
 
 ### 2.2. Requirements
 
-### Requirement: Test availability / unlock check endpoint
-- Given user + module, report whether the test is unlocked: locked until `testUnlockDelayHours` have passed since practice completion (F10's completion timestamp); and, after a failed attempt, locked until `testRetryDelayMinutes` have passed.
-- Return remaining time when locked.
+### Requirement: ModuleTestAttempt data model
 
-### Requirement: Start test endpoint
-- Verify unlock conditions. Draw 20 exercises from the module bank: enforce the fresh/repeat split (≥50% fresh = not shown to this user during practice), using F08 weighting within each subset. Each retry draws a new selection.
-- Return the questions **without** answers.
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| id | ObjectId | Unique attempt id | Auto-generated |
+| userId | string | User id | Required |
+| moduleId | string | Module id | Required |
+| exerciseIds | string[] | Exercises presented in this attempt | Set at start |
+| answers | object[] | Submitted answers per exercise (exerciseId, userAnswer) | Set on submit |
+| score | number | Percentage correct | 0–100 |
+| passed | boolean | Whether score ≥ testPassThreshold | Required |
+| takenAt | Date | When the attempt was submitted | Auto-set |
+| exerciseResults | ExerciseResult[] | Full per-exercise detail for mastery update | Used by F06 apply-results |
 
-### Requirement: Submit test endpoint
-- Accept all answers at once (answers are not shown during the test). Check each via the same normalized matching as F10.
-- Compute final score (% correct). Determine pass/fail vs `testPassThreshold`.
-- Build the review payload: every question with its correct answer; for incorrect ones, the user's answer alongside the correct answer.
-- **Update mastery**: call F06's apply-results with the test's ExerciseResults (vocab + grammar).
-- Record a ModuleTestAttempt (score, passed, takenAt) on UserModuleProgress (F07) — both passes and fails.
-- On pass: transition UserModuleProgress to `completed`.
+### Requirement: Test availability / unlock check
 
-### Requirement: ModuleTestAttempt persistence
-- Append every attempt (failed and passing) to the user's module progress test history (F07 store).
+- `GET /users/:userId/modules/:moduleId/testEligibility` — report whether the test is unlocked. Checks: `testUnlockDelayHours` have passed since practice completion, and after a failed attempt, `testRetryDelayMinutes` have passed. Returns remaining time when locked.
+
+### Requirement: Start test
+
+- `POST /users/:userId/modules/:moduleId/tests` — verify unlock conditions. Draw 20 exercises from the module bank, enforcing the fresh/repeat split (≥50% fresh = not shown to this user during practice), using F08 weighting within each subset. Return the questions **without** answers.
+
+### Requirement: Submit test
+
+- `POST /users/:userId/moduleTests/:attemptId/submit` — accept all answers at once (body: array of `{ exerciseId, userAnswer }`). Check each via normalized matching. Compute score; determine pass/fail vs `testPassThreshold`.
+  - **Update mastery**: call F06 apply-results with the attempt's ExerciseResults (vocab + grammar).
+  - Record the ModuleTestAttempt to the UserModuleProgress test history (F07).
+  - On pass: transition UserModuleProgress to `completed`.
 
 ### Requirement: Review read
-- Provide the post-test review (score + per-question answers) so the app can render results and offer "Explain my mistake" (F12) per incorrect item.
+
+- `GET /users/:userId/moduleTests/:attemptId/review` — return score + per-question answers: for incorrect items, include the user's answer alongside the correct answer. Enables "Explain my mistake" (F12) per incorrect item.
 
 ---
 
@@ -77,6 +87,6 @@ Step 3 is the graded assessment that completes a module. It is **time-locked** u
 
 | # | Question | Options / Notes |
 |---|----------|-----------------|
-| OQ-01 | If the bank lacks enough fresh exercises for 50%, what happens? | Relax the split, or trigger F19 refresh and proceed with what's available |
+| OQ-01 | If the bank lacks enough fresh exercises for 50%, what happens? | Relax the split or proceed with what's available; notify the external tool to expand the bank |
 | OQ-02 | Is the unlock timer reset if the user re-runs practice? | Tied to F10 OQ-02 |
 | OQ-03 | Does a passed module's test remain replayable for practice? | Idea implies retake draws from bank; clarify whether it re-grades mastery |

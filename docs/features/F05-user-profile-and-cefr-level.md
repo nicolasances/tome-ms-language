@@ -2,7 +2,7 @@
 
 ## 1. Purpose & Scope
 
-Every learner has exactly one active CEFR level (A1–C2) at a time, defaulting to A1 at account creation. The CEFR level is the progression spine of the whole app and the primary motivational anchor shown on the Home Dashboard. This feature owns the User entity in this microservice and exposes the user's current level (and the read used by the dashboard). It also provides the level-mutation operation invoked when a Level Test is passed.
+Every learner has exactly one active CEFR level (A1–C2) at a time, defaulting to A1 at account creation. The CEFR level is the progression spine of the whole app and the primary motivational anchor shown on the Home Dashboard. This feature owns the User entity in this microservice and exposes the user's current level. It also provides the level-mutation operation invoked when a Level Test is passed.
 
 **Out of scope**:
 - The Level Test that decides when the level changes (→ [F21](./F21-level-test.md)); this feature only exposes the operation to set the new level
@@ -23,21 +23,34 @@ Every learner has exactly one active CEFR level (A1–C2) at a time, defaulting 
 ### 2.2. Requirements
 
 ### Requirement: User data model
-- Fields: `id`, `name`, `email`, `cefrLevel` (default A1), `createdAt`, `lastActiveAt`.
-- `cefrLevel` may be initialized above A1 to support a future placement test.
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| id | string | Unique identifier (from auth platform) | Required; matches the identity provided by totoms UserContext |
+| name | string | Display name | Required |
+| email | string | Email address | Required |
+| cefrLevel | string | Current active CEFR level | Default: A1; Must be one of: A1, A2, B1, B2, C1, C2 |
+| createdAt | Date | When the profile was created | Auto-set |
+| lastActiveAt | Date | Timestamp of the last request | Updated on each authenticated request |
 
 ### Requirement: Store the user
 - Dedicated store, sole DB access for the user collection.
 - Support: find by id, upsert/create, update `cefrLevel`, update `lastActiveAt`.
 
-### Requirement: Get current profile / level endpoint
-- Return the user's current CEFR level (and basic profile) for the dashboard.
+### Requirement: Get current profile / level
+
+- `GET /users/:id` — return the user's profile including current CEFR level.
+
+### Requirement: Create / upsert user
+
+- `POST /users` — create or upsert the user's language-learning profile. Called on first authenticated access or explicit onboarding.
 
 ### Requirement: Advance level operation
-- An internal operation to set the user's level to the next CEFR tier. Invoked only by the Level Test feature on a pass. Validates the requested level is exactly the next tier (no skipping in v2.0).
+
+- `PUT /users/:id/cefrLevel` — set the user's CEFR level to the next tier. Invoked only by the Level Test feature (F21) on a pass. Validates the requested level is exactly the next tier (no skipping in v2.0).
 
 ### Requirement: Level ordering utility
-- A shared, testable helper that knows the ordered sequence of levels (next level, comparison). Reused by F21 and F23.
+- A shared, testable helper that knows the ordered sequence of levels (next level, comparison). Reused by F21.
 
 ---
 

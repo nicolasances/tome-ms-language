@@ -2,7 +2,7 @@
 
 ## 1. Purpose & Scope
 
-On request during a translation exercise, the user can ask for a hint that nudges them toward the answer without revealing it fully (e.g. first letter, word type, a clue about the sense). This is an explicit, on-demand AI touchpoint. Using a hint may reduce the "quick/unprompted" weight that the SRS gives a subsequent correct answer (F06).
+On request during a translation exercise, the user can ask for a hint that nudges them toward the answer without revealing it fully (e.g. first letter, word type, a clue about the sense). This is an explicit, on-demand AI touchpoint. Using a hint marks the attempt as "prompted", which reduces the SRS weight applied to a subsequent correct answer on that item in the test (F06).
 
 **Out of scope**:
 - Revealing the full answer (that's the wrong-answer feedback path in F10)
@@ -17,16 +17,18 @@ On request during a translation exercise, the user can ask for a hint that nudge
 | Term | Definition |
 |------|-----------|
 | Hint | A partial clue for a translation exercise that does not give away the full answer |
-| Hint penalty | Using a hint marks the attempt as "prompted", reducing SRS weight on a later correct answer |
+| Hint penalty | Using a hint marks the attempt as "prompted" (`wasPrompted = true`), reducing SRS weight on a later correct answer (F06) |
 
 ### 2.2. Requirements
 
 ### Requirement: Hint endpoint
-- Input: the translation exercise id.
-- Output: a short hint that helps without revealing the full answer, pitched at the user's CEFR level. Generated via the AI client (mockable).
+
+- `POST /exercises/:exerciseId/hint` — request a hint for a translation exercise.
+  - Body: `{ sessionId: string, cefrLevel: string }`.
+  - Output: a short hint that helps without revealing the full answer, pitched at the user's CEFR level. Generated via the AI client (mockable).
 
 ### Requirement: Mark attempt as prompted
-- When a hint is used for an exercise in the current session, flag that exercise's attempt as "prompted" so that, when results are later applied to mastery (in a test via F06), the correct answer carries less weight. (Practice does not update mastery, so the flag matters only if the same item is then tested — keep the flag on the session result that feeds the test, per the chosen design.)
+- When a hint is used for an exercise in the current session, set `wasPrompted = true` for that exercise's entry in the PracticeSession (F10) or test state (F11). This flag is forwarded to F06's apply-results so a subsequent correct answer on the same item carries reduced weight.
 
 ---
 
@@ -51,4 +53,4 @@ On request during a translation exercise, the user can ask for a hint that nudge
 | # | Question | Options / Notes |
 |---|----------|-----------------|
 | OQ-01 | Should hints be pre-generated and stored to avoid live AI? | Idea lists it as a live AI touchpoint; could pre-generate a generic hint per exercise to cut cost |
-| OQ-02 | How exactly does a hint reduce SRS weight, given practice doesn't update mastery? | Define the link between session "prompted" flag and later test weighting, or drop the penalty in v2.0 |
+| OQ-02 | How exactly does a hint reduce SRS weight in the test? | The `wasPrompted` flag on ExerciseResult feeds F06's SRS formula; define the weight reduction |

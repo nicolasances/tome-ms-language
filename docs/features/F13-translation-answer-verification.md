@@ -2,12 +2,11 @@
 
 ## 1. Purpose & Scope
 
-For `translation_active` exercises only, after an answer is marked wrong by the normalized matching, the user can explicitly ask the AI to verify whether their translation is actually valid (paraphrases, synonyms the pre-generated list missed). If valid, the exercise is marked correct and the user's translation is appended to `userContributedAnswers` for that exercise (stored separately from AI-generated alternatives, for auditability). If invalid, the AI explains why. One verification per exercise attempt; unlimited across different exercises.
+For `translation_active` exercises only, after an answer is marked wrong by the normalized matching, the user can explicitly ask the AI to verify whether their translation is actually valid (paraphrases, synonyms the pre-generated list missed). If valid, the exercise is marked correct and the user's translation is appended to `userContributedAnswers` for that exercise. If invalid, the AI explains why. One verification per exercise attempt; unlimited across different exercises.
 
 **Out of scope**:
 - All non-translation exercise types (not applicable)
 - Automatic verification (must be explicit, on demand)
-- Generating the initial alternative answers (→ [F17](./F17-ai-exercise-bank-generation.md))
 
 ---
 
@@ -23,16 +22,18 @@ For `translation_active` exercises only, after an answer is marked wrong by the 
 ### 2.2. Requirements
 
 ### Requirement: Verify-translation endpoint
-- Input: the `translation_active` exercise id + the user's answer that was marked wrong.
-- The AI checks validity independent of the pre-generated answer list, scoped by the exercise prompt and any `context` note on the linked vocab item, and the user's CEFR level.
-- **Valid** outcome: mark the exercise correct for this attempt; append the user's answer to that exercise's `userContributedAnswers` (via F04 store), kept separate from `alternativeAnswers`.
-- **Invalid** outcome: exercise stays wrong; return an AI explanation of why the translation is not valid.
+
+- `POST /exercises/:exerciseId/verifyAnswer` — request AI verification of a translation that was marked wrong.
+  - Body: `{ userAnswer: string, sessionId: string, cefrLevel: string }`.
+  - The AI checks validity scoped by the exercise prompt and any `context` note on the linked vocab item, and the user's CEFR level.
+  - **Valid** outcome: mark the exercise correct for this attempt; append the user's answer to that exercise's `userContributedAnswers` via F04's mutation endpoint.
+  - **Invalid** outcome: return an AI explanation of why the translation is not valid.
 
 ### Requirement: One-per-attempt guard
-- Allow only one verification per exercise attempt. No global limit across different exercises.
+- Allow only one verification per exercise attempt. Track using `sessionId` + `exerciseId`.
 
-### Requirement: Effect on session/test state
-- A "valid" result flips the in-session correctness of that exercise (so a missed item in practice no longer needs retry; in a test it counts toward the score if invoked during review before scoring is finalized — see OQ-01).
+### Requirement: Effect on session state
+- A "valid" result flips the in-session correctness of that exercise (removes it from the retry queue in practice; adjusts score calculation if invoked before scoring is finalized in a test).
 
 ---
 

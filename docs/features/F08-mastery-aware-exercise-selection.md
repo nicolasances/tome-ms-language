@@ -5,7 +5,6 @@
 This feature is the personalization engine: given a pool of exercises (a module bank or a level test bank) and the user's mastery state, it draws a session-sized subset weighted toward the user's weak spots. **No AI is involved** — it is a deterministic-but-randomized weighted sampling algorithm. It is consumed by Practice Sessions (F10), Module Tests (F11), and Level Tests (F21). Delivering it as its own feature keeps the algorithm independently testable.
 
 **Out of scope**:
-- Generating exercises (→ [F17](./F17-ai-exercise-bank-generation.md))
 - The session/test lifecycle around the selection (→ [F10](./F10-practice-session.md), [F11](./F11-module-test.md), [F21](./F21-level-test.md))
 - The fresh-vs-repeat split specific to module tests (that constraint is applied by F11 on top of this engine)
 
@@ -35,7 +34,6 @@ Given a pool, a target count, and the user's mastery state, draw a weighted rand
 
 ### Requirement: Pure, testable component
 - Implemented as a self-contained function/utility taking the pool + mastery map + parameters and returning the selected exercises. No direct DB or HTTP access inside the algorithm (callers fetch the inputs).
-- Reuses / generalizes the existing `WeightedSampler` utility concept.
 
 ### Requirement: Inputs from other features
 - Mastery map comes from F06 (bulk read of vocab + grammar progress for the linked items).

@@ -2,11 +2,12 @@
 
 ## 1. Purpose & Scope
 
-The Grammar Concept Catalog is the canonical store of named grammatical topics (e.g. "Inversion", "Modal Verbs", "Double definiteness"). Each concept carries the CEFR level at which it is introduced, a short explanation, and 1–2 Danish examples. Concepts are shared across modules and users and are referenced by modules and exercises. This feature provides storage and read access for grammar concepts.
+The Grammar Concept Catalog is the canonical store of named grammatical topics (e.g. "Inversion", "Modal Verbs", "Double definiteness"). Each concept carries the CEFR level at which it is introduced, a short explanation, and 1–2 Danish examples. Concepts are shared across modules and users and are referenced by modules and exercises.
+
+Grammar concepts (including their explanation text and examples) are authored and submitted by an **external tool**. This feature provides the write and read access for these canonical concepts.
 
 **Out of scope**:
 - Per-user mastery of a concept (→ [F06](./F06-mastery-and-progress-tracking.md))
-- AI generation of the explanation text (→ [F16](./F16-ai-grammar-explanation-generation.md)) — this feature only stores and serves it
 - Presenting the concept during a module run (→ [F09](./F09-grammar-introduction.md))
 
 ---
@@ -20,26 +21,36 @@ The Grammar Concept Catalog is the canonical store of named grammatical topics (
 | Grammar Concept | A named grammatical topic appearing inside modules |
 | Category | Grouping of concepts: tenses, sentence_structure, verbs, nouns, pronouns, adjectives, connectors, advanced |
 | CEFR level introduced | The earliest level at which the concept appears (per idea §3.3) |
-| Explanation | Short instructional text shown in Step 1 of a module; authored or AI-generated, stored, never regenerated live |
+| Explanation | Short instructional text shown in Step 1 of a module; authored externally, stored here, never regenerated live |
 | Danish example | A `{ danish, english }` pair illustrating the concept |
 
 ### 2.2. Requirements
 
 ### Requirement: GrammarConcept data model
-- Fields: `id`, `name`, `category`, `cefrLevelIntroduced`, `explanation` (text), `examples` (array of `{ danish, english }`).
-- Canonical & shared: a concept is stored once and referenced by modules via `grammarConceptIds`.
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| id | ObjectId | Unique identifier | Auto-generated |
+| name | string | Canonical name of the concept | Required; used as matching key in content analysis |
+| category | string | Concept grouping | Must be one of: tenses, sentence_structure, verbs, nouns, pronouns, adjectives, connectors, advanced |
+| cefrLevelIntroduced | string | Earliest level the concept appears | Must be one of: A1, A2, B1, B2, C1, C2 |
+| explanation | string | Instructional text for Step 1 | Required |
+| examples | object[] | Illustrative examples | Array of `{ danish: string, english: string }`; min 1, max 2 |
 
 ### Requirement: Store the catalog
 - Dedicated store is the only place that reads/writes the grammar concept collection.
-- Support: insert one / insert many (seeding), find by id, find by ids (bulk lookup for modules), list by category, list by `cefrLevelIntroduced` (used by content analysis and level scoping).
+- Support: insert one, insert many (batch), find by id, find by ids (bulk lookup for modules), list by category, list by `cefrLevelIntroduced`.
+
+### Requirement: Write endpoints
+
+- `POST /grammarConcepts` — insert a single grammar concept.
+- `POST /grammarConcepts/batch` — insert many grammar concepts; skips duplicates by `name`.
 
 ### Requirement: Read endpoints
-- Get a single grammar concept by id (returns explanation + examples).
-- Get multiple by ids (resolve a module's `grammarConceptIds`).
-- List concepts available up to / at a given CEFR level (supports content analysis "ahead in curriculum" classification).
 
-### Requirement: Seed the v2.0 taxonomy
-- The fixed concept taxonomy from idea §3.3 (with each concept's "available from" level) is the source of truth for which concepts exist and at which level they unlock.
+- `GET /grammarConcepts/:id` — get a single grammar concept by id (returns explanation + examples).
+- `GET /grammarConcepts` — list concepts; optional query params `?cefrLevel=A1` (at-or-below filter) and `?category=tenses`.
+- `POST /grammarConcepts/lookup` — resolve a set of ids in bulk; body: `{ ids: string[] }`.
 
 ---
 
@@ -53,8 +64,9 @@ The Grammar Concept Catalog is the canonical store of named grammatical topics (
 
 ## 4. Constraints and Assumptions
 
+- **Constraint** — Grammar concepts are inserted by an external tool; this microservice stores and serves them.
 - **Constraint** — A grammar concept's CEFR level gates which modules and levels can reference it; the taxonomy of "available from" levels in idea §3.3 must be honored.
-- **Assumption** — Explanations are generated/authored at seeding time and stored; never generated during a live session.
+- **Assumption** — Explanations are authored/generated externally before being submitted; never generated live by this microservice.
 
 ---
 

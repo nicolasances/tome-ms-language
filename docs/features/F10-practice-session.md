@@ -26,27 +26,43 @@ Step 2 is the interactive practice phase of a module. The user works through a f
 ### 2.2. Requirements
 
 ### Requirement: PracticeSession data model
-- Tracks an in-progress session: `id`, `userId`, `moduleId`, ordered selected exercise ids, per-exercise answer state (answered/correct/userAnswer), current position, retry queue, `startedAt`, `completedAt` (nullable).
-- This is the only new model; it is transient session state, distinct from progress/mastery models.
 
-### Requirement: Start session endpoint
-- Draw `practiceSessionSize` exercises from the module bank via F08 (using current mastery + most recent session misses), order them by the type progression above (within a type, F08's choice stands), and create a PracticeSession. Transition UserModuleProgress to `in_progress`.
-- Only exercise types present in the bank appear.
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| id | ObjectId | Unique session id | Auto-generated |
+| userId | string | User id | Required |
+| moduleId | string | Module id | Required |
+| exerciseIds | string[] | Ordered selected exercise ids | Set at session start |
+| answers | object[] | Per-exercise answer state (answered, isCorrect, userAnswer) | Updated as user progresses |
+| currentPosition | number | Index of the current exercise | 0-based |
+| retryQueue | string[] | Exercise ids still to retry | Built at end of primary pass |
+| wasPrompted | object | Map of exerciseId → boolean (hint used) | Tracks hint usage per exercise |
+| startedAt | Date | Session start timestamp | Auto-set |
+| completedAt | Date | Session completion timestamp | Nullable; set on complete |
 
-### Requirement: Submit answer endpoint
-- Normalize and check the user's answer against the exercise's accepted answer set (canonical + alternativeAnswers + userContributedAnswers), with optional fuzzy match slack.
-- If correct → advance. If wrong → return the correct answer, mark missed, advance. Increment the exercise's `timesShown` appropriately.
-- Record the result in the session state (not in mastery/progress history).
+### Requirement: Start session
+
+- `POST /users/:userId/modules/:moduleId/practiceSessions` — draw `practiceSessionSize` exercises via F08 (using current mastery + most recent session misses), order them by type progression, create and return the PracticeSession. Transitions UserModuleProgress to `in_progress`.
+
+### Requirement: Get session state
+
+- `GET /users/:userId/practiceSessions/:sessionId` — return the current session state (for resume after app close).
+
+### Requirement: Submit answer
+
+- `POST /users/:userId/practiceSessions/:sessionId/answers` — normalize and check the user's answer against the exercise's accepted answer set (canonical + alternativeAnswers + userContributedAnswers), with optional fuzzy match. Body: `{ exerciseId, userAnswer }`.
+  - If correct → advance. If wrong → return the correct answer, add to retry queue, advance. Increment the exercise's `timesShown`.
+  - Records the result in the session state (not in mastery/progress history).
 
 ### Requirement: Missed-retry loop
-- When the primary pass is done, present missed exercises again until the user answers each correctly. Then the session is complete.
+- When the primary pass is done, present missed exercises again until all are answered correctly. Then the session is complete.
 
-### Requirement: Complete session endpoint / state
-- Mark the session complete. Record completion time — this timestamp starts the `testUnlockDelayHours` countdown for the Module Test (F11 reads it).
-- Optionally emit an event (e.g. `practiceCompleted`) for downstream consumers (bank refresh F19 can react).
+### Requirement: Complete session
+
+- `POST /users/:userId/practiceSessions/:sessionId/complete` — mark the session complete; record completion timestamp (this starts the `testUnlockDelayHours` countdown for the Module Test, F11 reads it).
 
 ### Requirement: No mastery update
-- Explicitly: this feature must not call F06's mastery update. It only records transient session results.
+- This feature must not call F06's mastery update. It only records transient session results.
 
 ---
 

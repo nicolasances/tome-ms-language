@@ -24,16 +24,41 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 
 ### 2.2. Requirements
 
+### Requirement: ExerciseResult sub-model
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| exerciseId | string | Exercise id | Required |
+| type | string | Exercise type | Required |
+| isCorrect | boolean | Whether the answer was correct | Required |
+| wasPrompted | boolean | Whether a hint was used | Required; affects SRS weight |
+| userAnswer | string | What the user submitted | Required |
+| correctAnswer | string | Canonical correct answer | Required |
+| timestamp | Date | When the attempt occurred | Required |
+| moduleId | string | Module context of the attempt | Nullable for level tests |
+
 ### Requirement: UserVocabularyProgress data model
-- Fields: `userId`, `vocabularyItemId`, `masteryScore`, `lastReviewed` (nullable), `exerciseHistory` (ExerciseResult[]).
-- One record per user per vocabulary item.
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| userId | string | User id | Required |
+| vocabularyItemId | string | Vocabulary item id | Required; one record per (userId, vocabularyItemId) |
+| masteryScore | number | Mastery score | [0.0, 1.0]; ≥ 0.8 = mastered |
+| lastReviewed | Date | Last time the item appeared in a test | Nullable |
+| exerciseHistory | ExerciseResult[] | History of test attempts | Appended only at test time (F11/F21) |
 
 ### Requirement: UserGrammarConceptProgress data model
-- Fields: `userId`, `grammarConceptId`, `masteryScore`, `lastReviewed` (nullable), `exerciseHistory` (ExerciseResult[]).
-- One record per user per grammar concept. Created the first time a user encounters an exercise linked to that concept.
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| userId | string | User id | Required |
+| grammarConceptId | string | Grammar concept id | Required; one record per (userId, grammarConceptId) |
+| masteryScore | number | Mastery score | [0.0, 1.0]; ≥ 0.8 = mastered |
+| lastReviewed | Date | Last time the concept appeared in a test | Nullable |
+| exerciseHistory | ExerciseResult[] | History of test attempts | Appended only at test time (F11/F21) |
 
 ### Requirement: SRS mastery algorithm (shared, pure, testable)
-- A correct answer increases the score; more weight if answered quickly / unprompted (no hint used).
+- A correct answer increases the score; less weight if a hint was used (`wasPrompted = true`).
 - An incorrect answer decreases the score.
 - Items not reviewed for a long time decay gently (computed at read time or via a maintenance pass).
 - Threshold: ≥ 0.8 = mastered.
@@ -44,11 +69,16 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 - Support: get progress for a user across a set of vocab item ids / grammar concept ids (bulk read for F08), upsert a progress record, append an ExerciseResult and recompute masteryScore + lastReviewed.
 
 ### Requirement: Apply-results operation
-- Given a batch of ExerciseResults (from a completed Module Test or Level Test), update the relevant vocab/grammar progress records via the SRS algorithm in one transaction-like pass.
+
+- `POST /users/:userId/vocabularyProgress/applyResults` — given a batch of ExerciseResults from a completed Module Test or Level Test, update the relevant vocab progress records via the SRS algorithm.
+- `POST /users/:userId/grammarProgress/applyResults` — same for grammar concept progress.
 
 ### Requirement: Read endpoints
-- Get the user's mastery score for a vocabulary item (idea US-05: "see my mastery score per vocabulary item").
-- Get mastery for a set of items (used by reports and dashboards).
+
+- `GET /users/:userId/vocabularyProgress` — list all vocab mastery records for a user.
+- `GET /users/:userId/vocabularyProgress/:vocabularyItemId` — get mastery for a specific vocab item.
+- `GET /users/:userId/grammarProgress` — list all grammar mastery records for a user.
+- `GET /users/:userId/grammarProgress/:grammarConceptId` — get mastery for a specific grammar concept.
 
 ---
 

@@ -18,17 +18,19 @@ After any exercise answered **incorrectly** (in practice or in a test review), t
 | Term | Definition |
 |------|-----------|
 | Mistake explanation | AI-generated breakdown of why an answer was wrong, with rule + extra example |
-| On-demand | Generated only when the user explicitly asks |
+| On-demand | Generated only when the user explicitly requests it |
 
 ### 2.2. Requirements
 
 ### Requirement: Explain-mistake endpoint
-- Input: the exercise id (and the user's wrong answer / the context of the attempt).
-- Output: correct answer, why it is correct (grammar rule or vocab note), the rule stated simply in English, and a second Danish example demonstrating the same rule.
-- Calls the AI client; the prompt includes the exercise, the user's wrong answer, the linked vocab item or grammar concept, and the **user's current CEFR level** so complexity is pitched right.
+
+- `POST /exercises/:exerciseId/explainMistake` — request an AI explanation for a wrong answer.
+  - Body: `{ userAnswer: string, cefrLevel: string }`.
+  - Output: correct answer, why it is correct (grammar rule or vocab note), the rule stated simply in English, and a second Danish example demonstrating the same rule.
+  - Calls the AI client; the prompt includes the exercise, the user's wrong answer, the linked vocab item or grammar concept, and the **user's current CEFR level**.
 
 ### Requirement: AI client usage
-- Goes through the shared AI API client (mockable). No new persistent data model required; the explanation is returned, not necessarily stored (may be cached).
+- Goes through the shared AI API client (mockable). No new persistent data model required; the explanation is returned, not stored.
 
 ### Requirement: Stateless w.r.t. mastery
 - Requesting an explanation does not change mastery or the exercise's correctness.
@@ -55,5 +57,5 @@ After any exercise answered **incorrectly** (in practice or in a test review), t
 
 | # | Question | Options / Notes |
 |---|----------|-----------------|
-| OQ-01 | Cache explanations per (exercise, wrong-answer)? | Could reduce repeated AI cost for common mistakes |
+| OQ-01 | Cache explanations per (exerciseId, userAnswer)? | Could reduce repeated AI cost for common mistakes |
 | OQ-02 | Rate limiting per user? | Bound AI cost |

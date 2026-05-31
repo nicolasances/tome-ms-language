@@ -24,24 +24,46 @@ Module status is per-user: one learner may have completed a module another hasn'
 
 ### 2.2. Requirements
 
+### Requirement: ModuleTestAttempt sub-model
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| id | string | Unique attempt id | Auto-generated |
+| score | number | Percentage correct | 0–100 |
+| passed | boolean | Whether the attempt passed | Required |
+| takenAt | Date | When the test was submitted | Required |
+
 ### Requirement: UserModuleProgress data model
-- Fields: `userId`, `moduleId`, `status`, `startedAt` (nullable), `completedAt` (nullable), `testAttempts` (ModuleTestAttempt[]).
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| userId | string | User id | Required |
+| moduleId | string | Module id | Required; one record per (userId, moduleId) |
+| status | string | Current module status | Must be one of: locked, available, in_progress, completed |
+| startedAt | Date | When practice (Step 2) was first started | Nullable |
+| completedAt | Date | When the module was passed | Nullable |
+| testAttempts | ModuleTestAttempt[] | All module test attempts | Appended by F11 |
 
 ### Requirement: Status lifecycle rules
-- A module is `available` when its prerequisites are met (e.g. it is at the user's current level and prior modules satisfy whatever ordering rule applies); otherwise `locked`.
+- A module is `available` when its prerequisites are met (at the user's current level, and prior ordering rules satisfied); otherwise `locked`.
 - Transitions: `available` → `in_progress` when practice (Step 2) starts; `in_progress` → `completed` when the Module Test is passed.
-- `completed` is terminal for progression purposes (retaking for practice does not un-complete it).
+- `completed` is terminal for progression purposes.
 
 ### Requirement: Store progress
 - Dedicated store, sole DB access.
 - Support: get progress for a user+module, list a user's progress across all modules at a level (dashboard + completion gate), upsert status with timestamps, append a ModuleTestAttempt.
 
 ### Requirement: Read endpoints
-- Get the user's progress for a module (status, attempts).
-- List the user's module progress at their current level (for the dashboard, idea §3.5 "Module Progress").
 
-### Requirement: Completion-gate query
-- A query that answers "has the user completed all modules at level X?" — consumed by F21 to decide if the Level Test is available.
+- `GET /users/:userId/moduleProgress` — list the user's progress across modules; optional query param `?cefrLevel=A1`.
+- `GET /users/:userId/moduleProgress/:moduleId` — get progress for a specific module (status + attempts).
+- `GET /users/:userId/levelProgress` — completion-gate query: returns whether all modules at the user's current level are `completed`, consumed by F21.
+
+### Requirement: Write endpoints
+
+- `POST /users/:userId/moduleProgress/:moduleId` — initialize a progress record (sets status to `available` or `in_progress`).
+- `PATCH /users/:userId/moduleProgress/:moduleId` — update status and timestamps (transitions: in_progress, completed).
+- `POST /users/:userId/moduleProgress/:moduleId/testAttempts` — append a ModuleTestAttempt record; called by F11.
 
 ---
 

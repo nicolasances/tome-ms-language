@@ -2,10 +2,9 @@
 
 ## 1. Purpose & Scope
 
-Step 1 of a module run is purely instructional: for each grammar concept in the module, the app shows a short explanation with 1–2 Danish examples. The user does not interact. This feature serves the pre-generated explanation content for a module's grammar concepts in the order they should be presented. No mastery change, no AI at runtime — explanations were generated and stored at seeding time (F02/F16).
+Step 1 of a module run is purely instructional: for each grammar concept in the module, the app shows a short explanation with 1–2 Danish examples. The user does not interact. This feature serves the pre-authored explanation content for a module's grammar concepts in the order they should be presented. No mastery change, no AI at runtime — explanations were submitted and stored at seeding time (F02).
 
 **Out of scope**:
-- Generating explanations (→ [F16](./F16-ai-grammar-explanation-generation.md))
 - Storing the GrammarConcept (→ [F02](./F02-grammar-concept-catalog.md))
 - Any interactive exercise (→ [F10](./F10-practice-session.md))
 
@@ -21,8 +20,9 @@ Step 1 of a module run is purely instructional: for each grammar concept in the 
 
 ### 2.2. Requirements
 
-### Requirement: Get module grammar introduction endpoint
-- Given a module id, return its grammar concepts (resolved from `grammarConceptIds`) each with `name`, `explanation`, and `examples`, in the intended presentation order.
+### Requirement: Get module grammar introduction
+
+- `GET /modules/:moduleId/grammarIntroduction` — return the module's grammar concepts (resolved from `grammarConceptIds`) each with `name`, `explanation`, and `examples`, in the intended presentation order (order of `grammarConceptIds` on the module).
 - Read-only; reuses F02 and F03 stores; no new data model.
 
 ### Requirement: Mark Step 1 reached (optional)
@@ -42,7 +42,7 @@ Step 1 of a module run is purely instructional: for each grammar concept in the 
 
 - **Constraint** — No mastery scores are updated in Step 1.
 - **Constraint** — Explanations are never generated live; they are read from storage.
-- **Assumption** — Presentation order of concepts can follow the order of `grammarConceptIds` on the module.
+- **Assumption** — Presentation order of concepts follows the order of `grammarConceptIds` on the module.
 
 ---
 
