@@ -1,7 +1,8 @@
 import { WithId } from "mongodb";
+import { CEFR_LEVELS } from "./CefrLevels";
 
+export { CEFR_LEVELS };
 export const VOCABULARY_ITEM_TYPES = ["noun", "verb", "adjective", "adverb", "phrase", "pattern", "connector", "pronoun", "number"] as const;
-export const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 export const VOCABULARY_ITEM_SOURCES = ["curriculum", "user_added"] as const;
 
 export class VocabularyItem {
