@@ -55,6 +55,13 @@ export class GrammarConceptStore {
         return docs.map(doc => GrammarConcept.fromBSON(doc as any));
     }
 
+    async findByIds(ids: string[]): Promise<GrammarConcept[]> {
+
+        const docs = await this.db.collection(GRAMMAR_COLLECTION).find({ id: { $in: ids } }).toArray();
+
+        return docs.map(doc => GrammarConcept.fromBSON(doc as any));
+    }
+
     async findById(id: string): Promise<GrammarConcept | null> {
 
         const doc = await this.db.collection(GRAMMAR_COLLECTION).findOne({ id });
