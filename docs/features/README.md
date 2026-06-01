@@ -30,11 +30,11 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | F04 | [Exercise Bank](./F04-exercise-bank.md) | Exercise, ExerciseBank | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group B — User state & mastery
-| # | Feature | Primary model |
-|---|---------|---------------|
-| F05 | [User Profile & CEFR Level](./F05-user-profile-and-cefr-level.md) | User |
-| F06 | [Mastery & Progress Tracking (SRS)](./F06-mastery-and-progress-tracking.md) | UserVocabularyProgress, UserGrammarConceptProgress |
-| F07 | [User Module Progress](./F07-user-module-progress.md) | UserModuleProgress |
+| # | Feature | Primary model | Status | 
+|---|---------|---------------| ------ | 
+| F06 | [Mastery & Progress Tracking (SRS)](./F06-mastery-and-progress-tracking.md) | UserVocabularyProgress, UserGrammarConceptProgress | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+| F05 | [User Profile & CEFR Level](./F05-user-profile-and-cefr-level.md) | User | | 
+| F07 | [User Module Progress](./F07-user-module-progress.md) | UserModuleProgress | | 
 
 ### Group C — Exercise selection engine
 | # | Feature | Primary model |
