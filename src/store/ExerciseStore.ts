@@ -51,6 +51,17 @@ export class ExerciseStore {
     }
 
     /**
+     * Appends a user-contributed answer string to the exercise's userContributedAnswers array.
+     * Returns false if no exercise matched (not found), true otherwise.
+     */
+    async appendUserContributedAnswer(id: string, answer: string): Promise<boolean> {
+
+        const result = await this.db.collection(EXERCISES_COLLECTION).updateOne({ id }, { $push: { userContributedAnswers: answer } } as any);
+
+        return result.matchedCount > 0;
+    }
+
+    /**
      * Increments timesShown by 1 for the given exercise.
      * Returns false if no exercise matched (not found), true otherwise.
      */
