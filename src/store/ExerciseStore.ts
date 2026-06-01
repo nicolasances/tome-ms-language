@@ -51,6 +51,17 @@ export class ExerciseStore {
     }
 
     /**
+     * Increments timesShown by 1 for the given exercise.
+     * Returns false if no exercise matched (not found), true otherwise.
+     */
+    async incrementTimesShown(id: string): Promise<boolean> {
+
+        const result = await this.db.collection(EXERCISES_COLLECTION).updateOne({ id }, { $inc: { timesShown: 1 } });
+
+        return result.matchedCount > 0;
+    }
+
+    /**
      * Lists all exercises for a given moduleId.
      */
     async listByModuleId(moduleId: string): Promise<Exercise[]> {
