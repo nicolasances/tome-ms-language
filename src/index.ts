@@ -21,6 +21,7 @@ import { PostSentences } from './dlg/PostSentences';
 import { PostVocabularyItem } from './dlg/PostVocabularyItem';
 import { PostVocabularyItemBatch } from './dlg/PostVocabularyItemBatch';
 import { GetModule } from './dlg/GetModule';
+import { GetModules } from './dlg/GetModules';
 import { PostModule } from './dlg/PostModule';
 import { RemoveSentenceAlternative } from './dlg/RemoveSentenceAlternative';
 import { StartSession } from './dlg/session/StartSession';
@@ -38,6 +39,7 @@ const config: TotoMicroserviceConfiguration = {
         apiEndpoints: [
             { method: 'POST', path: '/modules', delegate: PostModule },
             { method: 'GET', path: '/modules/:id', delegate: GetModule },
+            { method: 'GET', path: '/modules', delegate: GetModules },
             { method: 'POST', path: '/grammarConcepts', delegate: PostGrammarConcept },
             { method: 'POST', path: '/grammarConcepts/batch', delegate: PostGrammarConceptBatch },
             { method: 'GET', path: '/grammarConcepts/:id', delegate: GetGrammarConcept },
