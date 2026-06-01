@@ -1,0 +1,108 @@
+import { WithId } from "mongodb";
+import { CEFR_LEVELS } from "./CefrLevels";
+
+export { CEFR_LEVELS };
+
+export class Module {
+
+    id: string;
+    title: string;
+    theme: string;
+    communicationGoal: string;
+    cefrLevel: string;
+    vocabularyItemIds: string[];
+    grammarConceptIds: string[];
+    createdAt: Date;
+    isUserGenerated: boolean;
+    createdByUserId?: string;
+    practiceSessionSize: number;
+    testUnlockDelayHours: number;
+    testRetryDelayMinutes: number;
+    testFreshExercisePercent: number;
+    testPassThreshold: number;
+
+    constructor(input: ModuleInput) {
+
+        this.id = input.id;
+        this.title = input.title;
+        this.theme = input.theme;
+        this.communicationGoal = input.communicationGoal;
+        this.cefrLevel = input.cefrLevel;
+        this.vocabularyItemIds = input.vocabularyItemIds ?? [];
+        this.grammarConceptIds = input.grammarConceptIds ?? [];
+        this.createdAt = input.createdAt ?? new Date();
+        this.isUserGenerated = input.isUserGenerated ?? false;
+        this.createdByUserId = input.createdByUserId;
+        this.practiceSessionSize = input.practiceSessionSize ?? 15;
+        this.testUnlockDelayHours = input.testUnlockDelayHours ?? 4;
+        this.testRetryDelayMinutes = input.testRetryDelayMinutes ?? 20;
+        this.testFreshExercisePercent = input.testFreshExercisePercent ?? 50;
+        this.testPassThreshold = input.testPassThreshold ?? 80;
+    }
+
+    /**
+     * Creates a Module instance from a MongoDB BSON document.
+     */
+    static fromBSON(data: WithId<any>): Module {
+
+        return new Module({
+            id: data.id,
+            title: data.title,
+            theme: data.theme,
+            communicationGoal: data.communicationGoal,
+            cefrLevel: data.cefrLevel,
+            vocabularyItemIds: data.vocabularyItemIds ?? [],
+            grammarConceptIds: data.grammarConceptIds ?? [],
+            createdAt: data.createdAt,
+            isUserGenerated: data.isUserGenerated ?? false,
+            createdByUserId: data.createdByUserId,
+            practiceSessionSize: data.practiceSessionSize ?? 15,
+            testUnlockDelayHours: data.testUnlockDelayHours ?? 4,
+            testRetryDelayMinutes: data.testRetryDelayMinutes ?? 20,
+            testFreshExercisePercent: data.testFreshExercisePercent ?? 50,
+            testPassThreshold: data.testPassThreshold ?? 80,
+        });
+    }
+
+    /**
+     * Serializes the Module to a MongoDB BSON document.
+     */
+    toBSON(): any {
+
+        return {
+            id: this.id,
+            title: this.title,
+            theme: this.theme,
+            communicationGoal: this.communicationGoal,
+            cefrLevel: this.cefrLevel,
+            vocabularyItemIds: this.vocabularyItemIds,
+            grammarConceptIds: this.grammarConceptIds,
+            createdAt: this.createdAt,
+            isUserGenerated: this.isUserGenerated,
+            createdByUserId: this.createdByUserId,
+            practiceSessionSize: this.practiceSessionSize,
+            testUnlockDelayHours: this.testUnlockDelayHours,
+            testRetryDelayMinutes: this.testRetryDelayMinutes,
+            testFreshExercisePercent: this.testFreshExercisePercent,
+            testPassThreshold: this.testPassThreshold,
+        };
+    }
+}
+
+export interface ModuleInput {
+    id: string;
+    title: string;
+    theme: string;
+    communicationGoal: string;
+    cefrLevel: string;
+    vocabularyItemIds?: string[];
+    grammarConceptIds?: string[];
+    createdAt?: Date;
+    isUserGenerated?: boolean;
+    createdByUserId?: string;
+    practiceSessionSize?: number;
+    testUnlockDelayHours?: number;
+    testRetryDelayMinutes?: number;
+    testFreshExercisePercent?: number;
+    testPassThreshold?: number;
+}
