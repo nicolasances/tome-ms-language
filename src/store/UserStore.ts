@@ -19,7 +19,11 @@ export class UserStore {
      */
     async findByEmail(email: string): Promise<User | null> {
 
-        throw new Error("Not implemented");
+        const doc = await this.db.collection(USERS_COLLECTION).findOne({ email });
+
+        if (!doc) return null;
+
+        return User.fromBSON(doc as any);
     }
 
     /**
@@ -27,7 +31,9 @@ export class UserStore {
      */
     async create(user: User): Promise<User> {
 
-        throw new Error("Not implemented");
+        await this.db.collection(USERS_COLLECTION).insertOne(user.toBSON());
+
+        return user;
     }
 
     /**
