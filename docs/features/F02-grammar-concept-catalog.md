@@ -42,7 +42,7 @@ Grammar concepts (including their explanation text and examples) are authored an
 #### 2.2.2. Endpoints
 
 - `POST /grammarConcepts` — insert a single grammar concept.
-- `POST /grammarConcepts/batch` — insert many grammar concepts; skips duplicates by `name`.
+- `POST /grammarConcepts/batch` — insert many grammar concepts; skips duplicates by `id`.
 - `GET /grammarConcepts/:id` — get a single grammar concept by id (returns explanation + examples).
 - `GET /grammarConcepts` — list concepts; optional query params `?cefrLevel=A1` (exact-match filter) and `?category=tenses`.
 - `POST /grammarConcepts/lookup` — resolve a set of ids in bulk; body: `{ ids: string[] }`.
@@ -50,7 +50,7 @@ Grammar concepts (including their explanation text and examples) are authored an
 #### 2.2.4. Business Logic
 
 - A dedicated store is the only place that reads/writes the grammar concept collection. Supports: insert one, insert many (batch), find by id, find by ids (bulk lookup for modules), list by category, list by `cefrLevelIntroduced`.
-- Inserting a concept that duplicates an existing `id` is rejected. Additionally, duplicate detection on `name` — batch insert skips a concept whose name already exists and reports which were inserted vs. skipped.
+- Inserting a concept that duplicates an existing `id` is rejected (single insert). Batch insert skips concepts whose `id` already exists; name uniqueness is not enforced at the batch level.
 - The `?cefrLevel=A1` filter on `GET /grammarConcepts` is an exact match on `cefrLevelIntroduced`. It returns only concepts introduced at that specific level, not at lower levels.
 
 ---
@@ -78,3 +78,22 @@ Grammar concepts (including their explanation text and examples) are authored an
 | # | Question | Options / Notes |
 |---|----------|-----------------|
 | OQ-01 | Are concept names stable identifiers usable for matching in content analysis? | Content analysis maps detected patterns to `conceptName`; need a canonical name list |
+
+---
+
+## 6. Technical Decisions
+
+### Storage
+- MongoDB collection: `grammar`.
+- The caller-provided `id` is stored as a plain document field, not as `_id` (same pattern as VocabularyItem).
+- Store performs explicit duplicate check on `id` before insert rather than relying on unique-index conflicts, to return typed statuses.
+
+### Shared constants
+- `CEFR_LEVELS` lives in `src/model/CefrLevels.ts` and is imported by both `VocabularyItem.ts` and `GrammarConcept.ts`. Do not duplicate it.
+
+### Endpoint design
+- `examples` min/max validation (1–2 items, each requiring `danish` and `english`) is enforced in the endpoint delegate's `parseRequest`, not in the model constructor.
+- Batch dedup is by `id` only. Name uniqueness is not enforced at the batch level; the caller is responsible for submitting distinct names.
+- `GET /grammarConcepts` returns results sorted alphabetically by `name`. Both `cefrLevel` and `category` filters are optional and can be combined.
+- `POST /grammarConcepts/lookup`: missing ids are silently absent from the response (no 404 for unknown ids).
+- Express route ordering: `/grammarConcepts/batch` and `/grammarConcepts/lookup` must be registered before `/grammarConcepts/:id`.

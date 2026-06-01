@@ -85,5 +85,20 @@ Modules are created by an **external tool** (a seeding script or a custom module
 
 | # | Question | Options / Notes |
 |---|----------|-----------------|
-| OQ-01 | Should config parameters live on the Module or a separate global config with per-module overrides? | Either; per-module override capability is the requirement |
-| OQ-02 | Do we store a module ordering/sequence within a level explicitly, or derive from a code (e.g. A1-01)? | Idea uses codes like A1-01; an explicit order field may be cleaner |
+| OQ-01 | Should config parameters live on the Module or a separate global config with per-module overrides? | **Resolved**: config parameters live directly on the Module document. Defaults are applied in the `Module` constructor; each can be overridden individually in the POST body. |
+| OQ-02 | Do we store a module ordering/sequence within a level explicitly, or derive from a code (e.g. A1-01)? | **Resolved**: ordering is derived from the `id` code (e.g. `danish-A1-01`). No explicit order field is stored. `GET /modules` sorts by `id` ascending, which preserves natural curriculum order. |
+
+---
+
+## 6. Technical Decisions
+
+### Storage
+- MongoDB collection: `modules`.
+- The caller-provided `id` is stored as a plain document field, not as `_id` (same pattern as VocabularyItem and GrammarConcept).
+- Store performs an explicit duplicate check on `id` before insert.
+- `createdByUserId` is an optional field set only when `isUserGenerated = true`; it is absent/null otherwise.
+
+### Endpoint design
+- `POST /modules` validates referenced `vocabularyItemIds` and `grammarConceptIds` by calling `VocabularyItemStore.findByIds()` and `GrammarConceptStore.findByIds()` respectively inside the delegate's `do()`. Missing ids are detected by comparing the returned array length to the input length; any mismatch rejects the request with 400.
+- `GET /modules` returns results sorted by `id` ascending to preserve natural curriculum ordering encoded in module codes.
+- `GET /modules` accepts `isUserGenerated` as a string query param (`"true"` / `"false"`); any other value (including absent) is treated as `undefined` (no filter applied).
