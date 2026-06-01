@@ -15,8 +15,7 @@ const validTranslationActive = {
 
 const validSentenceReorder = {
     type: "sentence_reorder",
-    prompt: "Reorder the words",
-    promptTranslation: "Reorder the words",
+    prompt: "I am happy",
     answer: "Jeg er glad",
     words: ["jeg", "er", "glad"],
     grammarConceptId: "grammar-1",

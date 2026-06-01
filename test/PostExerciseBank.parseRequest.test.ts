@@ -24,8 +24,7 @@ const validMultipleChoice = {
 
 const validSentenceReorder = {
     type: "sentence_reorder",
-    prompt: "Reorder the words",
-    promptTranslation: "Reorder the words",
+    prompt: "I am happy",
     answer: "Jeg er glad",
     words: ["jeg", "er", "glad"],
     grammarConceptId: "grammar-1",
@@ -176,11 +175,12 @@ describe("PostExerciseBank.parseRequest", () => {
         assert.throws(() => delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises: [noPromptTranslation] })), /promptTranslation/i);
     });
 
-    it("throws 400 when sentence_reorder is missing promptTranslation", () => {
+    it("accepts sentence_reorder without promptTranslation", () => {
 
         const delegate = new PostExerciseBank({} as any, {} as any);
-        const { promptTranslation: _pt, ...noPromptTranslation } = validSentenceReorder;
-        assert.throws(() => delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises: [noPromptTranslation] })), /promptTranslation/i);
+        const parsed = delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises: [validSentenceReorder] }));
+
+        assert.isNull(parsed.exercises[0].promptTranslation);
     });
 
     it("throws 400 when error_correction is missing promptTranslation", () => {

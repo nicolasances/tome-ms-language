@@ -5,7 +5,7 @@ export const EXERCISE_TYPES = ["translation_active", "multiple_choice", "fill_bl
 export const VOCAB_LINKED_TYPES = ["translation_active", "multiple_choice", "fill_blank", "conjugation_drill"] as const;
 export const GRAMMAR_LINKED_TYPES = ["sentence_reorder", "error_correction"] as const;
 
-export const PROMPT_TRANSLATION_REQUIRED_TYPES = ["multiple_choice", "fill_blank", "sentence_reorder", "error_correction"] as const;
+export const PROMPT_TRANSLATION_REQUIRED_TYPES = ["multiple_choice", "fill_blank", "error_correction"] as const;
 
 export class Exercise {
 
