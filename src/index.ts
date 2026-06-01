@@ -25,6 +25,7 @@ import { GetModules } from './dlg/GetModules';
 import { PostModule } from './dlg/PostModule';
 import { AppendExercisesToBank } from './dlg/AppendExercisesToBank';
 import { GetExercise } from './dlg/GetExercise';
+import { GetExercises } from './dlg/GetExercises';
 import { GetExerciseBank } from './dlg/GetExerciseBank';
 import { PostExerciseBank } from './dlg/PostExerciseBank';
 import { RemoveSentenceAlternative } from './dlg/RemoveSentenceAlternative';
@@ -44,6 +45,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/exerciseBanks', delegate: PostExerciseBank },
             { method: 'GET', path: '/exerciseBanks/:moduleId', delegate: GetExerciseBank },
             { method: 'POST', path: '/exerciseBanks/:moduleId/exercises', delegate: AppendExercisesToBank },
+            { method: 'GET', path: '/exercises', delegate: GetExercises },
             { method: 'GET', path: '/exercises/:id', delegate: GetExercise },
             { method: 'POST', path: '/modules', delegate: PostModule },
             { method: 'GET', path: '/modules/:id', delegate: GetModule },

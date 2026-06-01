@@ -51,6 +51,16 @@ export class ExerciseStore {
     }
 
     /**
+     * Lists all exercises for a given moduleId.
+     */
+    async listByModuleId(moduleId: string): Promise<Exercise[]> {
+
+        const docs = await this.db.collection(EXERCISES_COLLECTION).find({ moduleId }).toArray();
+
+        return docs.map(doc => Exercise.fromBSON(doc as any));
+    }
+
+    /**
      * Finds a single exercise by its id.
      * Returns null if not found.
      */
