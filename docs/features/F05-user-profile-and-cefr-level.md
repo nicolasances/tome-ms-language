@@ -28,11 +28,12 @@ Every learner has exactly one active CEFR level (A1–C2) at a time, defaulting 
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
-| id | string | Internal unique identifier | Auto-generated UUID on creation |
-| email | string | Email address | From JWT token; unique; indexed; reconciliation key |
+| id | string | Internal unique identifier | Auto-generated UUID (`crypto.randomUUID()`) on creation |
+| email | string | Email address | From JWT token; reconciliation key; no DB index (user count is small) |
 | cefrLevel | string | Current active CEFR level | Default: A1; Must be one of: A1, A2, B1, B2, C1, C2 |
-| createdAt | Date | When the profile was created | Auto-set |
-| lastActiveAt | Date | Timestamp of the last request | Updated on each authenticated request |
+| createdAt | string | When the profile was created (ISO string) | Auto-set |
+
+`lastActiveAt` was removed from scope — not needed for v2.0.
 
 Identity is established by the `email` extracted from the JWT on every authenticated request. The auth platform does not provide a user ID; `email` is the sole reconciliation key between the token and the stored profile.
 
@@ -44,11 +45,17 @@ Identity is established by the `email` extracted from the JWT on every authentic
 
 #### 2.2.4. Business Logic
 
-- A dedicated store is the sole DB accessor for the user collection. Supports: find by email, create, update `cefrLevel`, update `lastActiveAt`.
-- `email` must be unique and indexed in the database.
+- A dedicated store (`UserStore`) is the sole DB accessor for the `users` collection. Methods: `findByEmail`, `create`, `updateCefrLevel`.
+- No MongoDB index on `email` — user count is small; a collection scan on `findByEmail` is acceptable.
+- `GET /me` returns 404 when no profile exists; the client should redirect to `POST /users` to register first.
 - `PUT /me/cefrLevel` validates that the requested level is exactly the next tier in the ordered sequence (no level-skipping in v2.0); rejects the request if the level is not the immediate successor.
-- A shared, testable level-ordering utility knows the ordered sequence (A1 → A2 → B1 → B2 → C1 → C2) and exposes next-level and comparison operations. Reused by F21.
-- `lastActiveAt` is updated on each authenticated request to this microservice.
+- A shared, testable level-ordering utility (`src/model/CefrLevels.ts`) knows the ordered sequence (A1 → A2 → B1 → B2 → C1 → C2) and exposes `nextLevel()` and `isValidCefrLevel()`. Reused by F21.
+
+#### 2.2.5. Technical Decisions
+
+- `id` is stored as a plain UUID field in the document (not relying on MongoDB `_id`) — consistent with `VocabularyItem` and other entities with client-assigned IDs.
+- `createdAt` is stored as an ISO string — consistent with `Session` and other time-stamped entities in the service.
+- `PUT /me/cefrLevel` uses MongoDB `findOneAndUpdate` with `{ returnDocument: "after" }` to return the updated document atomically.
 
 ---
 
