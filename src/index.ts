@@ -1,5 +1,8 @@
 import { getHyperscalerConfiguration, SupportedHyperscalers, TotoMicroservice, TotoMicroserviceConfiguration } from 'totoms';
 import { ControllerConfig } from "./Config";
+import { GetMe } from './dlg/GetMe';
+import { PostUsers } from './dlg/PostUsers';
+import { PutMeCefrLevel } from './dlg/PutMeCefrLevel';
 import { AddSentenceAlternative } from './dlg/AddSentenceAlternative';
 import { GetGrammarConcept } from './dlg/GetGrammarConcept';
 import { GetGrammarConcepts } from './dlg/GetGrammarConcepts';
@@ -44,26 +47,35 @@ const config: TotoMicroserviceConfiguration = {
     customConfiguration: ControllerConfig,
     apiConfiguration: {
         apiEndpoints: [
+            { method: 'POST', path: '/users', delegate: PostUsers },
+            { method: 'GET', path: '/me', delegate: GetMe },
+            { method: 'PUT', path: '/me/cefrLevel', delegate: PutMeCefrLevel },
+
             { method: 'POST', path: '/exerciseBanks', delegate: PostExerciseBank },
             { method: 'GET', path: '/exerciseBanks/:moduleId', delegate: GetExerciseBank },
             { method: 'POST', path: '/exerciseBanks/:moduleId/exercises', delegate: AppendExercisesToBank },
+
             { method: 'GET', path: '/exercises', delegate: GetExercises },
             { method: 'GET', path: '/exercises/:id', delegate: GetExercise },
             { method: 'PUT', path: '/exercises/:id/timesShown', delegate: PatchExerciseTimesShown },
             { method: 'PUT', path: '/exercises/:id/userContributedAnswers', delegate: PatchExerciseUserContributedAnswers },
+
             { method: 'POST', path: '/modules', delegate: PostModule },
             { method: 'GET', path: '/modules/:id', delegate: GetModule },
             { method: 'GET', path: '/modules', delegate: GetModules },
+
             { method: 'POST', path: '/grammarConcepts', delegate: PostGrammarConcept },
             { method: 'POST', path: '/grammarConcepts/batch', delegate: PostGrammarConceptBatch },
             { method: 'GET', path: '/grammarConcepts/:id', delegate: GetGrammarConcept },
             { method: 'GET', path: '/grammarConcepts', delegate: GetGrammarConcepts },
             { method: 'POST', path: '/grammarConcepts/lookup', delegate: LookupGrammarConcepts },
+            
             { method: 'POST', path: '/vocabularyItems', delegate: PostVocabularyItem },
             { method: 'POST', path: '/vocabularyItems/batch', delegate: PostVocabularyItemBatch },
             { method: 'POST', path: '/vocabularyItems/lookup', delegate: LookupVocabularyItems },
             { method: 'GET', path: '/vocabularyItems', delegate: GetVocabularyItems },
             { method: 'GET', path: '/vocabularyItems/:id', delegate: GetVocabularyItem },
+            
             { method: 'GET', path: '/sentences/:language', delegate: GetSentences },
             { method: 'GET', path: '/sentences/:language/with-stats', delegate: GetSentencesWithStats },
             { method: 'POST', path: '/sentences/:language', delegate: PostSentence },
