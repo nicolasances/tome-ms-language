@@ -36,4 +36,17 @@ export class ExerciseStore {
 
         return bank.id;
     }
+
+    /**
+     * Finds the exercise bank for a given moduleId.
+     * Returns null if no bank exists for that module.
+     */
+    async findBankByModuleId(moduleId: string): Promise<ExerciseBank | null> {
+
+        const doc = await this.db.collection(EXERCISE_BANKS_COLLECTION).findOne({ moduleId });
+
+        if (!doc) return null;
+
+        return ExerciseBank.fromBSON(doc as any);
+    }
 }

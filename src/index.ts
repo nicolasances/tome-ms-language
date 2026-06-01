@@ -23,6 +23,7 @@ import { PostVocabularyItemBatch } from './dlg/PostVocabularyItemBatch';
 import { GetModule } from './dlg/GetModule';
 import { GetModules } from './dlg/GetModules';
 import { PostModule } from './dlg/PostModule';
+import { GetExerciseBank } from './dlg/GetExerciseBank';
 import { PostExerciseBank } from './dlg/PostExerciseBank';
 import { RemoveSentenceAlternative } from './dlg/RemoveSentenceAlternative';
 import { StartSession } from './dlg/session/StartSession';
@@ -39,6 +40,7 @@ const config: TotoMicroserviceConfiguration = {
     apiConfiguration: {
         apiEndpoints: [
             { method: 'POST', path: '/exerciseBanks', delegate: PostExerciseBank },
+            { method: 'GET', path: '/exerciseBanks/:moduleId', delegate: GetExerciseBank },
             { method: 'POST', path: '/modules', delegate: PostModule },
             { method: 'GET', path: '/modules/:id', delegate: GetModule },
             { method: 'GET', path: '/modules', delegate: GetModules },
