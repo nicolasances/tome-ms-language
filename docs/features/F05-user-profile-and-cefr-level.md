@@ -28,23 +28,25 @@ Every learner has exactly one active CEFR level (A1–C2) at a time, defaulting 
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
-| id | string | Unique identifier (from auth platform) | Required; matches the identity provided by totoms UserContext |
-| name | string | Display name | Required |
-| email | string | Email address | Required |
+| id | string | Internal unique identifier | Auto-generated UUID on creation |
+| email | string | Email address | From JWT token; unique; indexed; reconciliation key |
 | cefrLevel | string | Current active CEFR level | Default: A1; Must be one of: A1, A2, B1, B2, C1, C2 |
 | createdAt | Date | When the profile was created | Auto-set |
 | lastActiveAt | Date | Timestamp of the last request | Updated on each authenticated request |
 
+Identity is established by the `email` extracted from the JWT on every authenticated request. The auth platform does not provide a user ID; `email` is the sole reconciliation key between the token and the stored profile.
+
 #### 2.2.2. Endpoints
 
-- `GET /users/:id` — return the user's profile including current CEFR level.
-- `POST /users` — create or upsert the user's language-learning profile. Called on first authenticated access or explicit onboarding.
-- `PUT /users/:id/cefrLevel` — set the user's CEFR level to the next tier. Invoked only by the Level Test feature (F21) on a pass.
+- `POST /users` — register the authenticated user's language-learning profile. Extracts `email` from the JWT; creates the record if it does not exist, returns the existing record if it does (idempotent). No request body required.
+- `GET /me` — return the authenticated user's profile including current CEFR level. Resolved from the JWT email.
+- `PUT /me/cefrLevel` — advance the authenticated user's CEFR level to the next tier. Invoked by the client after the Level Test feature (F21) signals a pass.
 
 #### 2.2.4. Business Logic
 
-- A dedicated store is the sole DB accessor for the user collection. Supports: find by id, upsert/create, update `cefrLevel`, update `lastActiveAt`.
-- `PUT /users/:id/cefrLevel` validates that the requested level is exactly the next tier in the ordered sequence (no level-skipping in v2.0); rejects the request if the level is not the immediate successor.
+- A dedicated store is the sole DB accessor for the user collection. Supports: find by email, create, update `cefrLevel`, update `lastActiveAt`.
+- `email` must be unique and indexed in the database.
+- `PUT /me/cefrLevel` validates that the requested level is exactly the next tier in the ordered sequence (no level-skipping in v2.0); rejects the request if the level is not the immediate successor.
 - A shared, testable level-ordering utility knows the ordered sequence (A1 → A2 → B1 → B2 → C1 → C2) and exposes next-level and comparison operations. Reused by F21.
 - `lastActiveAt` is updated on each authenticated request to this microservice.
 
@@ -54,23 +56,15 @@ Every learner has exactly one active CEFR level (A1–C2) at a time, defaulting 
 
 | # | As a Consumer, I want to… | So that… |
 |---|--------------------------|----------|
-| CS-01 | Fetch a user's profile including their current CEFR level | the app can display level-appropriate content and dashboard info |
-| CS-02 | Create or upsert a user profile on first access | the user's language-learning state is initialised when they first arrive |
-| CS-03 | Advance a user's CEFR level to the next tier | the Level Test feature can promote the user after a passing score |
+| CS-01 | Fetch my profile including my current CEFR level | the app can display level-appropriate content and dashboard info |
+| CS-02 | Register my language-learning profile on first access | my learning state is initialised when I first arrive |
+| CS-03 | Advance my CEFR level to the next tier | my progress is recorded after passing a Level Test |
 
 ---
 
 ## 4. Constraints and Assumptions
 
 - **Constraint** — Exactly one active level per user at any time.
-- **Assumption** — User identity/auth is provided by the platform (totoms `UserContext`); this feature does not own authentication, only the language-learning profile fields.
+- **Assumption** — User identity is established via the `email` claim in the JWT provided by the auth platform (`totoms` `UserContext`). This service does not own authentication, only the language-learning profile fields.
 - **Constraint** — Level can only advance one tier at a time in v2.0.
-
----
-
-## 5. Open Questions
-
-| # | Question | Options / Notes |
-|---|----------|-----------------|
-| OQ-01 | Is the User record created lazily on first access or via an explicit onboarding call? | Lazy upsert on first authenticated request is simplest |
-| OQ-02 | Does this service own the User at all, or read it from a central identity service? | If central, store only language-specific fields (cefrLevel) keyed by userId |
+- **Constraint** — Access is curated: only users who call `POST /users` with a valid token get a profile. There is no admin-seeding or bulk import.
