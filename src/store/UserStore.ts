@@ -41,6 +41,14 @@ export class UserStore {
      */
     async updateCefrLevel(email: string, newLevel: CefrLevel): Promise<User> {
 
-        throw new Error("Not implemented");
+        const result = await this.db.collection(USERS_COLLECTION).findOneAndUpdate(
+            { email },
+            { $set: { cefrLevel: newLevel } },
+            { returnDocument: "after" }
+        );
+
+        if (!result) throw new Error(`User not found for email: ${email}`);
+
+        return User.fromBSON(result as any);
     }
 }

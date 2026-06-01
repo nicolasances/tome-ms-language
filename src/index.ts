@@ -2,6 +2,7 @@ import { getHyperscalerConfiguration, SupportedHyperscalers, TotoMicroservice, T
 import { ControllerConfig } from "./Config";
 import { GetMe } from './dlg/GetMe';
 import { PostUsers } from './dlg/PostUsers';
+import { PutMeCefrLevel } from './dlg/PutMeCefrLevel';
 import { AddSentenceAlternative } from './dlg/AddSentenceAlternative';
 import { GetGrammarConcept } from './dlg/GetGrammarConcept';
 import { GetGrammarConcepts } from './dlg/GetGrammarConcepts';
@@ -48,6 +49,7 @@ const config: TotoMicroserviceConfiguration = {
         apiEndpoints: [
             { method: 'POST', path: '/users', delegate: PostUsers },
             { method: 'GET', path: '/me', delegate: GetMe },
+            { method: 'PUT', path: '/me/cefrLevel', delegate: PutMeCefrLevel },
             { method: 'POST', path: '/exerciseBanks', delegate: PostExerciseBank },
             { method: 'GET', path: '/exerciseBanks/:moduleId', delegate: GetExerciseBank },
             { method: 'POST', path: '/exerciseBanks/:moduleId/exercises', delegate: AppendExercisesToBank },
