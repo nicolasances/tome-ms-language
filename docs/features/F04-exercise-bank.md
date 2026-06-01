@@ -64,8 +64,8 @@ Exercises are created by an **external tool** and submitted via POST endpoints. 
 - `GET /exerciseBanks/:moduleId` — get the exercise bank for a module (returns bank metadata + exercise ids).
 - `GET /exercises/:id` — get a single exercise by id.
 - `GET /exercises` — list exercises by module; query param `?moduleId=<id>` required.
-- `PATCH /exercises/:id/timesShown` — increment `timesShown` by 1 (called after each exercise is shown).
-- `PATCH /exercises/:id/userContributedAnswers` — append a validated user translation (body: `{ answer: string }`); called by F13.
+- `PUT /exercises/:id/timesShown` — increment `timesShown` by 1 (called after each exercise is shown).
+- `PUT /exercises/:id/userContributedAnswers` — append a validated user translation (body: `{ answer: string }`); called by F13.
 
 #### 2.2.4. Business Logic
 
@@ -98,7 +98,13 @@ Exercises are created by an **external tool** and submitted via POST endpoints. 
 
 ## 5. Open Questions
 
-| # | Question | Options / Notes |
-|---|----------|-----------------|
-| OQ-01 | Embed exercises inside the bank document or store as separate documents referenced by the bank? | Separate documents scale better for per-exercise updates (timesShown, userContributedAnswers) |
-| OQ-02 | For user-generated modules, how is per-user bank ownership keyed? | By moduleId is enough if the module itself is per-user |
+All open questions resolved.
+
+## 6. Technical Decisions
+
+- **OQ-01 resolved** — Exercises are stored as separate documents in the `exercises` collection, referenced by id in `ExerciseBank.exerciseIds`. The bank is stored in `exerciseBanks`. Separate documents scale for per-exercise runtime mutations (`timesShown`, `userContributedAnswers`).
+- **OQ-02 resolved** — Bank ownership is keyed by `moduleId` only. Since user-generated modules are themselves per-user, the moduleId is sufficient.
+- **Exercise ids are server-generated** — The caller submits exercise content only; ids are assigned server-side via `new ObjectId().toString()` in the `POST /exerciseBanks` and `POST /exerciseBanks/:moduleId/exercises` delegates.
+- **PATCH → PUT** — The `totoms` framework only supports GET, POST, PUT, DELETE. The two mutation endpoints (`timesShown`, `userContributedAnswers`) are wired as `PUT` rather than `PATCH`.
+- **Exercise validation is shared** — `src/util/ExerciseValidation.ts` exports `parseExerciseInput`, used by both `PostExerciseBank` and `AppendExercisesToBank` to avoid duplicating per-type validation logic.
+- **`POST /exerciseBanks` body** — `{ moduleId: string, exercises: ExerciseInput[] }`. The response is `{ bank: ExerciseBank }` including the full `exerciseIds` list.
