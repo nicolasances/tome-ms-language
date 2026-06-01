@@ -1,5 +1,6 @@
 import { getHyperscalerConfiguration, SupportedHyperscalers, TotoMicroservice, TotoMicroserviceConfiguration } from 'totoms';
 import { ControllerConfig } from "./Config";
+import { GetMe } from './dlg/GetMe';
 import { PostUsers } from './dlg/PostUsers';
 import { AddSentenceAlternative } from './dlg/AddSentenceAlternative';
 import { GetGrammarConcept } from './dlg/GetGrammarConcept';
@@ -46,6 +47,7 @@ const config: TotoMicroserviceConfiguration = {
     apiConfiguration: {
         apiEndpoints: [
             { method: 'POST', path: '/users', delegate: PostUsers },
+            { method: 'GET', path: '/me', delegate: GetMe },
             { method: 'POST', path: '/exerciseBanks', delegate: PostExerciseBank },
             { method: 'GET', path: '/exerciseBanks/:moduleId', delegate: GetExerciseBank },
             { method: 'POST', path: '/exerciseBanks/:moduleId/exercises', delegate: AppendExercisesToBank },
