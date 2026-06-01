@@ -1,5 +1,7 @@
 # F03 — Module Catalog
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 A Module is a self-contained learning unit with a theme, a communication goal, a CEFR level, a referenced vocabulary set, and referenced grammar concepts. This feature defines the canonical Module entity and the write/read access used by external tools and the app. Modules reference vocabulary and grammar concepts **by id** rather than embedding them, so words/concepts can be reused across modules.

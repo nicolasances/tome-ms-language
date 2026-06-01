@@ -1,5 +1,7 @@
 # F04 — Exercise Bank
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 Each module owns a bank of ~50 exercises. An exercise is a single interactive task (translation, multiple choice, fill-in-the-blank, sentence reorder, error correction, conjugation drill), linked to exactly one vocabulary item **or** one grammar concept. This feature defines the Exercise and ExerciseBank entities and their write/read access. The bank is the fixed content pool from which sessions and tests draw; selection logic lives in [F08](./F08-mastery-aware-exercise-selection.md).

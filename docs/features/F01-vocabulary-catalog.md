@@ -1,5 +1,7 @@
 # F01 — Vocabulary Catalog
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 The Vocabulary Catalog is the canonical store of learnable vocabulary units (words, verbs, phrases, patterns, connectors, etc.). A vocabulary item is defined **once** and shared across all users and modules; per-user mastery is tracked separately (see [F06](./F06-mastery-and-progress-tracking.md)). This feature provides the write and read access for these canonical items. It is the foundation that modules, exercises, and content analysis all reference.

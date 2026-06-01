@@ -22,12 +22,12 @@ Only backend capabilities are described here. UI-only concerns from the idea —
 Features are grouped by layer. Lower groups depend on higher ones.
 
 ### Group A — Catalog foundations (seeded via POST endpoints)
-| # | Feature | Primary model |
-|---|---------|---------------|
-| F01 | [Vocabulary Catalog](./F01-vocabulary-catalog.md) | VocabularyItem |
-| F02 | [Grammar Concept Catalog](./F02-grammar-concept-catalog.md) | GrammarConcept |
-| F03 | [Module Catalog](./F03-module-catalog.md) | Module |
-| F04 | [Exercise Bank](./F04-exercise-bank.md) | Exercise, ExerciseBank |
+| # | Feature | Primary model | Status |
+|---|---------|---------------|--------|
+| F01 | [Vocabulary Catalog](./F01-vocabulary-catalog.md) | VocabularyItem | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+| F02 | [Grammar Concept Catalog](./F02-grammar-concept-catalog.md) | GrammarConcept | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+| F03 | [Module Catalog](./F03-module-catalog.md) | Module | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+| F04 | [Exercise Bank](./F04-exercise-bank.md) | Exercise, ExerciseBank | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group B — User state & mastery
 | # | Feature | Primary model |

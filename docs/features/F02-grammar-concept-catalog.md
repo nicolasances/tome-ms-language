@@ -1,5 +1,7 @@
 # F02 — Grammar Concept Catalog
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 The Grammar Concept Catalog is the canonical store of named grammatical topics (e.g. "Inversion", "Modal Verbs", "Double definiteness"). Each concept carries the CEFR level at which it is introduced, a short explanation, and 1–2 Danish examples. Concepts are shared across modules and users and are referenced by modules and exercises.
