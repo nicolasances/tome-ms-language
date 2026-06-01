@@ -37,7 +37,7 @@ Exercises are created by an **external tool** and submitted via POST endpoints. 
 | moduleId | string | Owning module | Nullable (null for level-test exercises) |
 | type | string | Exercise type | Must be one of: translation_active, multiple_choice, fill_blank, sentence_reorder, error_correction, conjugation_drill |
 | prompt | string | The question or task shown to the user | Required |
-| promptTranslation | string | English translation of the prompt | Required for multiple_choice, fill_blank, sentence_reorder, error_correction; null for translation_active, conjugation_drill |
+| promptTranslation | string | English translation of the prompt | Required for multiple_choice, fill_blank, error_correction; null for translation_active, conjugation_drill, sentence_reorder |
 | answer | string | Canonical correct answer | Required |
 | alternativeAnswers | string[] | Additional accepted answers | May be empty |
 | userContributedAnswers | string[] | User translations validated by AI at answer time | Appended at runtime; starts empty |
@@ -108,3 +108,4 @@ All open questions resolved.
 - **PATCH → PUT** — The `totoms` framework only supports GET, POST, PUT, DELETE. The two mutation endpoints (`timesShown`, `userContributedAnswers`) are wired as `PUT` rather than `PATCH`.
 - **Exercise validation is shared** — `src/util/ExerciseValidation.ts` exports `parseExerciseInput`, used by both `PostExerciseBank` and `AppendExercisesToBank` to avoid duplicating per-type validation logic.
 - **`POST /exerciseBanks` body** — `{ moduleId: string, exercises: ExerciseInput[] }`. The response is `{ bank: ExerciseBank }` including the full `exerciseIds` list.
+- **`promptTranslation` for `sentence_reorder` is null** — For `multiple_choice`, `fill_blank`, and `error_correction` the `prompt` is a Danish sentence and `promptTranslation` provides the English meaning. For `sentence_reorder`, the `prompt` carries the English meaning directly (what the user is constructing), mirroring `translation_active`. Storing the same text in both fields would be redundant.

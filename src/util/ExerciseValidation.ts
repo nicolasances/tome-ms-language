@@ -16,6 +16,8 @@ export interface ParsedExerciseInput {
 /**
  * Validates and parses a single exercise input object from a request body.
  * Enforces type validity, required fields, and the vocabularyItemId/grammarConceptId linkage rule.
+ * promptTranslation is required for multiple_choice, fill_blank, error_correction (Danish prompt → needs English context).
+ * sentence_reorder and translation_active carry the English meaning in the prompt itself — promptTranslation is null.
  * Throws ValidationError on any violation.
  *
  * @param ex - Raw exercise object from the request body
