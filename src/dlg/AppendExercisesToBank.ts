@@ -7,13 +7,13 @@ import { ExerciseBank } from "../model/ExerciseBank";
 import { ExerciseStore } from "../store/ExerciseStore";
 import { ParsedExerciseInput, parseExerciseInput } from "../util/ExerciseValidation";
 
-export class PostExerciseBank extends TotoDelegate<PostExerciseBankRequest, PostExerciseBankResponse> {
+export class AppendExercisesToBank extends TotoDelegate<AppendExercisesToBankRequest, AppendExercisesToBankResponse> {
 
-    parseRequest(req: Request): PostExerciseBankRequest {
+    parseRequest(req: Request): AppendExercisesToBankRequest {
 
-        const { moduleId, exercises } = req.body ?? {};
+        const { moduleId } = req.params;
+        const { exercises } = req.body ?? {};
 
-        if (!moduleId) throw new ValidationError(400, "moduleId is required");
         if (!Array.isArray(exercises) || exercises.length === 0) throw new ValidationError(400, "exercises must be a non-empty array");
 
         const parsedExercises = exercises.map((ex: any, i: number) => parseExerciseInput(ex, i));
@@ -21,49 +21,46 @@ export class PostExerciseBank extends TotoDelegate<PostExerciseBankRequest, Post
         return { moduleId, exercises: parsedExercises };
     }
 
-    async do(req: PostExerciseBankRequest, _userContext?: UserContext): Promise<PostExerciseBankResponse> {
+    async do(req: AppendExercisesToBankRequest, _userContext?: UserContext): Promise<AppendExercisesToBankResponse> {
 
         const config = this.config as ControllerConfig;
         const db = await config.getMongoDb(config.getDBName());
 
         const store = new ExerciseStore(db);
+        const bank = await store.findBankByModuleId(req.moduleId);
+
+        if (!bank) throw new ValidationError(404, `Exercise bank not found for moduleId '${req.moduleId}'`);
 
         const exercises = req.exercises.map(ex => new Exercise({
             id: new ObjectId().toString(),
             moduleId: req.moduleId,
             type: ex.type,
             prompt: ex.prompt,
-            promptTranslation: ex.promptTranslation ?? null,
+            promptTranslation: ex.promptTranslation,
             answer: ex.answer,
-            alternativeAnswers: ex.alternativeAnswers ?? [],
-            words: ex.words ?? null,
-            distractors: ex.distractors ?? null,
-            vocabularyItemId: ex.vocabularyItemId ?? null,
-            grammarConceptId: ex.grammarConceptId ?? null,
+            alternativeAnswers: ex.alternativeAnswers,
+            words: ex.words,
+            distractors: ex.distractors,
+            vocabularyItemId: ex.vocabularyItemId,
+            grammarConceptId: ex.grammarConceptId,
         }));
 
-        const exerciseIds = await store.insertBatch(exercises);
+        const newIds = await store.insertBatch(exercises);
+        const now = new Date();
 
-        const bank = new ExerciseBank({
-            id: new ObjectId().toString(),
-            moduleId: req.moduleId,
-            exerciseIds,
-            generatedAt: new Date(),
-            totalGenerated: exerciseIds.length,
-        });
+        await store.appendExercisesToBank(req.moduleId, newIds, now);
 
-        await store.insertBank(bank);
+        const updatedBank = await store.findBankByModuleId(req.moduleId);
 
-        return { bank };
+        return { bank: updatedBank! };
     }
-
 }
 
-interface PostExerciseBankRequest {
+interface AppendExercisesToBankRequest {
     moduleId: string;
     exercises: ParsedExerciseInput[];
 }
 
-interface PostExerciseBankResponse {
+interface AppendExercisesToBankResponse {
     bank: ExerciseBank;
 }
