@@ -36,6 +36,8 @@ import { PostExerciseBank } from './dlg/PostExerciseBank';
 import { RemoveSentenceAlternative } from './dlg/RemoveSentenceAlternative';
 import { StartSession } from './dlg/session/StartSession';
 import { SubmitAnswer } from './dlg/session/SubmitAnswer';
+import { GetMeModuleProgress } from './dlg/GetMeModuleProgress';
+import { GetMeModuleProgressForModule } from './dlg/GetMeModuleProgressForModule';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -89,6 +91,9 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'GET', path: '/sessions/stats/rolling', delegate: GetRollingSessionStats },
             { method: 'POST', path: '/sessions/:sessionId/answers', delegate: SubmitAnswer },
             { method: 'POST', path: '/sessions/:sessionId/completion', delegate: CompleteSession },
+
+            { method: 'GET', path: '/me/moduleProgress', delegate: GetMeModuleProgress },
+            { method: 'GET', path: '/me/moduleProgress/:moduleId', delegate: GetMeModuleProgressForModule },
         ],
         apiOptions: { noCorrelationId: true }
     },
