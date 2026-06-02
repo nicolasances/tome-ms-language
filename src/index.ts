@@ -40,6 +40,7 @@ import { GetMeModuleProgress } from './dlg/GetMeModuleProgress';
 import { GetMeModuleProgressForModule } from './dlg/GetMeModuleProgressForModule';
 import { PutMeModuleProgress } from './dlg/PutMeModuleProgress';
 import { GetMeLevelProgress } from './dlg/GetMeLevelProgress';
+import { PostMeModuleTestAttempt } from './dlg/PostMeModuleTestAttempt';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -98,6 +99,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'GET', path: '/me/moduleProgress/:moduleId', delegate: GetMeModuleProgressForModule },
             { method: 'PUT', path: '/me/moduleProgress/:moduleId', delegate: PutMeModuleProgress },
             { method: 'GET', path: '/me/levelProgress', delegate: GetMeLevelProgress },
+            { method: 'POST', path: '/me/moduleProgress/:moduleId/testAttempts', delegate: PostMeModuleTestAttempt },
         ],
         apiOptions: { noCorrelationId: true }
     },

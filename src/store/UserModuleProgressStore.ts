@@ -35,4 +35,13 @@ export class UserModuleProgressStore {
         );
         return progress;
     }
+
+    async appendTestAttempt(userId: string, moduleId: string, attempt: ModuleTestAttempt): Promise<UserModuleProgress | null> {
+        const result = await this.db.collection(COLLECTION).updateOne(
+            { userId, moduleId },
+            { $push: { testAttempts: attempt.toBSON() } } as any
+        );
+        if (result.matchedCount === 0) return null;
+        return this.findByUserAndModule(userId, moduleId);
+    }
 }
