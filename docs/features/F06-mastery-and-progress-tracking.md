@@ -33,7 +33,6 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 | exerciseId | string | Exercise id | Required |
 | type | string | Exercise type | Required |
 | isCorrect | boolean | Whether the answer was correct | Required |
-| wasPrompted | boolean | Whether a hint was used | Required; affects SRS weight |
 | userAnswer | string | What the user submitted | Required |
 | correctAnswer | string | Canonical correct answer | Required |
 | timestamp | Date | When the attempt occurred | Required |
@@ -72,7 +71,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 
 - Dedicated store(s), sole DB access. Supports: get progress for a user across a set of vocab item ids / grammar concept ids (bulk read for F08), upsert a progress record, append an ExerciseResult and recompute masteryScore + lastReviewed.
 - SRS algorithm (shared, pure, testable, self-contained):
-  - A correct answer increases the score; less weight if a hint was used (`wasPrompted = true`).
+  - A correct answer increases the score.
   - An incorrect answer decreases the score.
   - Items not reviewed for a long time decay gently (computed at read time or via a maintenance pass).
   - Mastery threshold: ≥ 0.8 = mastered.
