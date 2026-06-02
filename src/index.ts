@@ -38,6 +38,7 @@ import { StartSession } from './dlg/session/StartSession';
 import { SubmitAnswer } from './dlg/session/SubmitAnswer';
 import { GetMeModuleProgress } from './dlg/GetMeModuleProgress';
 import { GetMeModuleProgressForModule } from './dlg/GetMeModuleProgressForModule';
+import { PutMeModuleProgress } from './dlg/PutMeModuleProgress';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -94,6 +95,7 @@ const config: TotoMicroserviceConfiguration = {
 
             { method: 'GET', path: '/me/moduleProgress', delegate: GetMeModuleProgress },
             { method: 'GET', path: '/me/moduleProgress/:moduleId', delegate: GetMeModuleProgressForModule },
+            { method: 'PUT', path: '/me/moduleProgress/:moduleId', delegate: PutMeModuleProgress },
         ],
         apiOptions: { noCorrelationId: true }
     },

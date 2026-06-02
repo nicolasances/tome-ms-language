@@ -26,4 +26,13 @@ export class UserModuleProgressStore {
         const docs = await this.db.collection(COLLECTION).find(filter).toArray();
         return docs.map(doc => UserModuleProgress.fromBSON(doc));
     }
+
+    async upsert(progress: UserModuleProgress): Promise<UserModuleProgress> {
+        await this.db.collection(COLLECTION).replaceOne(
+            { userId: progress.userId, moduleId: progress.moduleId },
+            progress.toBSON(),
+            { upsert: true }
+        );
+        return progress;
+    }
 }
