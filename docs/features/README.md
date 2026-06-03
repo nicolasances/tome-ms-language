@@ -36,7 +36,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 |---|---------|---------------| ------ | 
 | F05 | [User Profile & CEFR Level](./F05-user-profile-and-cefr-level.md) | User | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 | F06 | [Mastery & Progress Tracking (SRS)](./F06-mastery-and-progress-tracking.md) | UserVocabularyProgress, UserGrammarConceptProgress |  |
-| F07 | [User Module Progress](./F07-user-module-progress.md) | UserModuleProgress | | 
+| F07 | [User Module Progress](./F07-user-module-progress.md) | UserModuleProgress | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group C — Exercise selection engine
 | # | Feature | Primary model |
