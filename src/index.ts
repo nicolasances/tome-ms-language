@@ -36,8 +36,7 @@ import { PostExerciseBank } from './dlg/PostExerciseBank';
 import { RemoveSentenceAlternative } from './dlg/RemoveSentenceAlternative';
 import { StartSession } from './dlg/session/StartSession';
 import { SubmitAnswer } from './dlg/session/SubmitAnswer';
-import { GetMeModuleProgress } from './dlg/GetMeModuleProgress';
-import { GetMeModuleProgressForModule } from './dlg/GetMeModuleProgressForModule';
+import { GetMeProgress } from './dlg/GetMeProgress';
 import { PutMeModuleProgress } from './dlg/PutMeModuleProgress';
 import { GetMeLevelProgress } from './dlg/GetMeLevelProgress';
 import { PostMeModuleTestAttempt } from './dlg/PostMeModuleTestAttempt';
@@ -95,8 +94,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/sessions/:sessionId/answers', delegate: SubmitAnswer },
             { method: 'POST', path: '/sessions/:sessionId/completion', delegate: CompleteSession },
 
-            { method: 'GET', path: '/me/moduleProgress', delegate: GetMeModuleProgress },
-            { method: 'GET', path: '/me/moduleProgress/:moduleId', delegate: GetMeModuleProgressForModule },
+            { method: 'GET', path: '/me/progress', delegate: GetMeProgress },
             { method: 'PUT', path: '/me/moduleProgress/:moduleId', delegate: PutMeModuleProgress },
             { method: 'GET', path: '/me/levelProgress', delegate: GetMeLevelProgress },
             { method: 'POST', path: '/me/moduleProgress/:moduleId/testAttempts', delegate: PostMeModuleTestAttempt },
