@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { GetVocabularyItems } from "../src/dlg/GetVocabularyItems";
+import { GetVocabularyItems } from "../src/dlg/vocabulary/GetVocabularyItems";
 
 function makeReq(query: Record<string, string> = {}): Request {
     return { params: {}, body: {}, query } as unknown as Request;
@@ -26,3 +26,4 @@ describe("GetVocabularyItems.parseRequest", () => {
     });
 
 });
+

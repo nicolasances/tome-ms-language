@@ -1,0 +1,47 @@
+import { Db } from "mongodb";
+import { ControllerConfig } from "../Config";
+import { UserModuleProgress, ModuleTestAttempt } from "../model/UserModuleProgress";
+
+const COLLECTION = "userModuleProgress";
+
+export class UserModuleProgressStore {
+
+    private db: Db;
+    private config: ControllerConfig;
+
+    constructor({ db, config }: { db: Db; config: ControllerConfig }) {
+        this.db = db;
+        this.config = config;
+    }
+
+    async findByUserAndModule(userId: string, moduleId: string): Promise<UserModuleProgress | null> {
+        const doc = await this.db.collection(COLLECTION).findOne({ userId, moduleId });
+        if (!doc) return null;
+        return UserModuleProgress.fromBSON(doc);
+    }
+
+    async listByUser(userId: string, moduleIds?: string[]): Promise<UserModuleProgress[]> {
+        const filter: Record<string, any> = { userId };
+        if (moduleIds) filter.moduleId = { $in: moduleIds };
+        const docs = await this.db.collection(COLLECTION).find(filter).toArray();
+        return docs.map(doc => UserModuleProgress.fromBSON(doc));
+    }
+
+    async upsert(progress: UserModuleProgress): Promise<UserModuleProgress> {
+        await this.db.collection(COLLECTION).replaceOne(
+            { userId: progress.userId, moduleId: progress.moduleId },
+            progress.toBSON(),
+            { upsert: true }
+        );
+        return progress;
+    }
+
+    async appendTestAttempt(userId: string, moduleId: string, attempt: ModuleTestAttempt): Promise<UserModuleProgress | null> {
+        const result = await this.db.collection(COLLECTION).updateOne(
+            { userId, moduleId },
+            { $push: { testAttempts: attempt.toBSON() } } as any
+        );
+        if (result.matchedCount === 0) return null;
+        return this.findByUserAndModule(userId, moduleId);
+    }
+}

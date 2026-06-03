@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PutMeCefrLevel } from "../src/dlg/PutMeCefrLevel";
+import { PutMeCefrLevel } from "../src/dlg/user/PutMeCefrLevel";
 
 function makeReq(body?: any): Request {
     return { params: {}, body } as unknown as Request;
@@ -31,3 +31,4 @@ describe("PutMeCefrLevel.parseRequest", () => {
     });
 
 });
+

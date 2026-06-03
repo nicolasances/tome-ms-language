@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { User } from "../src/model/User";
-import { GetMe } from "../src/dlg/GetMe";
+import { GetMe } from "../src/dlg/user/GetMe";
 
 function makeMockConfig(docs: any[]) {
 
@@ -45,3 +45,4 @@ describe("GetMe.do", () => {
     });
 
 });
+

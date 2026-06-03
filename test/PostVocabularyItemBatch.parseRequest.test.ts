@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PostVocabularyItemBatch } from "../src/dlg/PostVocabularyItemBatch";
+import { PostVocabularyItemBatch } from "../src/dlg/vocabulary/PostVocabularyItemBatch";
 
 function makeReq(body: Record<string, any>): Request {
     return { params: {}, body } as unknown as Request;
@@ -53,3 +53,4 @@ describe("PostVocabularyItemBatch.parseRequest", () => {
     });
 
 });
+

@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { LookupGrammarConcepts } from "../src/dlg/LookupGrammarConcepts";
+import { LookupGrammarConcepts } from "../src/dlg/grammar/LookupGrammarConcepts";
 
 function makeReq(body: Record<string, any>): Request {
     return { params: {}, body } as unknown as Request;
@@ -31,3 +31,4 @@ describe("LookupGrammarConcepts.parseRequest", () => {
     });
 
 });
+

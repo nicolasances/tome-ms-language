@@ -44,14 +44,14 @@ Step 3 is the graded assessment that completes a module. It is **time-locked** u
 
 #### 2.2.2. Endpoints
 
-- `GET /users/:userId/modules/:moduleId/testEligibility` — report whether the test is unlocked, with remaining time when locked.
+- `GET /users/:userId/modules/:moduleId/testEligibility` — authoritative unlock check for a module test. Reports whether the test is unlocked, with remaining time when locked, plus the absolute `testUnlocksAt` / `testRetryAvailableAt` timestamps. The app does **not** poll this to render the overview countdown — those timestamps are surfaced in F07's `GET /me/progress` for the in-progress module. This endpoint remains the source of truth that `POST …/tests` enforces server-side and is available for an explicit re-check.
 - `POST /users/:userId/modules/:moduleId/tests` — start a new test attempt; returns questions without answers.
 - `POST /users/:userId/moduleTests/:attemptId/submit` — accept all answers at once; body: array of `{ exerciseId, userAnswer }`.
 - `GET /users/:userId/moduleTests/:attemptId/review` — return score and per-question answers; for incorrect items, include the user's answer alongside the correct answer.
 
 #### 2.2.4. Business Logic
 
-- Eligibility check (`GET …/testEligibility`): `testUnlockDelayHours` must have passed since the practice session's `completedAt`; and if there is a prior failed attempt, `testRetryDelayMinutes` must have passed since that attempt's `takenAt`.
+- Eligibility check (`GET …/testEligibility`): `testUnlockDelayHours` must have passed since the practice session's `completedAt`; and if there is a prior failed attempt, `testRetryDelayMinutes` must have passed since that attempt's `takenAt`. The computed `testUnlocksAt` / `testRetryAvailableAt` timestamps are also exposed to F07 so `GET /me/progress` can carry them on the in-progress module. This check is the authoritative gate enforced by `POST …/tests`; the client-side countdown rendered from those timestamps is only a hint.
 - Starting a test (`POST …/tests`): verify unlock conditions. Draw 20 exercises from the module bank via F08, enforcing the fresh/repeat split: at least `testFreshExercisePercent`% of selected exercises must be exercises the user has not seen during practice for this module. Return the questions **without** answers.
 - Submitting (`POST …/submit`): check each answer via normalized matching (same logic as F10). Compute score. Determine pass/fail against `testPassThreshold`.
   - **Update mastery**: call F06 apply-results with the attempt's ExerciseResults (vocab + grammar items).
@@ -66,7 +66,7 @@ Step 3 is the graded assessment that completes a module. It is **time-locked** u
 
 | # | As a Consumer, I want to… | So that… |
 |---|--------------------------|----------|
-| CS-01 | Check test eligibility for a user and module | the app shows or hides the test CTA with an accurate unlock countdown |
+| CS-01 | Check test eligibility for a user and module | the app (or F07's aggregate read) can show or hide the test CTA with an accurate unlock countdown, and the server can gate test start authoritatively |
 | CS-02 | Start a test and receive questions without answers | the app presents a true assessment where answers are revealed only at the end |
 | CS-03 | Submit all answers at once and receive a score | mastery is updated and the module is marked completed on a pass |
 | CS-04 | Fetch the test review for a completed attempt | the app shows the full result with per-question correctness for the review screen |

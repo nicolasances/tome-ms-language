@@ -7,7 +7,6 @@ After any exercise answered **incorrectly** (in practice or in a test review), t
 **Out of scope**:
 - Automatic explanations (must be on demand)
 - Translation answer *re-validation* (→ [F13](./F13-translation-answer-verification.md)) — a different touchpoint
-- Hints before answering (→ [F14](./F14-vocabulary-hint.md))
 
 ---
 

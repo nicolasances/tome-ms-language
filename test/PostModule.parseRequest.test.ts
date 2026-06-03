@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PostModule } from "../src/dlg/PostModule";
+import { PostModule } from "../src/dlg/modules/PostModule";
 
 function makeReq(body: Record<string, any>): Request {
     return { params: {}, body } as unknown as Request;
@@ -120,3 +120,4 @@ describe("PostModule.parseRequest", () => {
     });
 
 });
+

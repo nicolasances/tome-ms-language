@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { GetGrammarConcepts } from "../src/dlg/GetGrammarConcepts";
+import { GetGrammarConcepts } from "../src/dlg/grammar/GetGrammarConcepts";
 
 function makeReq(query: Record<string, any>): Request {
     return { params: {}, body: {}, query } as unknown as Request;
@@ -48,3 +48,4 @@ describe("GetGrammarConcepts.parseRequest", () => {
     });
 
 });
+

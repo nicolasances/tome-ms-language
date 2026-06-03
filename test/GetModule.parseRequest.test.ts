@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { GetModule } from "../src/dlg/GetModule";
+import { GetModule } from "../src/dlg/modules/GetModule";
 
 function makeReq(params: Record<string, any>): Request {
     return { params, body: {} } as unknown as Request;
@@ -24,3 +24,4 @@ describe("GetModule.parseRequest", () => {
     });
 
 });
+

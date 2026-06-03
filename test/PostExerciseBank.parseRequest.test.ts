@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PostExerciseBank } from "../src/dlg/PostExerciseBank";
+import { PostExerciseBank } from "../src/dlg/exercises/PostExerciseBank";
 
 function makeReq(body: Record<string, any>): Request {
     return { params: {}, body } as unknown as Request;
@@ -18,7 +18,7 @@ const validMultipleChoice = {
     prompt: "Han ___ kaffe",
     promptTranslation: "He ___ coffee",
     answer: "drikker",
-    distractors: ["spiser", "sover", "læser"],
+    distractors: ["spiser", "sover", "lÃ¦ser"],
     vocabularyItemId: "vocab-2",
 };
 
@@ -191,3 +191,4 @@ describe("PostExerciseBank.parseRequest", () => {
     });
 
 });
+

@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { User } from "../src/model/User";
-import { PutMeCefrLevel } from "../src/dlg/PutMeCefrLevel";
+import { PutMeCefrLevel } from "../src/dlg/user/PutMeCefrLevel";
 
 function makeMockConfig(docs: any[]) {
 
@@ -50,7 +50,7 @@ describe("PutMeCefrLevel.do", () => {
         }
     });
 
-    it("throws 400 when the user is already at C2 — no next level exists", async () => {
+    it("throws 400 when the user is already at C2 â€” no next level exists", async () => {
 
         const user = new User({ id: "uuid-001", email: "alice@example.com", cefrLevel: "C2", createdAt: "2026-01-01T00:00:00.000Z" });
         const config = makeMockConfig([user.toBSON()]);
@@ -79,3 +79,4 @@ describe("PutMeCefrLevel.do", () => {
     });
 
 });
+
