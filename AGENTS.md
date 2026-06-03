@@ -65,6 +65,8 @@ interface PostTopicRequest { name: string }
 interface PostTopicResponse { id: string }
 ```
 
+**Organizing delegates in subfolders**: If the microservice has many endpoints, you can organize delegates in subfolders by logical grouping (e.g. `src/dlg/topics/PostTopic.ts`, `src/dlg/topics/GetTopics.ts`, etc.). The entry point (`src/index.ts`) should import them with their full path.
+
 ---
 
 ## Store Classes (`src/store/`)
