@@ -8,7 +8,7 @@ Step 2 is the interactive practice phase of a module. The user works through a f
 - Updating mastery (deliberately not done here; happens only in F11/F21)
 - The Module Test (→ [F11](./F11-module-test.md))
 - Selection algorithm internals (→ [F08](./F08-mastery-aware-exercise-selection.md))
-- On-demand "explain my mistake" / hint / verification (→ [F12](./F12-explain-my-mistake.md), [F14](./F14-vocabulary-hint.md), [F13](./F13-translation-answer-verification.md)) — surfaced here but owned there
+- On-demand "explain my mistake" / verification (→ [F12](./F12-explain-my-mistake.md), [F13](./F13-translation-answer-verification.md)) — surfaced here but owned there
 
 ---
 
@@ -38,7 +38,6 @@ Step 2 is the interactive practice phase of a module. The user works through a f
 | answers | object[] | Per-exercise answer state (answered, isCorrect, userAnswer) | Updated as user progresses |
 | currentPosition | number | Index of the current exercise | 0-based |
 | retryQueue | string[] | Exercise ids still to retry | Built at end of primary pass |
-| wasPrompted | object | Map of exerciseId → boolean (hint used) | Tracks hint usage per exercise |
 | startedAt | Date | Session start timestamp | Auto-set |
 | completedAt | Date | Session completion timestamp | Nullable; set on complete |
 

@@ -42,7 +42,7 @@ Identity is established by the `email` extracted from the JWT on every authentic
 #### 2.2.2. Endpoints
 
 - `POST /users` — register the authenticated user's language-learning profile. Extracts `email` from the JWT; creates the record if it does not exist, returns the existing record if it does (idempotent). No request body required.
-- `GET /me` — return the authenticated user's profile including current CEFR level. Resolved from the JWT email.
+- `GET /me` — return the authenticated user's profile including current CEFR level. Resolved from the JWT email. This is the lean profile read; the dashboard's combined CEFR-rollup + module view is served by F07's `GET /me/progress`, which reads the user's current level from this feature.
 - `PUT /me/cefrLevel` — advance the authenticated user's CEFR level to the next tier. Invoked by the client after the Level Test feature (F21) signals a pass.
 
 #### 2.2.4. Business Logic
