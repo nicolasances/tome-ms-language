@@ -1,9 +1,9 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
 import { User } from "../src/model/User";
 import { Module } from "../src/model/Module";
 import { UserModuleProgress } from "../src/model/UserModuleProgress";
-import { GetMeLevelProgress } from "../src/dlg/GetMeLevelProgress";
+import { GetMeLevelProgress } from "../src/dlg/user/GetMeLevelProgress";
 
 const userContext = { email: "alice@example.com", userId: "u1", authProvider: "test" };
 
@@ -54,7 +54,7 @@ function makeMockConfig(userDocs: any[], moduleDocs: any[], progressDocs: any[])
 
 describe("GetMeLevelProgress.parseRequest", () => {
 
-    it("returns an empty object — no params needed", () => {
+    it("returns an empty object â€” no params needed", () => {
         const delegate = new GetMeLevelProgress({} as any, {} as any);
         const parsed = delegate.parseRequest({ params: {}, query: {}, body: {} } as unknown as Request);
 
@@ -135,3 +135,4 @@ describe("GetMeLevelProgress.do", () => {
         }
     });
 });
+

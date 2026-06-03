@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PutMeModuleProgress } from "../src/dlg/PutMeModuleProgress";
+import { PutMeModuleProgress } from "../src/dlg/user/PutMeModuleProgress";
 
 function makeReq(params: any, body: any): Request {
     return { params, query: {}, body } as unknown as Request;
@@ -43,3 +43,4 @@ describe("PutMeModuleProgress.parseRequest", () => {
         assert.throws(() => delegate.parseRequest(makeReq({}, { status: "in_progress" })), /400|moduleId/i);
     });
 });
+

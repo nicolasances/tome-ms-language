@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PostGrammarConceptBatch } from "../src/dlg/PostGrammarConceptBatch";
+import { PostGrammarConceptBatch } from "../src/dlg/grammar/PostGrammarConceptBatch";
 
 function makeReq(body: Record<string, any>): Request {
     return { params: {}, body } as unknown as Request;
@@ -54,3 +54,4 @@ describe("PostGrammarConceptBatch.parseRequest", () => {
     });
 
 });
+

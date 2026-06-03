@@ -1,6 +1,6 @@
-import { Request } from "express";
+﻿import { Request } from "express";
 import { assert } from "chai";
-import { GetSentencesWithStats } from "../src/dlg/GetSentencesWithStats";
+import { GetSentencesWithStats } from "../src/dlg/sentences/GetSentencesWithStats";
 
 function makeRequest(params: Record<string, string>, query: Record<string, string> = {}): Request {
     return { params, query, body: {} } as unknown as Request;
@@ -8,7 +8,7 @@ function makeRequest(params: Record<string, string>, query: Record<string, strin
 
 const delegate = new GetSentencesWithStats({} as any, {} as any);
 
-describe("GetSentencesWithStats.parseRequest — sortBy / sortDir validation", () => {
+describe("GetSentencesWithStats.parseRequest â€” sortBy / sortDir validation", () => {
 
     it("accepts no sortBy or sortDir and defaults to no sort", () => {
         const result = delegate.parseRequest(makeRequest({ language: "danish" }));
@@ -36,3 +36,4 @@ describe("GetSentencesWithStats.parseRequest — sortBy / sortDir validation", (
         assert.throws(() => delegate.parseRequest(makeRequest({ language: "danish" }, { sortBy: "difficulty", sortDir: "sideways" })));
     });
 });
+

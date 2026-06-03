@@ -1,4 +1,4 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
 
 function makePostReq(params: Record<string, string>, body: Record<string, any>): Request {
@@ -9,7 +9,7 @@ function makeDeleteReq(params: Record<string, string>): Request {
     return { params, body: {} } as unknown as Request;
 }
 
-import { AddSentenceAlternative } from "../src/dlg/AddSentenceAlternative";
+import { AddSentenceAlternative } from "../src/dlg/sentences/AddSentenceAlternative";
 
 describe("AddSentenceAlternative.parseRequest", () => {
 
@@ -35,7 +35,7 @@ describe("AddSentenceAlternative.parseRequest", () => {
     });
 });
 
-import { RemoveSentenceAlternative } from "../src/dlg/RemoveSentenceAlternative";
+import { RemoveSentenceAlternative } from "../src/dlg/sentences/RemoveSentenceAlternative";
 
 describe("RemoveSentenceAlternative.parseRequest", () => {
 
@@ -54,3 +54,4 @@ describe("RemoveSentenceAlternative.parseRequest", () => {
         assert.throws(() => delegate.parseRequest(req), /unsupported language/i);
     });
 });
+

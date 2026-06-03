@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PostGrammarConcept } from "../src/dlg/PostGrammarConcept";
+import { PostGrammarConcept } from "../src/dlg/grammar/PostGrammarConcept";
 
 function makeReq(body: Record<string, any>): Request {
     return { params: {}, body } as unknown as Request;
@@ -33,7 +33,7 @@ describe("PostGrammarConcept.parseRequest", () => {
     it("parses a valid body with two examples", () => {
 
         const delegate = new PostGrammarConcept({} as any, {} as any);
-        const body = { ...validBody, examples: [{ danish: "Jeg spiser.", english: "I eat." }, { danish: "Han løber.", english: "He runs." }] };
+        const body = { ...validBody, examples: [{ danish: "Jeg spiser.", english: "I eat." }, { danish: "Han lÃ¸ber.", english: "He runs." }] };
         const parsed = delegate.parseRequest(makeReq(body));
 
         assert.equal(parsed.examples.length, 2);
@@ -119,3 +119,4 @@ describe("PostGrammarConcept.parseRequest", () => {
     });
 
 });
+

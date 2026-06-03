@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PostMeModuleTestAttempt } from "../src/dlg/PostMeModuleTestAttempt";
+import { PostMeModuleTestAttempt } from "../src/dlg/user/PostMeModuleTestAttempt";
 
 function makeReq(moduleId: string, body: any): Request {
     return { params: { moduleId }, query: {}, body } as unknown as Request;
@@ -50,3 +50,4 @@ describe("PostMeModuleTestAttempt.parseRequest", () => {
         assert.throws(() => delegate.parseRequest(makeReq("mod-1", { score: 80 })), /400|passed/i);
     });
 });
+

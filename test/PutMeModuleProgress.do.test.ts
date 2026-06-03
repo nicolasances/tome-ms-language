@@ -1,7 +1,7 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { User } from "../src/model/User";
 import { UserModuleProgress, ModuleTestAttempt } from "../src/model/UserModuleProgress";
-import { PutMeModuleProgress } from "../src/dlg/PutMeModuleProgress";
+import { PutMeModuleProgress } from "../src/dlg/user/PutMeModuleProgress";
 
 const userContext = { email: "alice@example.com", userId: "u1", authProvider: "test" };
 
@@ -104,3 +104,4 @@ describe("PutMeModuleProgress.do", () => {
         }
     });
 });
+

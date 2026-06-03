@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PatchExerciseUserContributedAnswers } from "../src/dlg/PatchExerciseUserContributedAnswers";
+import { PatchExerciseUserContributedAnswers } from "../src/dlg/exercises/PatchExerciseUserContributedAnswers";
 
 function makeReq(params: Record<string, string>, body: Record<string, any>): Request {
     return { params, body } as unknown as Request;
@@ -24,3 +24,4 @@ describe("PatchExerciseUserContributedAnswers.parseRequest", () => {
     });
 
 });
+

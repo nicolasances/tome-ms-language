@@ -1,6 +1,6 @@
-import { assert } from "chai";
+﻿import { assert } from "chai";
 import { Request } from "express";
-import { PostUsers } from "../src/dlg/PostUsers";
+import { PostUsers } from "../src/dlg/user/PostUsers";
 
 function makeReq(body?: any): Request {
     return { params: {}, body } as unknown as Request;
@@ -25,3 +25,4 @@ describe("PostUsers.parseRequest", () => {
     });
 
 });
+
