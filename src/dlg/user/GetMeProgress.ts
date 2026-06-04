@@ -69,11 +69,20 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
         });
 
         // 4. Per-module list for the viewed level
-        const viewedModules = allModules.filter(m => m.cefrLevel === viewedLevel);
+        // Modules are sorted by ascending id
+        const viewedModules = allModules.filter(m => m.cefrLevel === viewedLevel).sort((a, b) => a.id > b.id ? 1 : -1);
 
-        const modules: ModuleProgressEntry[] = viewedModules.map(m => {
+        const modules: ModuleProgressEntry[] = viewedModules.map((m, idx) => {
+
             const progress = progressMap.get(m.id);
-            const status = progress?.status ?? "locked";
+            
+            let status = progress?.status;
+            if (!status && idx === 0) {
+                // First module of the level is available if no progress record exists
+                status = "available";
+            } 
+            else status = status ?? "locked";
+
             const step = deriveStep(status);
             const completionPct = status === "completed" ? 100 : 0;
 
