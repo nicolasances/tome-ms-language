@@ -4,13 +4,13 @@ import { VocabularyItem } from "../model/VocabularyItem";
 const VOCABULARY_COLLECTION = "vocabulary";
 
 export interface InsertOneResult {
-    status: "created" | "duplicate_id" | "duplicate_canonical";
+    status: "created" | "duplicate_id" | "duplicate_canonical"; // duplicate_canonical is deprecated - will have to be removed
     item: VocabularyItem;
 }
 
 export interface BatchItemResult {
     id: string;
-    status: "created" | "duplicate_id" | "duplicate_canonical";
+    status: "created" | "duplicate_id" | "duplicate_canonical"; // duplicate_canonical is deprecated - will have to be removed
 }
 
 export interface InsertBatchResult {
@@ -37,12 +37,6 @@ export class VocabularyItemStore {
             return { status: "duplicate_id", item: VocabularyItem.fromBSON(byId as any) };
         }
 
-        const byCanonical = await collection.findOne({ danish: item.danish, type: item.type, context: item.context });
-
-        if (byCanonical) {
-            return { status: "duplicate_canonical", item: VocabularyItem.fromBSON(byCanonical as any) };
-        }
-
         await collection.insertOne(item.toBSON());
 
         return { status: "created", item };
@@ -60,28 +54,12 @@ export class VocabularyItemStore {
         const existingById = await collection.find({ id: { $in: inputIds } }).toArray();
         const existingIdSet = new Set(existingById.map(doc => doc.id as string));
 
-        const canonicalFilters = items
-            .filter(i => !existingIdSet.has(i.id))
-            .map(i => ({ danish: i.danish, type: i.type, context: i.context }));
-
-        const existingByCanonical = canonicalFilters.length > 0
-            ? await collection.find({ $or: canonicalFilters }).toArray()
-            : [];
-
-        const canonicalKey = (danish: string, type: string, context: string | null) => `${danish}::${type}::${context}`;
-        const existingCanonicalSet = new Set(existingByCanonical.map(doc => canonicalKey(doc.danish, doc.type, doc.context)));
-
         const batchResults: BatchItemResult[] = [];
         const toInsert: VocabularyItem[] = [];
 
         for (const item of items) {
             if (existingIdSet.has(item.id)) {
                 batchResults.push({ id: item.id, status: "duplicate_id" });
-                continue;
-            }
-
-            if (existingCanonicalSet.has(canonicalKey(item.danish, item.type, item.context))) {
-                batchResults.push({ id: item.id, status: "duplicate_canonical" });
                 continue;
             }
 

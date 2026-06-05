@@ -55,8 +55,9 @@ Vocabulary items are created by an **external tool** (a seeding script or a cont
 #### 2.2.4. Business Logic
 
 - A dedicated store is the only place that reads/writes the vocabulary collection. Supports: insert one, insert many (batch), find by id, find by ids (bulk lookup used by modules/exercises), find by `danish` text (dedup check), list by `cefrLevel`.
-- Inserting an item that duplicates an existing `id` is rejected (id uniqueness is the primary guard). Additionally, inserting an item that duplicates an existing `(danish, type, context)` triple is rejected — dedup on canonical key to prevent seeding duplicates.
+- Inserting an item that duplicates an existing `id` is rejected (id uniqueness is the primary guard). 
 - Batch insert skips duplicates silently and returns a summary of inserted vs. already-present items.
+- **Important note:** inserting an item that duplicates an existing `(danish, type, context)` triple is **accepted**. It is acceptable that another module reuses some vocabulary! 
 
 ---
 
@@ -84,7 +85,6 @@ Vocabulary items are created by an **external tool** (a seeding script or a cont
 
 | # | Question | Options / Notes |
 |---|----------|-----------------|
-| OQ-01 | Canonical dedup key — is `(danish, type, context)` sufficient? | Two senses of *stor* differ only by `context`; ensure that is enough |
 | OQ-02 | Do we need soft-delete / versioning when seeded content changes? | Decide whether old items are orphaned or updated in place |
 
 ---
@@ -96,11 +96,11 @@ Vocabulary items are created by an **external tool** (a seeding script or a cont
 - The caller-provided `id` is stored as a regular document field named `id`, not as `_id`. MongoDB's `_id` is the auto-generated ObjectId and is never exposed externally.
 - `context` and `addedByUserId` are nullable; stored explicitly as `null` in MongoDB (not omitted) so queries on those fields behave predictably.
 - `tags` defaults to `[]` when absent from the input.
-- The store performs an explicit existence check before inserting (querying by `id`, then by `(danish, type, context)`) rather than relying on MongoDB unique-index conflicts, so it can return typed statuses (`created`, `duplicate_id`, `duplicate_canonical`) instead of raw errors.
+- The store performs an explicit existence check before inserting (querying by `id`) rather than relying on MongoDB unique-index conflicts, so it can return typed statuses (`created`, `duplicate_id`) instead of raw errors.
 
 ### Endpoint design
 - No `:language` path prefix — language is encoded in the field names (`danish`, `english`) of the VocabularyItem model itself.
 - `POST /vocabularyItems/lookup` uses POST (not GET) to avoid query-string length limits when the id list is large. Missing ids are silently absent from the response; callers diff request vs response ids if needed.
 - Express route ordering: `/vocabularyItems/batch` and `/vocabularyItems/lookup` must be registered **before** `/vocabularyItems/:id` so Express matches static segments before the wildcard.
 - `GET /vocabularyItems` returns all items with no pagination; sorted alphabetically by `danish`.
-- Batch insert (`POST /vocabularyItems/batch`): per-item validation errors do not abort the whole batch. Response shape: `{ inserted, alreadyPresent, validationErrors, items: [{ id, status, reason? }] }`. `alreadyPresent` is the sum of `duplicate_id` and `duplicate_canonical` statuses.
+- Batch insert (`POST /vocabularyItems/batch`): per-item validation errors do not abort the whole batch. Response shape: `{ inserted, alreadyPresent, validationErrors, items: [{ id, status, reason? }] }`. `alreadyPresent` is the number of `duplicate_id`statuses.

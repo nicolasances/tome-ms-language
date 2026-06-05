@@ -35,7 +35,7 @@ function makeMockCollection(docs: any[] = []) {
                 ? store.filter(doc => (filter.$or as any[]).some((f: any) => {
                     if (f.id !== undefined) return doc.id === f.id;
                     return doc.danish === f.danish && doc.type === f.type && doc.context === f.context;
-                  }))
+                }))
                 : filter.id?.$in
                     ? store.filter(doc => (filter.id.$in as string[]).includes(doc.id))
                     : filter.cefrLevel
@@ -77,12 +77,13 @@ describe("VocabularyItemStore.insertOne", () => {
         assert.equal(result.status, "duplicate_id");
     });
 
-    it("returns duplicate_canonical when (danish, type, context) already exists with a different id", async () => {
-        const existing = makeItem().toBSON();
+    it("DO NOT return duplicate_canonical when (danish, type, context) already exists with a different id", async () => {
+        const existing = makeItem({ id: "A1-01-hjem" }).toBSON();
         const col = makeMockCollection([existing]);
         const store = new VocabularyItemStore(makeMockDb(col));
-        const result = await store.insertOne(makeItem({ id: "A1-02-n-hus-9999" }));
-        assert.equal(result.status, "duplicate_canonical");
+        const result = await store.insertOne(makeItem({ id: "A1-02-hjem" }));
+        assert.equal(result.status, "created");
+        assert.equal(result.item.id, "A1-02-hjem");
     });
 
     it("allows two items with the same danish but different type", async () => {
@@ -137,14 +138,15 @@ describe("VocabularyItemStore.insertBatch", () => {
         assert.equal(result.items.find(i => i.id === "ID-2")!.status, "created");
     });
 
-    it("skips duplicate_canonical and returns correct summary", async () => {
-        const existing = makeItem({ id: "ID-1", danish: "hus" }).toBSON();
+    it("duplicate_canonical are ignored!", async () => {
+        const existing = makeItem({ id: "A1-01-hus", danish: "hus" }).toBSON();
         const col = makeMockCollection([existing]);
         const store = new VocabularyItemStore(makeMockDb(col));
-        const items = [makeItem({ id: "ID-99", danish: "hus" })];
+        const items = [makeItem({ id: "A1-02-hus", danish: "hus" })];
         const result = await store.insertBatch(items);
-        assert.equal(result.alreadyPresent, 1);
-        assert.equal(result.items[0].status, "duplicate_canonical");
+        assert.equal(result.alreadyPresent, 0);
+        assert.equal(result.inserted, 1);
+        assert.isTrue(result.items.every(i => i.status === "created"));
     });
 
     it("returns empty result for an empty input array", async () => {
