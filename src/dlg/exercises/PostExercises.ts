@@ -1,15 +1,18 @@
-﻿import { Request } from "express";
+import { Request } from "express";
 import { ObjectId } from "mongodb";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { ControllerConfig } from "../../Config";
 import { Exercise } from "../../model/Exercise";
-import { ExerciseBank } from "../../model/ExerciseBank";
 import { ExerciseStore } from "../../store/ExerciseStore";
 import { ParsedExerciseInput, parseExerciseInput } from "../../util/ExerciseValidation";
 
-export class PostExerciseBank extends TotoDelegate<PostExerciseBankRequest, PostExerciseBankResponse> {
+export class PostExercises extends TotoDelegate<PostExercisesRequest, PostExercisesResponse> {
 
-    parseRequest(req: Request): PostExerciseBankRequest {
+    /**
+     * Parses moduleId (from body, required) and exercises[] (from body, non-empty array required).
+     * Delegates per-exercise validation to parseExerciseInput.
+     */
+    parseRequest(req: Request): PostExercisesRequest {
 
         const { moduleId, exercises } = req.body ?? {};
 
@@ -21,9 +24,15 @@ export class PostExerciseBank extends TotoDelegate<PostExerciseBankRequest, Post
         return { moduleId, exercises: parsedExercises };
     }
 
-    async do(req: PostExerciseBankRequest, _userContext?: UserContext): Promise<PostExerciseBankResponse> {
+    /**
+     * Batch-inserts exercises into the exercises collection.
+     * Returns the server-generated ids of the inserted exercises.
+     * No bank document is created or updated.
+     */
+    async do(req: PostExercisesRequest, _userContext?: UserContext): Promise<PostExercisesResponse> {
 
         const config = this.config as ControllerConfig;
+
         const db = await config.getMongoDb(config.getDBName());
 
         const store = new ExerciseStore(db);
@@ -44,27 +53,16 @@ export class PostExerciseBank extends TotoDelegate<PostExerciseBankRequest, Post
 
         const exerciseIds = await store.insertBatch(exercises);
 
-        const bank = new ExerciseBank({
-            id: new ObjectId().toString(),
-            moduleId: req.moduleId,
-            exerciseIds,
-            generatedAt: new Date(),
-            totalGenerated: exerciseIds.length,
-        });
-
-        await store.insertBank(bank);
-
-        return { bank };
+        return { exerciseIds };
     }
 
 }
 
-interface PostExerciseBankRequest {
+interface PostExercisesRequest {
     moduleId: string;
     exercises: ParsedExerciseInput[];
 }
 
-interface PostExerciseBankResponse {
-    bank: ExerciseBank;
+interface PostExercisesResponse {
+    exerciseIds: string[];
 }
-

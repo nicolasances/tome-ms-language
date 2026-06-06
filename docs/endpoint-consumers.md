@@ -95,14 +95,12 @@ Grouped by feature. "Consumer" is the expected caller per the idea + wireframe.
 | `/modules/:id` | GET | frontend | Module overview |
 | `/modules` | GET | frontend | Module map (list by level) |
 
-### F04 — Exercise Bank
+### F04 — Exercises
 | Endpoint | Method | Consumer | Notes |
 |----------|--------|----------|-------|
-| `/exerciseBanks` | POST | seeding / external | Create a module's bank |
-| `/exerciseBanks/:moduleId/exercises` | POST | external | Bank refresh (async generator) |
-| `/exerciseBanks/:moduleId` | GET | internal | Read by selection (F08) |
+| `/exercises` | POST | seeding / external | Batch-insert exercises for a module; callable multiple times to grow the pool |
 | `/exercises/:id` | GET | frontend / internal | Render / score an exercise |
-| `/exercises` | GET | internal | List by module (selection) |
+| `/exercises` | GET | internal | List by module (the exercise pool — used by selection F08) |
 | `/exercises/:id/timesShown` | PUT | internal | Incremented by F10/F11 as exercises are shown |
 | `/exercises/:id/userContributedAnswers` | PUT | internal | Appended by F13 after a verified translation |
 
@@ -200,7 +198,7 @@ Grouped by feature. "Consumer" is the expected caller per the idea + wireframe.
 ## 3. Summary by consumer
 
 - **frontend** — the endpoints the `tome` webapp renders or triggers: the aggregate `GET /me/progress` and the read endpoints across F03/F05/F06, the grammar intro (F09), the full practice and test loops (F10/F11/F21), the on-demand AI touchpoints (F12/F13), user-added vocabulary (F22), and content-report views (F23).
-- **internal** — orchestration plumbing called by other features in this service: mastery `applyResults` (F06), module-progress writes (F07), exercise bookkeeping (F04 `timesShown`, `userContributedAnswers`), the completion gate (`/me/levelProgress`), bank reads (F04/F20), and the selection algorithm (F08).
+- **internal** — orchestration plumbing called by other features in this service: mastery `applyResults` (F06), module-progress writes (F07), exercise bookkeeping (F04 `timesShown`, `userContributedAnswers`), the completion gate (`/me/levelProgress`), exercise pool reads (F04 `GET /exercises`) and level test bank reads (F20), and the selection algorithm (F08).
 - **external** — catalog/bank seeding and the content-analysis submission (`POST /contentReports`).
 - **seeding** — the catalog and bank `POST` endpoints loaded by the development/seeding tool.
 
