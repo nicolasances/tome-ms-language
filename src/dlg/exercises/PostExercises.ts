@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { ControllerConfig } from "../../Config";
 import { Exercise } from "../../model/Exercise";
-import { ExerciseStore } from "../../store/ExerciseStore";
+import { ExerciseStore, InsertBatchResult } from "../../store/ExerciseStore";
 import { ParsedExerciseInput, parseExerciseInput } from "../../util/ExerciseValidation";
 
 export class PostExercises extends TotoDelegate<PostExercisesRequest, PostExercisesResponse> {
@@ -51,9 +51,9 @@ export class PostExercises extends TotoDelegate<PostExercisesRequest, PostExerci
             grammarConceptId: ex.grammarConceptId ?? null,
         }));
 
-        const exerciseIds = await store.insertBatch(exercises);
+        const result = await store.insertBatch(exercises);
 
-        return { exerciseIds };
+        return { inserted: result.inserted, duplicatesSkipped: result.duplicatesSkipped };
     }
 
 }
@@ -64,5 +64,6 @@ interface PostExercisesRequest {
 }
 
 interface PostExercisesResponse {
-    exerciseIds: string[];
+    inserted: string[];
+    duplicatesSkipped: number;
 }

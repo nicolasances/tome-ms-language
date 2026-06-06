@@ -26,6 +26,7 @@ Selection logic lives in [F08](./F08-mastery-aware-exercise-selection.md).
 | Exercise | One interactive task of a given type, testing one vocab item or one grammar concept |
 | Exercise type | translation_active, multiple_choice, fill_blank, sentence_reorder, error_correction, conjugation_drill |
 | Exercise pool | The set of all exercises for a module — queried from the exercises collection by `moduleId`; not a stored entity |
+| Duplicate exercise | An exercise with the same `(moduleId, type, prompt)` as one already in the collection |
 | Alternative answers | Additional accepted answers stored alongside the canonical answer |
 | User-contributed answers | Answers validated on-demand by AI at answer time (translation_active only) |
 
@@ -53,7 +54,7 @@ Selection logic lives in [F08](./F08-mastery-aware-exercise-selection.md).
 
 #### 2.2.2. Endpoints
 
-- `POST /exercises` — batch-insert exercises for a module (body: `{ moduleId, exercises[] }`). Can be called multiple times to grow the pool. Returns `{ exerciseIds: string[] }`.
+- `POST /exercises` — batch-insert exercises for a module (body: `{ moduleId, exercises[] }`). Can be called multiple times to grow the pool. Duplicate exercises (same `moduleId`, `type`, `prompt`) are silently skipped — not rejected. Returns `{ inserted: string[], duplicatesSkipped: number }`.
 - `GET /exercises` — list all exercises for a module; query param `?moduleId=<id>` required. This is the pool retrieval used by sessions and the selection engine.
 - `GET /exercises/:id` — get a single exercise by id.
 - `PUT /exercises/:id/timesShown` — increment `timesShown` by 1 (called after each exercise is shown in a session).
@@ -61,10 +62,10 @@ Selection logic lives in [F08](./F08-mastery-aware-exercise-selection.md).
 
 #### 2.2.4. Business Logic
 
-- A dedicated store is the sole DB accessor for exercises. Supports: batch-insert exercises, list exercises by moduleId, find exercise by id, increment `timesShown`, append a string to `userContributedAnswers`.
+- A dedicated store is the sole DB accessor for exercises. Supports: batch-insert exercises with duplicate detection, list exercises by moduleId, find exercise by id, increment `timesShown`, append a string to `userContributedAnswers`.
 - Per-type linkage rule: `vocabularyItemId` is set for multiple_choice, fill_blank, conjugation_drill, translation_active; `grammarConceptId` is set for sentence_reorder, error_correction. Exactly one of the two must be set per exercise; the other must be null.
+- **Deduplication**: `(moduleId, type, prompt)` is the uniqueness key for exercises. On `POST /exercises`, each exercise in the batch is checked against this key before insert. Duplicates are skipped (not inserted, not errored); the rest are inserted normally. The response reports how many were inserted and how many were skipped.
 - Pool size for a module is derived at query time (count of exercises with that `moduleId`). There is no stored counter.
-- `POST /exercises` returns the server-generated ids of the inserted exercises.
 
 ---
 

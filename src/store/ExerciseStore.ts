@@ -3,6 +3,11 @@ import { Exercise } from "../model/Exercise";
 
 const EXERCISES_COLLECTION = "exercises";
 
+export interface InsertBatchResult {
+    inserted: string[];
+    duplicatesSkipped: number;
+}
+
 export class ExerciseStore {
 
     private db: Db;
@@ -13,15 +18,29 @@ export class ExerciseStore {
 
     /**
      * Batch-inserts exercise documents into the collection.
-     * Returns the ids of the inserted exercises in the same order.
+     * Deduplicates by (moduleId, type, prompt): exercises matching an existing tuple are silently skipped.
+     * Returns the ids of the inserted exercises and the count of skipped duplicates.
      */
-    async insertBatch(exercises: Exercise[]): Promise<string[]> {
+    async insertBatch(exercises: Exercise[]): Promise<InsertBatchResult> {
 
-        if (exercises.length === 0) return [];
+        if (exercises.length === 0) return { inserted: [], duplicatesSkipped: 0 };
 
-        await this.db.collection(EXERCISES_COLLECTION).insertMany(exercises.map(e => e.toBSON()), { ordered: false });
+        const moduleIds = [...new Set(exercises.map(e => e.moduleId).filter((id): id is string => id !== null))];
 
-        return exercises.map(e => e.id);
+        const existing = await this.db.collection(EXERCISES_COLLECTION)
+            .find({ moduleId: { $in: moduleIds } }, { projection: { moduleId: 1, type: 1, prompt: 1 } } as any)
+            .toArray();
+
+        const existingKeys = new Set(existing.map((e: any) => `${e.moduleId}::${e.type}::${e.prompt}`));
+
+        const toInsert = exercises.filter(e => !existingKeys.has(`${e.moduleId}::${e.type}::${e.prompt}`));
+        const duplicatesSkipped = exercises.length - toInsert.length;
+
+        if (toInsert.length > 0) {
+            await this.db.collection(EXERCISES_COLLECTION).insertMany(toInsert.map(e => e.toBSON()), { ordered: false });
+        }
+
+        return { inserted: toInsert.map(e => e.id), duplicatesSkipped };
     }
 
     /**
