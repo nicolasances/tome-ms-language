@@ -1,4 +1,4 @@
-# F09 — Grammar Introduction (Module Step 1)
+# F09 — Grammar Introduction (Module Step 1) ![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
 
 ## 1. Purpose & Scope
 
@@ -50,6 +50,14 @@ Step 1 of a module run is purely instructional: for each grammar concept in the 
 
 ## 5. Open Questions
 
-| # | Question | Options / Notes |
-|---|----------|-----------------|
-| OQ-01 | Does Step 1 trigger `in_progress`, or only Step 2? | Avoid double-handling; pick the boundary explicitly |
+All open questions resolved.
+
+| # | Question | Resolution |
+|---|----------|------------|
+| OQ-01 | Does Step 1 trigger `in_progress`, or only Step 2? | **Deferred to F10.** This endpoint is pure read-only; no `UserModuleProgress` update is performed. |
+
+## 6. Technical Decisions
+
+- **Response shape**: `{ concepts: [{ name, explanation, examples }] }` — only the fields the app needs for display are returned; `id`, `category`, and `cefrLevelIntroduced` are intentionally omitted from the response.
+- **Order preservation**: `GrammarConceptStore.findByIds` uses MongoDB `$in`, which does not preserve input order. The delegate re-sorts results client-side using a `Map` keyed by concept id before returning.
+- **Empty module**: if `grammarConceptIds` is empty the delegate returns `{ concepts: [] }` immediately without querying the grammar collection.
