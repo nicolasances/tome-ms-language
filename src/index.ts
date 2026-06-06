@@ -26,13 +26,11 @@ import { PostVocabularyItemBatch } from './dlg/vocabulary/PostVocabularyItemBatc
 import { GetModule } from './dlg/modules/GetModule';
 import { GetModules } from './dlg/modules/GetModules';
 import { PostModule } from './dlg/modules/PostModule';
-import { AppendExercisesToBank } from './dlg/exercises/AppendExercisesToBank';
 import { GetExercise } from './dlg/exercises/GetExercise';
 import { GetExercises } from './dlg/exercises/GetExercises';
 import { PatchExerciseTimesShown } from './dlg/exercises/PatchExerciseTimesShown';
 import { PatchExerciseUserContributedAnswers } from './dlg/exercises/PatchExerciseUserContributedAnswers';
-import { GetExerciseBank } from './dlg/exercises/GetExerciseBank';
-import { PostExerciseBank } from './dlg/exercises/PostExerciseBank';
+import { PostExercises } from './dlg/exercises/PostExercises';
 import { RemoveSentenceAlternative } from './dlg/sentences/RemoveSentenceAlternative';
 import { StartSession } from './dlg/session/StartSession';
 import { SubmitAnswer } from './dlg/session/SubmitAnswer';
@@ -55,10 +53,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'GET', path: '/me', delegate: GetMe },
             { method: 'PUT', path: '/me/cefrLevel', delegate: PutMeCefrLevel },
 
-            { method: 'POST', path: '/exerciseBanks', delegate: PostExerciseBank },
-            { method: 'GET', path: '/exerciseBanks/:moduleId', delegate: GetExerciseBank },
-            { method: 'POST', path: '/exerciseBanks/:moduleId/exercises', delegate: AppendExercisesToBank },
-
+            { method: 'POST', path: '/exercises', delegate: PostExercises },
             { method: 'GET', path: '/exercises', delegate: GetExercises },
             { method: 'GET', path: '/exercises/:id', delegate: GetExercise },
             { method: 'PUT', path: '/exercises/:id/timesShown', delegate: PatchExerciseTimesShown },
