@@ -52,7 +52,7 @@ Step 3 is the graded assessment that completes a module. It is **time-locked** u
 #### 2.2.4. Business Logic
 
 - Eligibility check (`GET …/testEligibility`): `testUnlockDelayHours` must have passed since the practice session's `completedAt`; and if there is a prior failed attempt, `testRetryDelayMinutes` must have passed since that attempt's `takenAt`. The computed `testUnlocksAt` / `testRetryAvailableAt` timestamps are also exposed to F07 so `GET /me/progress` can carry them on the in-progress module. This check is the authoritative gate enforced by `POST …/tests`; the client-side countdown rendered from those timestamps is only a hint.
-- Starting a test (`POST …/tests`): verify unlock conditions. Draw 20 exercises from the module bank via F08, enforcing the fresh/repeat split: at least `testFreshExercisePercent`% of selected exercises must be exercises the user has not seen during practice for this module. Return the questions **without** answers.
+- Starting a test (`POST …/tests`): verify unlock conditions. Draw 20 exercises from the module's exercise pool (all exercises with that `moduleId`, fetched via F04) using F08, enforcing the fresh/repeat split: at least `testFreshExercisePercent`% of selected exercises must be exercises the user has not seen during practice for this module. Return the questions **without** answers.
 - Submitting (`POST …/submit`): check each answer via normalized matching (same logic as F10). Compute score. Determine pass/fail against `testPassThreshold`.
   - **Update mastery**: call F06 apply-results with the attempt's ExerciseResults (vocab + grammar items).
   - Record the attempt score and outcome in UserModuleProgress test history (F07).

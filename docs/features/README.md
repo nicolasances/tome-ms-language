@@ -29,7 +29,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | F01 | [Vocabulary Catalog](./F01-vocabulary-catalog.md) | VocabularyItem | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 | F02 | [Grammar Concept Catalog](./F02-grammar-concept-catalog.md) | GrammarConcept | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 | F03 | [Module Catalog](./F03-module-catalog.md) | Module | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
-| F04 | [Exercise Bank](./F04-exercise-bank.md) | Exercise, ExerciseBank | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+| F04 | [Exercises](./F04-exercise-bank.md) | Exercise | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group B — User state & mastery
 | # | Feature | Primary model | Status | 

@@ -16,7 +16,7 @@ This feature is the personalization engine: given a pool of exercises (a module 
 
 | Term | Definition |
 |------|-----------|
-| Exercise pool | The set of candidate exercises (a module bank or a level test bank) |
+| Exercise pool | The set of candidate exercises — for modules: all exercises with that `moduleId`; for level tests: all exercises in the LevelTestBank for that CEFR level |
 | Weight | A per-exercise probability derived from `(1 − masteryScore)` of its linked item |
 | Deprioritized | Exercises whose linked item mastery > 0.85 are skipped unless the pool is nearly empty |
 | Recent-miss boost | Extra weight for exercises the user got wrong in their most recent session |
@@ -33,7 +33,7 @@ This feature is the personalization engine: given a pool of exercises (a module 
   4. Exercises answered incorrectly in the most recent session get an additional priority boost.
   5. When multiple exercises test the same item/concept, pick one at random among them (avoid testing the same item twice unless needed to fill the session).
   6. Draw a weighted random sample to fill the target count.
-- Inputs come from callers: mastery map from F06 (bulk read), recent session misses from the caller (F10/F11 know their last session), pool from F04 or F20.
+- Inputs come from callers: mastery map from F06 (bulk read), recent session misses from the caller (F10/F11 know their last session), pool from F04 (`GET /exercises?moduleId=`) or F20 (`GET /levelTestBanks/:cefrLevel`).
 - Thresholds (0.85 deprioritize, boost magnitude) are tunable parameters.
 
 ---
