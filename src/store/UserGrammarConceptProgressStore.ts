@@ -4,7 +4,7 @@ import { ExerciseResult } from "../model/ExerciseResult";
 import { UserGrammarConceptProgress } from "../model/UserGrammarConceptProgress";
 import { applyCorrect, applyIncorrect } from "../util/SrsAlgorithm";
 
-const COLLECTION = "userGrammarConceptProgress";
+const COLLECTION = "userGrammarProgress";
 
 export class UserGrammarConceptProgressStore {
 
