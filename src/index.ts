@@ -39,6 +39,9 @@ import { GetMeProgress } from './dlg/user/GetMeProgress';
 import { PutMeModuleProgress } from './dlg/user/PutMeModuleProgress';
 import { GetMeLevelProgress } from './dlg/user/GetMeLevelProgress';
 import { PostMeModuleTestAttempt } from './dlg/user/PostMeModuleTestAttempt';
+import { PostApplyVocabularyResults } from './dlg/progress/PostApplyVocabularyResults';
+import { GetUserVocabularyProgress } from './dlg/progress/GetUserVocabularyProgress';
+import { GetUserVocabularyProgressItem } from './dlg/progress/GetUserVocabularyProgressItem';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -95,6 +98,10 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'PUT', path: '/me/moduleProgress/:moduleId', delegate: PutMeModuleProgress },
             { method: 'GET', path: '/me/levelProgress', delegate: GetMeLevelProgress },
             { method: 'POST', path: '/me/moduleProgress/:moduleId/testAttempts', delegate: PostMeModuleTestAttempt },
+
+            { method: 'POST', path: '/users/:userId/vocabularyProgress/applyResults', delegate: PostApplyVocabularyResults },
+            { method: 'GET', path: '/users/:userId/vocabularyProgress', delegate: GetUserVocabularyProgress },
+            { method: 'GET', path: '/users/:userId/vocabularyProgress/:vocabularyItemId', delegate: GetUserVocabularyProgressItem },
         ],
         apiOptions: { noCorrelationId: true }
     },
