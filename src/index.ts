@@ -42,6 +42,9 @@ import { PostMeModuleTestAttempt } from './dlg/user/PostMeModuleTestAttempt';
 import { PostApplyVocabularyResults } from './dlg/progress/PostApplyVocabularyResults';
 import { GetUserVocabularyProgress } from './dlg/progress/GetUserVocabularyProgress';
 import { GetUserVocabularyProgressItem } from './dlg/progress/GetUserVocabularyProgressItem';
+import { PostApplyGrammarResults } from './dlg/progress/PostApplyGrammarResults';
+import { GetUserGrammarProgress } from './dlg/progress/GetUserGrammarProgress';
+import { GetUserGrammarProgressItem } from './dlg/progress/GetUserGrammarProgressItem';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -102,6 +105,10 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/users/:userId/vocabularyProgress/applyResults', delegate: PostApplyVocabularyResults },
             { method: 'GET', path: '/users/:userId/vocabularyProgress', delegate: GetUserVocabularyProgress },
             { method: 'GET', path: '/users/:userId/vocabularyProgress/:vocabularyItemId', delegate: GetUserVocabularyProgressItem },
+
+            { method: 'POST', path: '/users/:userId/grammarProgress/applyResults', delegate: PostApplyGrammarResults },
+            { method: 'GET', path: '/users/:userId/grammarProgress', delegate: GetUserGrammarProgress },
+            { method: 'GET', path: '/users/:userId/grammarProgress/:grammarConceptId', delegate: GetUserGrammarProgressItem },
         ],
         apiOptions: { noCorrelationId: true }
     },
