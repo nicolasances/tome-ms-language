@@ -44,9 +44,9 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | F08 | [Mastery-Aware Exercise Selection](./F08-mastery-aware-exercise-selection.md) | — (algorithm) |
 
 ### Group D — Module execution flow
-| # | Feature | Primary model |
-|---|---------|---------------|
-| F09 | [Grammar Introduction (Step 1)](./F09-grammar-introduction.md) | — |
+| # | Feature | Primary model | Status | 
+|---|---------|---------------|--------|
+| F09 | [Grammar Introduction (Step 1)](./F09-grammar-introduction.md) | — | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 | F10 | [Practice Session (Step 2)](./F10-practice-session.md) | PracticeSession |
 | F11 | [Module Test (Step 3)](./F11-module-test.md) | ModuleTestAttempt |
 
