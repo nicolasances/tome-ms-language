@@ -23,6 +23,7 @@ import { PostSentence } from './dlg/sentences/PostSentence';
 import { PostSentences } from './dlg/sentences/PostSentences';
 import { PostVocabularyItem } from './dlg/vocabulary/PostVocabularyItem';
 import { PostVocabularyItemBatch } from './dlg/vocabulary/PostVocabularyItemBatch';
+import { GetGrammarIntroduction } from './dlg/modules/GetGrammarIntroduction';
 import { GetModule } from './dlg/modules/GetModule';
 import { GetModules } from './dlg/modules/GetModules';
 import { PostModule } from './dlg/modules/PostModule';
@@ -62,6 +63,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/modules', delegate: PostModule },
             { method: 'GET', path: '/modules/:id', delegate: GetModule },
             { method: 'GET', path: '/modules', delegate: GetModules },
+            { method: 'GET', path: '/modules/:moduleId/grammarIntroduction', delegate: GetGrammarIntroduction },
 
             { method: 'POST', path: '/grammarConcepts', delegate: PostGrammarConcept },
             { method: 'POST', path: '/grammarConcepts/batch', delegate: PostGrammarConceptBatch },
