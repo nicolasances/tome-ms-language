@@ -86,6 +86,14 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
             const step = deriveStep(status);
             const completionPct = status === "completed" ? 100 : 0;
 
+            // testUnlocksAt: practiceCompletedAt (Step 2 complete) + module unlock delay; null until Step 2 completes
+            let testUnlocksAt: string | null = null;
+            if (progress?.practiceCompletedAt) {
+                const unlockAt = new Date(progress.practiceCompletedAt);
+                unlockAt.setHours(unlockAt.getHours() + m.testUnlockDelayHours);
+                testUnlocksAt = unlockAt.toISOString();
+            }
+
             // testRetryAvailableAt: last failed attempt's takenAt + module retry delay
             let testRetryAvailableAt: string | null = null;
             if (progress && progress.testAttempts.length > 0) {
@@ -106,7 +114,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 completionPct,
                 startedAt: progress?.startedAt ?? null,
                 completedAt: progress?.completedAt ?? null,
-                testUnlocksAt: null,   // requires F10 practice session completedAt â€” not available yet
+                testUnlocksAt,
                 testRetryAvailableAt,
             };
         });

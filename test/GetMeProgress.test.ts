@@ -11,7 +11,7 @@ function makeUser(cefrLevel = "A1") {
     return new User({ id: "uuid-001", email: "alice@example.com", cefrLevel: cefrLevel as any, createdAt: "2026-01-01T00:00:00.000Z" });
 }
 
-function makeModule(id: string, cefrLevel = "A1", overrides: Partial<{ testRetryDelayMinutes: number }> = {}) {
+function makeModule(id: string, cefrLevel = "A1", overrides: Partial<{ testRetryDelayMinutes: number; testUnlockDelayHours: number }> = {}) {
     return new Module({
         id, title: `Module ${id}`, theme: "T", communicationGoal: "G",
         cefrLevel: cefrLevel as any, vocabularyItemIds: [], grammarConceptIds: [],
@@ -22,6 +22,7 @@ function makeModule(id: string, cefrLevel = "A1", overrides: Partial<{ testRetry
 function makeProgress(moduleId: string, status: string, overrides: Partial<{
     startedAt: string | null;
     completedAt: string | null;
+    practiceCompletedAt: string | null;
     testAttempts: ModuleTestAttempt[];
 }> = {}): UserModuleProgress {
     return new UserModuleProgress({
@@ -321,7 +322,7 @@ describe("GetMeProgress.do - per-module status and step", () => {
 
 describe("GetMeProgress.do â€” test timing", () => {
 
-    it("testUnlocksAt is always null (requires F10 practice session data)", async () => {
+    it("testUnlocksAt is null when practiceCompletedAt is not set (Step 2 incomplete)", async () => {
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
             [makeModule("a1-1", "A1").toBSON()],
@@ -332,6 +333,18 @@ describe("GetMeProgress.do â€” test timing", () => {
         const result = await delegate.do({}, userContext);
 
         assert.isNull(result.modules[0].testUnlocksAt);
+    });
+
+    it("testUnlocksAt is practiceCompletedAt plus testUnlockDelayHours when Step 2 is complete", async () => {
+        const module = makeModule("a1-1", "A1", { testUnlockDelayHours: 4 });
+        const progress = makeProgress("a1-1", "in_progress", { practiceCompletedAt: "2026-01-10T09:00:00.000Z" });
+        const config = makeMockConfig([makeUser("A1").toBSON()], [module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        // 09:00 + 4 hours = 13:00
+        assert.equal(result.modules[0].testUnlocksAt, "2026-01-10T13:00:00.000Z");
     });
 
     it("testRetryAvailableAt is null when there are no test attempts", async () => {
