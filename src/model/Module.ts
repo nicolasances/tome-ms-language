@@ -18,7 +18,6 @@ export class Module {
     practiceSessionSize: number;
     testUnlockDelayHours: number;
     testRetryDelayMinutes: number;
-    testFreshExercisePercent: number;
     testPassThreshold: number;
 
     constructor(input: ModuleInput) {
@@ -33,10 +32,9 @@ export class Module {
         this.createdAt = input.createdAt ?? new Date();
         this.isUserGenerated = input.isUserGenerated ?? false;
         this.createdByUserId = input.createdByUserId;
-        this.practiceSessionSize = input.practiceSessionSize ?? 15;
+        this.practiceSessionSize = input.practiceSessionSize ?? 20;
         this.testUnlockDelayHours = input.testUnlockDelayHours ?? 4;
         this.testRetryDelayMinutes = input.testRetryDelayMinutes ?? 20;
-        this.testFreshExercisePercent = input.testFreshExercisePercent ?? 50;
         this.testPassThreshold = input.testPassThreshold ?? 80;
     }
 
@@ -56,10 +54,9 @@ export class Module {
             createdAt: data.createdAt,
             isUserGenerated: data.isUserGenerated ?? false,
             createdByUserId: data.createdByUserId,
-            practiceSessionSize: data.practiceSessionSize ?? 15,
+            practiceSessionSize: data.practiceSessionSize ?? 20,
             testUnlockDelayHours: data.testUnlockDelayHours ?? 4,
             testRetryDelayMinutes: data.testRetryDelayMinutes ?? 20,
-            testFreshExercisePercent: data.testFreshExercisePercent ?? 50,
             testPassThreshold: data.testPassThreshold ?? 80,
         });
     }
@@ -83,7 +80,6 @@ export class Module {
             practiceSessionSize: this.practiceSessionSize,
             testUnlockDelayHours: this.testUnlockDelayHours,
             testRetryDelayMinutes: this.testRetryDelayMinutes,
-            testFreshExercisePercent: this.testFreshExercisePercent,
             testPassThreshold: this.testPassThreshold,
         };
     }
@@ -103,6 +99,5 @@ export interface ModuleInput {
     practiceSessionSize?: number;
     testUnlockDelayHours?: number;
     testRetryDelayMinutes?: number;
-    testFreshExercisePercent?: number;
     testPassThreshold?: number;
 }

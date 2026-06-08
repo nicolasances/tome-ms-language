@@ -46,11 +46,18 @@ describe("PostModule.parseRequest", () => {
         const delegate = new PostModule({} as any, {} as any);
         const parsed = delegate.parseRequest(makeReq(validBody));
 
-        assert.equal(parsed.practiceSessionSize, 15);
+        assert.equal(parsed.practiceSessionSize, 20);
         assert.equal(parsed.testUnlockDelayHours, 4);
         assert.equal(parsed.testRetryDelayMinutes, 20);
-        assert.equal(parsed.testFreshExercisePercent, 50);
         assert.equal(parsed.testPassThreshold, 80);
+    });
+
+    it("does not carry a testFreshExercisePercent parameter", () => {
+
+        const delegate = new PostModule({} as any, {} as any);
+        const parsed = delegate.parseRequest(makeReq({ ...validBody, testFreshExercisePercent: 60 }));
+
+        assert.notProperty(parsed, "testFreshExercisePercent");
     });
 
     it("uses caller-provided configurable parameters when given", () => {
@@ -61,14 +68,12 @@ describe("PostModule.parseRequest", () => {
             practiceSessionSize: 10,
             testUnlockDelayHours: 2,
             testRetryDelayMinutes: 30,
-            testFreshExercisePercent: 60,
             testPassThreshold: 90,
         }));
 
         assert.equal(parsed.practiceSessionSize, 10);
         assert.equal(parsed.testUnlockDelayHours, 2);
         assert.equal(parsed.testRetryDelayMinutes, 30);
-        assert.equal(parsed.testFreshExercisePercent, 60);
         assert.equal(parsed.testPassThreshold, 90);
     });
 

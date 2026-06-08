@@ -10,7 +10,7 @@ export class PostModule extends TotoDelegate<PostModuleRequest, PostModuleRespon
 
     parseRequest(req: Request): PostModuleRequest {
 
-        const { id, title, theme, communicationGoal, cefrLevel, vocabularyItemIds, grammarConceptIds, isUserGenerated, createdByUserId, practiceSessionSize, testUnlockDelayHours, testRetryDelayMinutes, testFreshExercisePercent, testPassThreshold } = req.body ?? {};
+        const { id, title, theme, communicationGoal, cefrLevel, vocabularyItemIds, grammarConceptIds, isUserGenerated, createdByUserId, practiceSessionSize, testUnlockDelayHours, testRetryDelayMinutes, testPassThreshold } = req.body ?? {};
 
         if (!id) throw new ValidationError(400, "id is required");
         if (!title) throw new ValidationError(400, "title is required");
@@ -28,10 +28,9 @@ export class PostModule extends TotoDelegate<PostModuleRequest, PostModuleRespon
             grammarConceptIds: Array.isArray(grammarConceptIds) ? grammarConceptIds : [],
             isUserGenerated: isUserGenerated ?? false,
             createdByUserId,
-            practiceSessionSize: practiceSessionSize ?? 15,
+            practiceSessionSize: practiceSessionSize ?? 20,
             testUnlockDelayHours: testUnlockDelayHours ?? 4,
             testRetryDelayMinutes: testRetryDelayMinutes ?? 20,
-            testFreshExercisePercent: testFreshExercisePercent ?? 50,
             testPassThreshold: testPassThreshold ?? 80,
         };
     }
@@ -81,7 +80,6 @@ interface PostModuleRequest {
     practiceSessionSize: number;
     testUnlockDelayHours: number;
     testRetryDelayMinutes: number;
-    testFreshExercisePercent: number;
     testPassThreshold: number;
 }
 
