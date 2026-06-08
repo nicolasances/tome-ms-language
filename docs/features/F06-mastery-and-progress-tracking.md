@@ -1,5 +1,7 @@
 # F06 — Mastery & Progress Tracking (SRS)
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 This feature tracks, per user, how well each **vocabulary item** and each **grammar concept** is known, as a Mastery Score in [0.0–1.0] computed by a spaced-repetition (SRS) algorithm from exercise history. Mastery is the signal that drives exercise selection (F08) and the weak-areas report (F21). The two progress entities are intentionally identical mirrors (one for vocabulary, one for grammar) sharing the same SRS algorithm, so they are delivered together.
@@ -17,7 +19,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 | Term | Definition |
 |------|-----------|
 | Mastery Score | Float [0.0–1.0]; ≥ 0.8 = "mastered" |
-| SRS | Spaced Repetition System: correct ↑, incorrect ↓, long gaps decay |
+| SRS | Spaced Repetition System: correct ↑, incorrect ↓ (decay deferred — see Technical Decisions) |
 | ExerciseResult | One recorded attempt: exerciseId, type, isCorrect, userAnswer, correctAnswer, timestamp, moduleId |
 | UserVocabularyProgress | Per-user, per-vocab-item progress record |
 | UserGrammarConceptProgress | Per-user, per-grammar-concept progress record (mirror of the above) |
@@ -73,9 +75,9 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 - SRS algorithm (shared, pure, testable, self-contained):
   - A correct answer increases the score.
   - An incorrect answer decreases the score.
-  - Items not reviewed for a long time decay gently (computed at read time or via a maintenance pass).
   - Mastery threshold: ≥ 0.8 = mastered.
   - Exact tuning is configurable; the algorithm must be independently unit-testable.
+  - Decay (items not reviewed for a long time losing score) is **deferred** — see Technical Decisions.
 - `applyResults` processes all results in the batch atomically per item; each item's history is appended and its score recomputed in one operation.
 
 ---
@@ -95,14 +97,34 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 
 - **Constraint** — Mastery is **global per item per user**, not per module. The same word mastered in module A counts as mastered when module B references it.
 - **Constraint** — Mastery is updated only during tests (F11/F21), not practice (F10).
-- **Assumption** — Gentle decay (OQ-02 in the idea) is in scope: yes, with a tunable decay rate.
+- **Assumption** — Decay is deferred for v1 (see Technical Decisions / OQ-01); the SRS algorithm only adjusts the score on correct/incorrect answers.
 
 ---
 
-## 5. Open Questions
+## 5. Technical Decisions
 
-| # | Question | Options / Notes |
-|---|----------|-----------------|
-| OQ-01 | Is decay computed lazily at read time or by a scheduled maintenance job? | Lazy-at-read avoids a cron; document the chosen approach |
-| OQ-02 | Exact SRS formula and weights | Standard SM-2-like or custom; tunable, must be unit-tested |
-| OQ-03 | Cap on `exerciseHistory` length? | Long histories may need trimming/rollup for performance |
+- **SRS formula** — simple proportional adjustment, pure and unit-tested in `SrsAlgorithm.ts`:
+  - Correct: `score + MASTERY_INCREMENT * (1 - score)`, with `MASTERY_INCREMENT = 0.12`
+  - Incorrect: `score - MASTERY_DECREMENT * score`, with `MASTERY_DECREMENT = 0.18`
+  - `isMastered(score) = score >= MASTERY_THRESHOLD`, with `MASTERY_THRESHOLD = 0.8`
+  - All three constants are exported and overridable per-call (for testing/tuning); the score is always clamped to `[0.0, 1.0]`.
+- **Decay — deferred** — decay (score erosion for items not reviewed in a long time) is **not** implemented in this iteration. The algorithm only adjusts the score in response to correct/incorrect answers. Adding decay later is a self-contained extension to `SrsAlgorithm.ts` plus a read-time or maintenance-pass trigger; it does not change the data model or endpoint contracts.
+- **`applyResults` payload contract** — `ExerciseResult` itself does not carry the target item id, so the caller (F11/F21) pairs each result with the id of the item/concept it belongs to:
+  ```jsonc
+  POST /users/:userId/vocabularyProgress/applyResults
+  { "results": [
+      { "vocabularyItemId": "A1-01-v-jeg-5325", "result": { "exerciseId": "...", "type": "...", "isCorrect": true, "userAnswer": "...", "correctAnswer": "...", "timestamp": "...", "moduleId": "..." } }
+  ] }
+  ```
+  (mirrored with `grammarConceptId` for `/grammarProgress/applyResults`). Each entry is processed independently: an absent progress record is created starting from `masteryScore = 0.0`.
+- **Routing** — endpoints take `userId` directly from the route param (no `/me` → email → `UserStore` resolution), since these are consumer/service-facing endpoints (F08, F11, F21 call them on behalf of a user), mirroring how `GetVocabularyItem` reads `req.params.id` directly.
+- **`exerciseHistory` cap** — none for v1; the history grows only at test time (slow growth). Revisit if it becomes a performance concern.
+
+---
+
+## 6. Open Questions
+
+All open questions from the original spec have been resolved (see Technical Decisions above):
+- Decay (OQ-01) is explicitly deferred.
+- The SRS formula (OQ-02) is the simple proportional adjustment described above.
+- No cap is placed on `exerciseHistory` (OQ-03) for v1.
