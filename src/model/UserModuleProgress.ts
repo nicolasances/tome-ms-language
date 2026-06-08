@@ -43,14 +43,18 @@ export class UserModuleProgress {
     status: ModuleStatus;
     startedAt: string | null;
     completedAt: string | null;
+    vocabularyItemsPracticed: string[];
+    practiceCompletedAt: string | null;
     testAttempts: ModuleTestAttempt[];
 
-    constructor({ userId, moduleId, status, startedAt, completedAt, testAttempts }: UserModuleProgressInput) {
+    constructor({ userId, moduleId, status, startedAt, completedAt, vocabularyItemsPracticed, practiceCompletedAt, testAttempts }: UserModuleProgressInput) {
         this.userId = userId;
         this.moduleId = moduleId;
         this.status = status;
         this.startedAt = startedAt;
         this.completedAt = completedAt;
+        this.vocabularyItemsPracticed = vocabularyItemsPracticed ?? [];
+        this.practiceCompletedAt = practiceCompletedAt ?? null;
         this.testAttempts = testAttempts;
     }
 
@@ -61,6 +65,8 @@ export class UserModuleProgress {
             status: data.status,
             startedAt: data.startedAt ?? null,
             completedAt: data.completedAt ?? null,
+            vocabularyItemsPracticed: data.vocabularyItemsPracticed ?? [],
+            practiceCompletedAt: data.practiceCompletedAt ?? null,
             testAttempts: (data.testAttempts ?? []).map((a: any) => ModuleTestAttempt.fromBSON(a)),
         });
     }
@@ -72,6 +78,8 @@ export class UserModuleProgress {
             status: this.status,
             startedAt: this.startedAt,
             completedAt: this.completedAt,
+            vocabularyItemsPracticed: this.vocabularyItemsPracticed,
+            practiceCompletedAt: this.practiceCompletedAt,
             testAttempts: this.testAttempts.map(a => a.toBSON()),
         };
     }
@@ -83,5 +91,7 @@ interface UserModuleProgressInput {
     status: ModuleStatus;
     startedAt: string | null;
     completedAt: string | null;
+    vocabularyItemsPracticed?: string[];
+    practiceCompletedAt?: string | null;
     testAttempts: ModuleTestAttempt[];
 }

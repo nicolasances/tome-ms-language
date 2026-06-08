@@ -55,10 +55,9 @@ Selection logic lives in [F08](./F08-mastery-aware-exercise-selection.md).
 #### 2.2.2. Endpoints
 
 - `POST /exercises` — batch-insert exercises for a module (body: `{ moduleId, exercises[] }`). Can be called multiple times to grow the pool. Duplicate exercises (same `moduleId`, `type`, `prompt`) are silently skipped — not rejected. Returns `{ inserted: string[], duplicatesSkipped: number }`.
-- `GET /exercises` — list all exercises for a module; query param `?moduleId=<id>` required. This is the pool retrieval used by sessions and the selection engine.
 - `GET /exercises/:id` — get a single exercise by id.
-- `PUT /exercises/:id/timesShown` — increment `timesShown` by 1 (called after each exercise is shown in a session).
-- `PUT /exercises/:id/userContributedAnswers` — append a validated user translation (body: `{ answer: string }`); called by F13.
+
+> **Note — pool retrieval and runtime mutations are not REST endpoints.** `ExerciseStore.listByModuleId(moduleId)`, `ExerciseStore.incrementTimesShown(id)`, and `ExerciseStore.appendUserContributedAnswer(id, answer)` are called directly, in-process: the selection engine (F08) lists a module's pool; the practice/test features (F10/F11) increment `timesShown` as exercises are shown; F13 appends a verified translation. All of these consumers live inside this microservice, so HTTP endpoints (formerly `GET /exercises`, `PUT /exercises/:id/timesShown`, `PUT /exercises/:id/userContributedAnswers`) had no external consumer and were removed per the coding standard. See [the change record](./changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 #### 2.2.4. Business Logic
 
@@ -97,6 +96,5 @@ All open questions resolved.
 
 - **No bank entity** — The exercise pool for a module is the set of exercises with that `moduleId`. Pool membership and size are derived from the exercises collection directly — no separate bank document, no exerciseIds list to maintain in sync.
 - **Exercise ids are server-generated** — The caller submits exercise content only; ids are assigned server-side.
-- **PATCH → PUT** — The `totoms` framework only supports GET, POST, PUT, DELETE. The two mutation endpoints (`timesShown`, `userContributedAnswers`) are wired as `PUT` rather than `PATCH`.
 - **Exercise validation is shared** — `src/util/ExerciseValidation.ts` exports `parseExerciseInput`, used by `PostExercises` to enforce per-type validation rules.
 - **`promptTranslation` for `sentence_reorder` is null** — For `multiple_choice`, `fill_blank`, and `error_correction` the `prompt` is a Danish sentence and `promptTranslation` provides the English meaning. For `sentence_reorder`, the `prompt` carries the English meaning directly (what the user is constructing), mirroring `translation_active`. Storing the same text in both fields would be redundant.
