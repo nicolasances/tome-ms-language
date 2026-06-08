@@ -6,7 +6,6 @@ import { PutMeCefrLevel } from './dlg/user/PutMeCefrLevel';
 import { AddSentenceAlternative } from './dlg/sentences/AddSentenceAlternative';
 import { GetGrammarConcept } from './dlg/grammar/GetGrammarConcept';
 import { GetGrammarConcepts } from './dlg/grammar/GetGrammarConcepts';
-import { LookupGrammarConcepts } from './dlg/grammar/LookupGrammarConcepts';
 import { PostGrammarConcept } from './dlg/grammar/PostGrammarConcept';
 import { PostGrammarConceptBatch } from './dlg/grammar/PostGrammarConceptBatch';
 import { CompleteSession } from './dlg/session/CompleteSession';
@@ -28,21 +27,13 @@ import { GetModule } from './dlg/modules/GetModule';
 import { GetModules } from './dlg/modules/GetModules';
 import { PostModule } from './dlg/modules/PostModule';
 import { GetExercise } from './dlg/exercises/GetExercise';
-import { GetExercises } from './dlg/exercises/GetExercises';
-import { PatchExerciseTimesShown } from './dlg/exercises/PatchExerciseTimesShown';
-import { PatchExerciseUserContributedAnswers } from './dlg/exercises/PatchExerciseUserContributedAnswers';
 import { PostExercises } from './dlg/exercises/PostExercises';
 import { RemoveSentenceAlternative } from './dlg/sentences/RemoveSentenceAlternative';
 import { StartSession } from './dlg/session/StartSession';
 import { SubmitAnswer } from './dlg/session/SubmitAnswer';
 import { GetMeProgress } from './dlg/user/GetMeProgress';
-import { GetMeLevelProgress } from './dlg/user/GetMeLevelProgress';
-import { PostMeModuleTestAttempt } from './dlg/user/PostMeModuleTestAttempt';
-import { PostMePracticedVocabulary } from './dlg/user/PostMePracticedVocabulary';
-import { PostApplyVocabularyResults } from './dlg/progress/PostApplyVocabularyResults';
 import { GetUserVocabularyProgress } from './dlg/progress/GetUserVocabularyProgress';
 import { GetUserVocabularyProgressItem } from './dlg/progress/GetUserVocabularyProgressItem';
-import { PostApplyGrammarResults } from './dlg/progress/PostApplyGrammarResults';
 import { GetUserGrammarProgress } from './dlg/progress/GetUserGrammarProgress';
 import { GetUserGrammarProgressItem } from './dlg/progress/GetUserGrammarProgressItem';
 
@@ -61,10 +52,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'PUT', path: '/me/cefrLevel', delegate: PutMeCefrLevel },
 
             { method: 'POST', path: '/exercises', delegate: PostExercises },
-            { method: 'GET', path: '/exercises', delegate: GetExercises },
             { method: 'GET', path: '/exercises/:id', delegate: GetExercise },
-            { method: 'PUT', path: '/exercises/:id/timesShown', delegate: PatchExerciseTimesShown },
-            { method: 'PUT', path: '/exercises/:id/userContributedAnswers', delegate: PatchExerciseUserContributedAnswers },
 
             { method: 'POST', path: '/modules', delegate: PostModule },
             { method: 'GET', path: '/modules/:id', delegate: GetModule },
@@ -75,8 +63,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/grammarConcepts/batch', delegate: PostGrammarConceptBatch },
             { method: 'GET', path: '/grammarConcepts/:id', delegate: GetGrammarConcept },
             { method: 'GET', path: '/grammarConcepts', delegate: GetGrammarConcepts },
-            { method: 'POST', path: '/grammarConcepts/lookup', delegate: LookupGrammarConcepts },
-            
+
             { method: 'POST', path: '/vocabularyItems', delegate: PostVocabularyItem },
             { method: 'POST', path: '/vocabularyItems/batch', delegate: PostVocabularyItemBatch },
             { method: 'POST', path: '/vocabularyItems/lookup', delegate: LookupVocabularyItems },
@@ -98,15 +85,10 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/sessions/:sessionId/completion', delegate: CompleteSession },
 
             { method: 'GET', path: '/me/progress', delegate: GetMeProgress },
-            { method: 'GET', path: '/me/levelProgress', delegate: GetMeLevelProgress },
-            { method: 'POST', path: '/me/moduleProgress/:moduleId/testAttempts', delegate: PostMeModuleTestAttempt },
-            { method: 'POST', path: '/me/moduleProgress/:moduleId/practicedVocabulary', delegate: PostMePracticedVocabulary },
 
-            { method: 'POST', path: '/users/:userId/vocabularyProgress/applyResults', delegate: PostApplyVocabularyResults },
             { method: 'GET', path: '/users/:userId/vocabularyProgress', delegate: GetUserVocabularyProgress },
             { method: 'GET', path: '/users/:userId/vocabularyProgress/:vocabularyItemId', delegate: GetUserVocabularyProgressItem },
 
-            { method: 'POST', path: '/users/:userId/grammarProgress/applyResults', delegate: PostApplyGrammarResults },
             { method: 'GET', path: '/users/:userId/grammarProgress', delegate: GetUserGrammarProgress },
             { method: 'GET', path: '/users/:userId/grammarProgress/:grammarConceptId', delegate: GetUserGrammarProgressItem },
         ],
