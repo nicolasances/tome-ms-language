@@ -103,5 +103,38 @@ describe("PutMeModuleProgress.do", () => {
             assert.equal(err.code, 404);
         }
     });
+
+    it("preserves vocabularyItemsPracticed from the existing record during a status transition", async () => {
+        const existing = makeProgress({ status: "in_progress", vocabularyItemsPracticed: ["v-1", "v-2"] }).toBSON();
+        const progressDocs = [existing];
+        const config = makeMockConfig([makeUser().toBSON()], progressDocs);
+        const delegate = new PutMeModuleProgress({} as any, config);
+
+        await delegate.do({ moduleId: "mod-1", status: "completed" }, userContext);
+
+        assert.deepEqual(progressDocs[0].vocabularyItemsPracticed, ["v-1", "v-2"]);
+    });
+
+    it("sets practiceCompletedAt when provided and none exists yet", async () => {
+        const existing = makeProgress({ status: "in_progress" }).toBSON();
+        const progressDocs = [existing];
+        const config = makeMockConfig([makeUser().toBSON()], progressDocs);
+        const delegate = new PutMeModuleProgress({} as any, config);
+
+        await delegate.do({ moduleId: "mod-1", status: "in_progress", practiceCompletedAt: "2026-06-02T09:00:00.000Z" }, userContext);
+
+        assert.equal(progressDocs[0].practiceCompletedAt, "2026-06-02T09:00:00.000Z");
+    });
+
+    it("does not overwrite an existing practiceCompletedAt (idempotent)", async () => {
+        const existing = makeProgress({ status: "in_progress", practiceCompletedAt: "2026-06-01T08:00:00.000Z" }).toBSON();
+        const progressDocs = [existing];
+        const config = makeMockConfig([makeUser().toBSON()], progressDocs);
+        const delegate = new PutMeModuleProgress({} as any, config);
+
+        await delegate.do({ moduleId: "mod-1", status: "completed", practiceCompletedAt: "2026-06-09T10:00:00.000Z" }, userContext);
+
+        assert.equal(progressDocs[0].practiceCompletedAt, "2026-06-01T08:00:00.000Z");
+    });
 });
 

@@ -42,5 +42,19 @@ describe("PutMeModuleProgress.parseRequest", () => {
         const delegate = new PutMeModuleProgress({} as any, {} as any);
         assert.throws(() => delegate.parseRequest(makeReq({}, { status: "in_progress" })), /400|moduleId/i);
     });
+
+    it("parses an optional practiceCompletedAt timestamp when provided", () => {
+        const delegate = new PutMeModuleProgress({} as any, {} as any);
+        const parsed = delegate.parseRequest(makeReq({ moduleId: "mod-1" }, { status: "in_progress", practiceCompletedAt: "2026-06-02T09:00:00.000Z" }));
+
+        assert.equal(parsed.practiceCompletedAt, "2026-06-02T09:00:00.000Z");
+    });
+
+    it("leaves practiceCompletedAt undefined when not provided", () => {
+        const delegate = new PutMeModuleProgress({} as any, {} as any);
+        const parsed = delegate.parseRequest(makeReq({ moduleId: "mod-1" }, { status: "in_progress" }));
+
+        assert.isUndefined(parsed.practiceCompletedAt);
+    });
 });
 

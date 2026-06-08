@@ -11,12 +11,12 @@ export class PutMeModuleProgress extends TotoDelegate<PutMeModuleProgressRequest
         const moduleId = req.params.moduleId;
         if (!moduleId) throw new ValidationError(400, "moduleId is required");
 
-        const { status } = req.body ?? {};
+        const { status, practiceCompletedAt } = req.body ?? {};
         if (!status || !["in_progress", "completed"].includes(status)) {
             throw new ValidationError(400, "status must be one of: in_progress, completed");
         }
 
-        return { moduleId, status };
+        return { moduleId, status, practiceCompletedAt };
     }
 
     async do(req: PutMeModuleProgressRequest, userContext?: UserContext): Promise<PutMeModuleProgressResponse> {
@@ -39,6 +39,8 @@ export class PutMeModuleProgress extends TotoDelegate<PutMeModuleProgressRequest
                 ? (existing?.startedAt ?? now)
                 : (existing?.startedAt ?? null),
             completedAt: req.status === "completed" ? now : (existing?.completedAt ?? null),
+            vocabularyItemsPracticed: existing?.vocabularyItemsPracticed ?? [],
+            practiceCompletedAt: existing?.practiceCompletedAt ?? req.practiceCompletedAt ?? null,
             testAttempts: existing?.testAttempts ?? [],
         });
 
@@ -51,6 +53,7 @@ export class PutMeModuleProgress extends TotoDelegate<PutMeModuleProgressRequest
 interface PutMeModuleProgressRequest {
     moduleId: string;
     status: string;
+    practiceCompletedAt?: string;
 }
 
 interface PutMeModuleProgressResponse {
