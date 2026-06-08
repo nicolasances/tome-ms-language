@@ -36,7 +36,6 @@ import { RemoveSentenceAlternative } from './dlg/sentences/RemoveSentenceAlterna
 import { StartSession } from './dlg/session/StartSession';
 import { SubmitAnswer } from './dlg/session/SubmitAnswer';
 import { GetMeProgress } from './dlg/user/GetMeProgress';
-import { PutMeModuleProgress } from './dlg/user/PutMeModuleProgress';
 import { GetMeLevelProgress } from './dlg/user/GetMeLevelProgress';
 import { PostMeModuleTestAttempt } from './dlg/user/PostMeModuleTestAttempt';
 import { PostMePracticedVocabulary } from './dlg/user/PostMePracticedVocabulary';
@@ -99,7 +98,6 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/sessions/:sessionId/completion', delegate: CompleteSession },
 
             { method: 'GET', path: '/me/progress', delegate: GetMeProgress },
-            { method: 'PUT', path: '/me/moduleProgress/:moduleId', delegate: PutMeModuleProgress },
             { method: 'GET', path: '/me/levelProgress', delegate: GetMeLevelProgress },
             { method: 'POST', path: '/me/moduleProgress/:moduleId/testAttempts', delegate: PostMeModuleTestAttempt },
             { method: 'POST', path: '/me/moduleProgress/:moduleId/practicedVocabulary', delegate: PostMePracticedVocabulary },
