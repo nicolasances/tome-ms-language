@@ -44,10 +44,11 @@ Modules are created by an **external tool** (a seeding script or a custom module
 | createdAt | Date | Creation timestamp | Auto-set |
 | isUserGenerated | boolean | Whether created on demand for a user | Default: false |
 | practiceSessionSize | number | Number of exercises per practice session (practice may span multiple sessions) | Default: 20 |
-| practiceMinUnseenVocabPercent | number | Min % of each practice session reserved for vocabulary items the user has not yet encountered in this module; guarantees full vocabulary coverage within a bounded number of sessions | Default: 50 |
 | testUnlockDelayHours | number | Hours after Step 2 is complete (every vocabulary item practiced at least once) before the test unlocks | Default: 4 |
 | testRetryDelayMinutes | number | Minutes after a failed test before retry | Default: 20 |
 | testPassThreshold | number | % correct needed to pass the test | Default: 80 |
+
+> **`practiceMinUnseenVocabPercent` is NOT a per-module field.** It is a **microservice-level tuning constant** (`PRACTICE_MIN_UNSEEN_VOCAB_PERCENT`, default 50, exported from `Config.ts`) — the minimum share of each practice session reserved for unseen vocabulary, which guarantees full vocabulary coverage within a bounded number of sessions. It governs selection behavior uniformly across all modules, so it is not stored on the Module document. Consumed by the practice-session coverage override (F10).
 
 #### 2.2.2. Endpoints
 

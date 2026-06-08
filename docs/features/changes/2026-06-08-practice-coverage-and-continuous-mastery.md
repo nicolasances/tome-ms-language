@@ -3,7 +3,7 @@
 Mirrors the idea change [`2026-06-08-change.md`](../../../../tome/docs/idea/language-learning/changes/2026-06-08-change.md) into this microservice's feature set.
 
 ## What changed
-- **F03 (Module Catalog)** — `practiceSessionSize` default 15 → 20; **removed** `testFreshExercisePercent`; **added** `practiceMinUnseenVocabPercent` (default 50); `testUnlockDelayHours` now measured from Step 2 completion (full coverage).
+- **F03 (Module Catalog)** — `practiceSessionSize` default 15 → 20; **removed** `testFreshExercisePercent`; **added** `practiceMinUnseenVocabPercent` (default 50) as a **microservice-level constant** (`PRACTICE_MIN_UNSEEN_VOCAB_PERCENT` in `Config.ts`), NOT a per-module field; `testUnlockDelayHours` now measured from Step 2 completion (full coverage).
 - **F06 (Mastery & Progress Tracking)** — mastery is now updated **continuously**, including during practice (F10), not only at test time. `exerciseHistory` / `lastReviewed` now grow at practice time too. `applyResults` is now also called by F10.
 - **F07 (User Module Progress)** — `UserModuleProgress` gains `vocabularyItemsPracticed` (`string[]`) and `practiceCompletedAt` (`timestamp | null`). New write endpoint `POST /me/moduleProgress/:moduleId/practicedVocabulary`. `testUnlocksAt` is now derived from `practiceCompletedAt`.
 - **F08 (Mastery-Aware Selection)** — out-of-scope note updated: the module-test fresh-vs-repeat split is gone; the new practice-time coverage override is applied by F10 on top of F08 (tests draw from the unconstrained algorithm).
@@ -20,7 +20,7 @@ The fix attacks the root cause: **guarantee full vocabulary coverage during prac
 
 **F03 — Module Catalog**
 - **Modify**: `practiceSessionSize` default 15 → 20.
-- **Add**: `practiceMinUnseenVocabPercent` parameter (default 50).
+- **Add**: `practiceMinUnseenVocabPercent` (default 50) as a **microservice-level constant** in `Config.ts` (`PRACTICE_MIN_UNSEEN_VOCAB_PERCENT`), not a persisted `Module` field — it governs selection uniformly across modules.
 - **Remove**: `testFreshExercisePercent` parameter.
 - **Modify**: `testUnlockDelayHours` description (counts from Step 2 completion).
 
