@@ -67,19 +67,19 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 
 **Writes**
 
-- `PUT /me/moduleProgress/:moduleId` — upsert status and timestamps (valid statuses: `in_progress`, `completed`; settable timestamps include `practiceCompletedAt`). Creates the record if it does not exist yet (no separate initialization endpoint).
-- `POST /me/moduleProgress/:moduleId/practicedVocabulary` — append `vocabularyItemId`s the user has just encountered in practice to `vocabularyItemsPracticed` (de-duplicated, set-union semantics); called by F10 after each practice session. F10 decides when full coverage is reached and sets `practiceCompletedAt` via the `PUT` above.
+- `POST /me/moduleProgress/:moduleId/practicedVocabulary` — append `vocabularyItemId`s the user has just encountered in practice to `vocabularyItemsPracticed` (de-duplicated, set-union semantics); called by F10 after each practice session. F10 decides when full coverage is reached and sets `practiceCompletedAt` via the status transition described below.
 - `POST /me/moduleProgress/:moduleId/testAttempts` — append a ModuleTestAttempt record; called by F11.
 
 **Internal**
 
 - `GET /me/levelProgress` — completion-gate query: reads the user's CEFR level from their profile, returns whether all modules at that level are `completed`, consumed by F21.
+- **Status transitions are not a REST endpoint.** `UserModuleProgressStore.transitionStatus(userId, moduleId, status, practiceCompletedAt?)` upserts the status (`in_progress` | `completed`) and timestamps (including `practiceCompletedAt`) directly, in-process. F10 calls it on practice start and when Step 2 coverage completes; F11 calls it on a passing test. There is no separate initialization operation — the first `in_progress` call creates the record. (A `PUT /me/moduleProgress/:moduleId` endpoint existed earlier in the redesign but was removed: its only consumers were F10/F11, both internal to this microservice, so exposing it over HTTP violated the coding standard that REST endpoints must serve an external consumer — see [change record](./changes/2026-06-08-remove-internal-module-progress-endpoint.md).)
 
 #### 2.2.3. Business Logic
 
 - A dedicated store (`UserModuleProgressStore`, collection `userModuleProgress`) is the sole accessor of the progress collection.
 - `GET /me/progress` is an aggregating read: it resolves the user's CEFR level (F05), lists the modules for the selected level (F03), maps each to its progress record (defaulting to `locked` if no record exists), and computes the per-level rollup. For the `in_progress` module it pulls the test-timing fields from F11.
-- The `PUT` endpoint acts as an upsert — the first call with `in_progress` creates the record. There is no separate initialization endpoint; callers (e.g. `StartSession`) drive directly to `in_progress`.
+- `UserModuleProgressStore.transitionStatus` acts as an upsert — the first call with `in_progress` creates the record. There is no separate initialization operation; callers (F10 on practice start, F11 on test pass) drive the transition directly.
 - `startedAt` is idempotent: set on the first `in_progress` transition and never overwritten by subsequent transitions.
 - `practiceCompletedAt` is idempotent: set once when full vocabulary coverage is first reached and never overwritten; it is the timestamp F11's `testUnlocksAt` (= `practiceCompletedAt + testUnlockDelayHours`) is derived from. Re-running practice after coverage is reached does not move it.
 - `vocabularyItemsPracticed` accumulates with set-union semantics (no duplicates) and is preserved across status transitions.
