@@ -1,5 +1,7 @@
 # F08 — Mastery-Aware Exercise Selection
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 This feature is the personalization engine: given a pool of exercises (a module bank or a level test bank) and the user's mastery state, it draws a session-sized subset weighted toward the user's weak spots. **No AI is involved** — it is a deterministic-but-randomized weighted sampling algorithm. It is consumed by Practice Sessions (F10), Module Tests (F11), and Level Tests (F21). Delivering it as its own feature keeps the algorithm independently testable.
@@ -36,6 +38,13 @@ This feature is the personalization engine: given a pool of exercises (a module 
 - Inputs come from callers: mastery map from F06 (bulk read), recent session misses from the caller (F10/F11 know their last session), pool from F04 (`GET /exercises?moduleId=`) or F20 (`GET /levelTestBanks/:cefrLevel`).
 - Thresholds (0.85 deprioritize, boost magnitude) are tunable parameters.
 
+#### Technical Decisions
+
+- Implemented as `selectExercises` in `src/util/ExerciseSelector.ts` — a pure function taking `{ pool, masteryByItemId, recentMisses, targetCount }` and returning the selected `Exercise[]`. `masteryByItemId` is a single `Map<string, number>` keyed by the linked item id (`vocabularyItemId` or `grammarConceptId` — both id spaces are disjoint, so one map suffices); `recentMisses` is a `Set<string>` of exercise ids missed in the caller's most recent session.
+- The recent-miss boost is **additive**: `weight = (1 − masteryScore) + (RECENT_MISS_BOOST if missed else 0)`. Both `DEPRIORITIZE_MASTERY_THRESHOLD` (0.85) and `RECENT_MISS_BOOST` (0.5) live as tunable constants in `Config.ts`.
+- "Pool nearly empty" (OQ-02) is resolved as: if the count of non-deprioritized exercises (mastery ≤ 0.85) is less than `targetCount`, deprioritization is skipped entirely and the full pool is scored.
+- Dedup is implemented by randomly picking one exercise per linked item as the "primary" candidate; the rest are kept as a fallback pool only drawn from when there aren't enough distinct items to reach `targetCount`. The final draw reuses the existing `weightedSample` (Efraimidis-Spirakis) from `src/util/WeightedSampler.ts`.
+
 ---
 
 ## 3. Key Consumer Stories
@@ -59,5 +68,4 @@ This feature is the personalization engine: given a pool of exercises (a module 
 
 | # | Question | Options / Notes |
 |---|----------|-----------------|
-| OQ-01 | How is "most recent session" scoped — per module or global? | Likely per module for module sessions; per level for level tests |
-| OQ-02 | What counts as "pool nearly empty" for the deprioritization override? | e.g. fewer non-deprioritized exercises than the target count |
+| OQ-01 | How is "most recent session" scoped — per module or global? | Out of scope for the engine — `recentMisses` is an opaque set of exercise ids supplied by the caller (F10/F11/F21 each scope their own "most recent session") |
