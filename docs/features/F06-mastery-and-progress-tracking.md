@@ -62,12 +62,12 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 
 #### 2.2.2. Endpoints
 
-- `POST /users/:userId/vocabularyProgress/applyResults` — given a batch of ExerciseResults from a practice session, Module Test, or Level Test, update the relevant vocab progress records via the SRS algorithm.
-- `POST /users/:userId/grammarProgress/applyResults` — same for grammar concept progress.
 - `GET /users/:userId/vocabularyProgress` — list all vocab mastery records for a user.
 - `GET /users/:userId/vocabularyProgress/:vocabularyItemId` — get mastery for a specific vocab item.
 - `GET /users/:userId/grammarProgress` — list all grammar mastery records for a user.
 - `GET /users/:userId/grammarProgress/:grammarConceptId` — get mastery for a specific grammar concept.
+
+> **Note — applying results is not a REST endpoint.** `UserVocabularyProgressStore.appendResultAndRecompute(userId, vocabularyItemId, result)` and `UserGrammarConceptProgressStore.appendResultAndRecompute(userId, grammarConceptId, result)` run the SRS update directly, in-process — appending the `ExerciseResult` and recomputing `masteryScore`/`lastReviewed` in one operation. F10, F11 and F21 — their only consumers — all live inside this microservice, so HTTP endpoints here would have no external consumer; per the coding standard, the previously-built `POST .../applyResults` endpoints were removed in favour of these direct store calls. See [the change record](./changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 #### 2.2.4. Business Logic
 
@@ -78,7 +78,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
   - Mastery threshold: ≥ 0.8 = mastered.
   - Exact tuning is configurable; the algorithm must be independently unit-testable.
   - Decay (items not reviewed for a long time losing score) is **deferred** — see Technical Decisions.
-- `applyResults` processes all results in the batch atomically per item; each item's history is appended and its score recomputed in one operation.
+- `appendResultAndRecompute` processes one result for one item per call; each item's history is appended and its score recomputed in one operation. A caller applying a batch (e.g. F10 after a practice session) calls it once per `{ itemId, result }` entry.
 
 ---
 
@@ -109,15 +109,12 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
   - `isMastered(score) = score >= MASTERY_THRESHOLD`, with `MASTERY_THRESHOLD = 0.8`
   - All three constants are exported and overridable per-call (for testing/tuning); the score is always clamped to `[0.0, 1.0]`.
 - **Decay — deferred** — decay (score erosion for items not reviewed in a long time) is **not** implemented in this iteration. The algorithm only adjusts the score in response to correct/incorrect answers. Adding decay later is a self-contained extension to `SrsAlgorithm.ts` plus a read-time or maintenance-pass trigger; it does not change the data model or endpoint contracts.
-- **`applyResults` payload contract** — `ExerciseResult` itself does not carry the target item id, so the caller (F10/F11/F21) pairs each result with the id of the item/concept it belongs to:
-  ```jsonc
-  POST /users/:userId/vocabularyProgress/applyResults
-  { "results": [
-      { "vocabularyItemId": "A1-01-v-jeg-5325", "result": { "exerciseId": "...", "type": "...", "isCorrect": true, "userAnswer": "...", "correctAnswer": "...", "timestamp": "...", "moduleId": "..." } }
-  ] }
+- **Applying results is a direct, per-item store call** — `ExerciseResult` itself does not carry the target item id, so the caller (F10/F11/F21) pairs each result with the id of the item/concept it belongs to and calls the store directly:
+  ```typescript
+  await new UserVocabularyProgressStore({ db, config }).appendResultAndRecompute(userId, vocabularyItemId, result);
+  // mirrored with UserGrammarConceptProgressStore + grammarConceptId
   ```
-  (mirrored with `grammarConceptId` for `/grammarProgress/applyResults`). Each entry is processed independently: an absent progress record is created starting from `masteryScore = 0.0`.
-- **Routing** — endpoints take `userId` directly from the route param (no `/me` → email → `UserStore` resolution), since these are consumer/service-facing endpoints (F08, F10, F11, F21 call them on behalf of a user), mirroring how `GetVocabularyItem` reads `req.params.id` directly.
+  Each entry is processed independently: an absent progress record is created starting from `masteryScore = 0.0`. (A `POST /users/:userId/.../applyResults` REST pair existed earlier in the redesign but was removed: its only consumers — F10/F11/F21 — are internal to this microservice, so exposing it over HTTP violated the coding standard that endpoints must serve an external consumer.)
 - **`exerciseHistory` cap** — none for v1. Note the history now also grows at practice time (F10), not only at test time, so it grows faster than under the previous test-only model. Revisit a cap if it becomes a performance concern.
 
 ---

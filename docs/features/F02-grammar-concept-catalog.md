@@ -47,7 +47,8 @@ Grammar concepts (including their explanation text and examples) are authored an
 - `POST /grammarConcepts/batch` — insert many grammar concepts; skips duplicates by `id`.
 - `GET /grammarConcepts/:id` — get a single grammar concept by id (returns explanation + examples).
 - `GET /grammarConcepts` — list concepts; optional query params `?cefrLevel=A1` (exact-match filter) and `?category=tenses`.
-- `POST /grammarConcepts/lookup` — resolve a set of ids in bulk; body: `{ ids: string[] }`.
+
+> **Note — bulk id resolution is not a REST endpoint.** `GrammarConceptStore.findByIds(ids)` resolves a set of concept ids directly, in-process — e.g. `GetGrammarIntroduction` (F09) calls it to hydrate a module's referenced concepts. A `POST /grammarConcepts/lookup` endpoint existed earlier in the redesign, but no code path — internal or external — ever called it (F09 always used `findByIds` directly), so it was removed per the coding standard ("only create REST endpoints when consumed by an external consumer"). See [the change record](./changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 #### 2.2.4. Business Logic
 
@@ -97,5 +98,5 @@ Grammar concepts (including their explanation text and examples) are authored an
 - `examples` min/max validation (1–2 items, each requiring `danish` and `english`) is enforced in the endpoint delegate's `parseRequest`, not in the model constructor.
 - Batch dedup is by `id` only. Name uniqueness is not enforced at the batch level; the caller is responsible for submitting distinct names.
 - `GET /grammarConcepts` returns results sorted alphabetically by `name`. Both `cefrLevel` and `category` filters are optional and can be combined.
-- `POST /grammarConcepts/lookup`: missing ids are silently absent from the response (no 404 for unknown ids).
-- Express route ordering: `/grammarConcepts/batch` and `/grammarConcepts/lookup` must be registered before `/grammarConcepts/:id`.
+- `GrammarConceptStore.findByIds`: missing ids are silently absent from the result (no error for unknown ids).
+- Express route ordering: `/grammarConcepts/batch` must be registered before `/grammarConcepts/:id`.

@@ -8,8 +8,6 @@ This folder breaks down the [Language Learning idea](../../../tome/docs/specs/la
 
 Only backend capabilities are described here. UI-only concerns from the idea — Home Dashboard, level visibility prominence, mobile-first exercise rendering, navigation — belong to the `tome` app and are **out of scope** for this microservice. Where the idea mentions them, the backend feature only exposes the data the app needs.
 
-> For a cross-cutting view of **which endpoints each consumer calls** (frontend vs. internal vs. external/seeding), mapped against the UI wireframe flows, see [Endpoint Consumers & UI Flows](../endpoint-consumers.md).
-
 ## Cross-cutting constraints (apply to every feature)
 
 - **Danish only** for v2.0; keep models language-agnostic where cheap (e.g. don't hardcode "danish"/"english" semantics into shared logic more than necessary).

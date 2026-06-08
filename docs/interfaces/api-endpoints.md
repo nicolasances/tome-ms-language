@@ -1,6 +1,6 @@
 # API Endpoints
 
-> Documents every REST endpoint exposed by `tome-ms-language`, per the [Toto microservice coding standards](https://github.com/nicolasances/sdlc-agent-specs/blob/main/coding-standards/toto-microservice-development.md). For *who calls what and why* (frontend / internal / external / seeding), see [Endpoint Consumers & UI Flows](../endpoint-consumers.md). For the feature behind an endpoint, see [docs/features](../features/README.md).
+> Documents every REST endpoint exposed by `tome-ms-language`, per the [Toto microservice coding standards](https://github.com/nicolasances/sdlc-agent-specs/blob/main/coding-standards/toto-microservice-development.md). For the feature behind an endpoint, see [docs/features](../features/README.md).
 
 ## Table of Contents
 
@@ -74,7 +74,6 @@
 | ------ | -------- | ----------- |
 | POST | `/grammarConcepts` | Insert a single grammar concept |
 | POST | `/grammarConcepts/batch` | Insert many grammar concepts in one call |
-| POST | `/grammarConcepts/lookup` | Bulk-resolve a set of grammar concept ids |
 | GET | `/grammarConcepts` | List grammar concepts, optionally filtered by CEFR level and/or category |
 | GET | `/grammarConcepts/:id` | Get a single grammar concept by id |
 
@@ -86,9 +85,7 @@
 **Used for:** Seeding the catalog incrementally and idempotently in one call. Skips concepts whose `id` already exists; name uniqueness is not enforced at the batch level.
 **Request & Response:** `PostGrammarConceptBatchRequest` / `PostGrammarConceptBatchResponse` in `src/dlg/grammar/PostGrammarConceptBatch.ts`
 
-### POST /grammarConcepts/lookup
-**Used for:** Bulk-resolving a set of grammar concept ids in one round-trip — e.g. so a module's Grammar Introduction (F09) or an exercise can hydrate the concepts it references. Missing ids are silently absent from the response.
-**Request & Response:** `LookupGrammarConceptsRequest` / `LookupGrammarConceptsResponse` in `src/dlg/grammar/LookupGrammarConcepts.ts`
+> **Note — bulk concept resolution is not a REST endpoint.** `GrammarConceptStore.findByIds(ids)` resolves a set of concept ids directly, in-process — e.g. `GetGrammarIntroduction` (F09) calls it to hydrate a module's referenced concepts. A `POST /grammarConcepts/lookup` endpoint existed earlier in the redesign, but no code path ever called it, so it was removed per the coding standard ("only create REST endpoints when consumed by an external consumer"). See [the change record](../features/changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 ### GET /grammarConcepts
 **Used for:** Listing concepts filtered by `?cefrLevel=A1` (exact match on `cefrLevelIntroduced`) and/or `?category=tenses`, so the seeding tool and exercise generator can scope content to a level. Sorted alphabetically by `name`.
@@ -130,30 +127,17 @@
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
 | POST | `/exercises` | Batch-insert exercises into a module's pool |
-| GET | `/exercises` | List all exercises for a module (the selection pool) |
 | GET | `/exercises/:id` | Get a single exercise by id |
-| PUT | `/exercises/:id/timesShown` | Increment an exercise's `timesShown` counter |
-| PUT | `/exercises/:id/userContributedAnswers` | Append an AI-validated user translation to an exercise's accepted answers |
 
 ### POST /exercises
 **Used for:** Submitting a batch of exercises for a module, building up its content pool (~50 exercises target). Can be called repeatedly to grow the pool over time. Duplicate exercises — same `(moduleId, type, prompt)` — are silently skipped rather than rejected; the response reports how many were inserted vs. skipped.
 **Request & Response:** `PostExercisesRequest` / `PostExercisesResponse` in `src/dlg/exercises/PostExercises.ts`
 
-### GET /exercises
-**Used for:** Listing the full exercise pool for a module (`?moduleId=<id>` required) — the pool retrieval used by the mastery-aware selection engine (F08) when assembling a practice session or test.
-**Request & Response:** `GetExercisesRequest` / `GetExercisesResponse` in `src/dlg/exercises/GetExercises.ts`
-
 ### GET /exercises/:id
 **Used for:** Fetching a single exercise to render or score it, e.g. when the app needs the full prompt/answer/distractor set for one item in a session.
 **Request & Response:** `GetExerciseRequest` / `GetExerciseResponse` in `src/dlg/exercises/GetExercise.ts`
 
-### PUT /exercises/:id/timesShown
-**Used for:** Incrementing an exercise's `timesShown` counter by 1, called by the practice/test features (F10/F11) each time the exercise is shown to a user — feeds the selection engine's exposure tracking. Wired as `PUT` rather than `PATCH` because the `totoms` framework only supports GET/POST/PUT/DELETE.
-**Request & Response:** `PatchExerciseTimesShownRequest` / `PatchExerciseTimesShownResponse` in `src/dlg/exercises/PatchExerciseTimesShown.ts`
-
-### PUT /exercises/:id/userContributedAnswers
-**Used for:** Appending an AI-validated user translation to an exercise's `userContributedAnswers`, called by F13 (Translation Answer Verification) once a non-canonical translation has been confirmed correct — so future attempts accept that paraphrase too.
-**Request & Response:** `PatchRequest` / `PatchResponse` in `src/dlg/exercises/PatchExerciseUserContributedAnswers.ts`
+> **Note — pool retrieval and runtime mutations are not REST endpoints.** `ExerciseStore.listByModuleId(moduleId)`, `ExerciseStore.incrementTimesShown(id)`, and `ExerciseStore.appendUserContributedAnswer(id, answer)` are called directly, in-process: the selection engine (F08) lists a module's pool; the practice/test features (F10/F11) increment `timesShown`; F13 appends a verified translation. All consumers live inside this microservice, so the formerly-wired `GET /exercises`, `PUT /exercises/:id/timesShown`, and `PUT /exercises/:id/userContributedAnswers` had no external consumer and were removed per the coding standard. See [the change record](../features/changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 ---
 
@@ -161,40 +145,28 @@
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
 | GET | `/me/progress` | Aggregate read: CEFR rollup + per-module progress for the Home dashboard and Module map |
-| GET | `/me/levelProgress` | Completion-gate read: whether all modules at the user's current level are completed |
-| POST | `/me/moduleProgress/:moduleId/practicedVocabulary` | Append vocabulary item ids the user has just practiced |
-| POST | `/me/moduleProgress/:moduleId/testAttempts` | Append a module test attempt record |
 
 ### GET /me/progress
 **Used for:** The single BFF-style aggregate read that powers the Home dashboard and the Module map: the user's CEFR rollup across all six tiers (`levels`) plus the per-module status/step/progress list for the viewed level (`?cefrLevel`, defaults to the user's current level). For the in-progress module it also surfaces `testUnlocksAt` / `testRetryAvailableAt` (sourced from F11) so the app can render a local unlock countdown without a second request. Replaces the former `GET /me/moduleProgress[?cefrLevel][/:moduleId]`.
 **Request & Response:** `GetMeProgressRequest` / `GetMeProgressResponse` in `src/dlg/user/GetMeProgress.ts`
 
-### GET /me/levelProgress
-**Used for:** An internal completion-gate query consumed by the Level Test feature (F21): reads the user's current CEFR level and reports whether every module at that level has status `completed`, plus the per-module status array.
-**Request & Response:** `GetMeLevelProgressRequest` / `GetMeLevelProgressResponse` in `src/dlg/user/GetMeLevelProgress.ts`
-
-> **Note — module status transitions are not a REST endpoint.** `UserModuleProgressStore.transitionStatus(userId, moduleId, status, practiceCompletedAt?)` drives the status lifecycle (`in_progress` → `completed`) and its idempotent timestamps (`startedAt`, `completedAt`, `practiceCompletedAt`) directly, in-process. F10 and F11 — its only consumers — both live inside this microservice, so an HTTP endpoint here would have no external consumer; per the coding standard ("only create REST endpoints when the endpoint needs to be consumed by an external consumer"), it was removed in favour of the direct store call. See [the change record](../features/changes/2026-06-08-remove-internal-module-progress-endpoint.md).
-
-### POST /me/moduleProgress/:moduleId/practicedVocabulary
-**Used for:** Appending the `vocabularyItemId`s a user has just encountered during a practice session to `vocabularyItemsPracticed`, with de-duplicated set-union semantics. Called by F10 after each practice session; F10 uses the accumulated coverage to decide when Step 2 (full vocabulary coverage) is complete and then sets `practiceCompletedAt` via `UserModuleProgressStore.transitionStatus` (see note above).
-**Request & Response:** `PostMePracticedVocabularyRequest` / `PostMePracticedVocabularyResponse` in `src/dlg/user/PostMePracticedVocabulary.ts`
-
-### POST /me/moduleProgress/:moduleId/testAttempts
-**Used for:** Appending a `ModuleTestAttempt` record (score, passed, takenAt) to a module's progress, called by F11 once a module test is graded — letting F11 persist the outcome without owning the progress store directly.
-**Request & Response:** `PostMeModuleTestAttemptRequest` / `PostMeModuleTestAttemptResponse` in `src/dlg/user/PostMeModuleTestAttempt.ts`
+> **Note — writes and the completion-gate query are not REST endpoints.** Everything below `GET /me/progress` is driven directly, in-process, by the features that need it (F10, F11, F21 — all inside this microservice, so an HTTP endpoint would have no external consumer):
+> - `UserModuleProgressStore.transitionStatus(userId, moduleId, status, practiceCompletedAt?)` drives the status lifecycle (`in_progress` → `completed`) and its idempotent timestamps (`startedAt`, `completedAt`, `practiceCompletedAt`). Called by F10 (practice start, Step 2 coverage complete) and F11 (passing test).
+> - `UserModuleProgressStore.appendPracticedVocabulary(userId, moduleId, vocabularyItemIds)` appends `vocabularyItemId`s with de-duplicated set-union semantics (`$addToSet`). Called by F10 after each practice session.
+> - `UserModuleProgressStore.appendTestAttempt(userId, moduleId, attempt)` appends a `ModuleTestAttempt` record. Called by F11 once a module test is graded.
+> - The completion-gate check (whether every module at the user's current level is `completed`) is a small in-process aggregation F21 performs itself via `UserModuleProgressStore.listByUser`, mirroring how `GetMeProgress` aggregates across F03/F05/F07 — not a shared store method.
+>
+> Earlier in the redesign these existed as `PUT /me/moduleProgress/:moduleId`, `POST /me/moduleProgress/:moduleId/practicedVocabulary`, `POST /me/moduleProgress/:moduleId/testAttempts`, and `GET /me/levelProgress`; all four were removed per the coding standard ("only create REST endpoints when consumed by an external consumer") — see the [change](../features/changes/2026-06-08-remove-internal-module-progress-endpoint.md) [records](../features/changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 ---
 
 ## Vocabulary Mastery & Progress (SRS)
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
-| POST | `/users/:userId/vocabularyProgress/applyResults` | Apply a batch of exercise results to update vocabulary mastery scores |
 | GET | `/users/:userId/vocabularyProgress` | List all vocabulary mastery records for a user |
 | GET | `/users/:userId/vocabularyProgress/:vocabularyItemId` | Get the mastery record for one vocabulary item |
 
-### POST /users/:userId/vocabularyProgress/applyResults
-**Used for:** Updating a user's per-vocabulary-item mastery via the SRS algorithm from a batch of `ExerciseResult`s gathered during a practice session, Module Test, or Level Test. Each entry pairs a `vocabularyItemId` with its `ExerciseResult`; an absent progress record is created starting at `masteryScore = 0.0`. Called by F10/F11/F21 — practice and tests update mastery identically (mastery is global per item per user, not per module).
-**Request & Response:** `PostApplyVocabularyResultsRequest` / `PostApplyVocabularyResultsResponse` in `src/dlg/progress/PostApplyVocabularyResults.ts`
+> **Note — applying results is not a REST endpoint.** `UserVocabularyProgressStore.appendResultAndRecompute(userId, vocabularyItemId, result)` updates a user's per-item mastery via the SRS algorithm directly, in-process, one `ExerciseResult` at a time; an absent progress record is created starting at `masteryScore = 0.0`. F10/F11/F21 — its only (not-yet-implemented) consumers — all live inside this microservice, so a `POST .../applyResults` endpoint had no external consumer and was removed per the coding standard. See [the change record](../features/changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 ### GET /users/:userId/vocabularyProgress
 **Used for:** Bulk-reading mastery scores for a user — consumed by the mastery-aware selection engine (F08) to weight exercise choice without N+1 queries, and by "my words" views in the app.
@@ -209,13 +181,10 @@
 ## Grammar Mastery & Progress (SRS)
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
-| POST | `/users/:userId/grammarProgress/applyResults` | Apply a batch of exercise results to update grammar concept mastery scores |
 | GET | `/users/:userId/grammarProgress` | List all grammar concept mastery records for a user |
 | GET | `/users/:userId/grammarProgress/:grammarConceptId` | Get the mastery record for one grammar concept |
 
-### POST /users/:userId/grammarProgress/applyResults
-**Used for:** The grammar-concept mirror of the vocabulary `applyResults` endpoint above — updates a user's per-grammar-concept mastery via the same SRS algorithm from a batch of `{ grammarConceptId, result }` entries. Called by F10/F11/F21.
-**Request & Response:** `PostApplyGrammarResultsRequest` / `PostApplyGrammarResultsResponse` in `src/dlg/progress/PostApplyGrammarResults.ts`
+> **Note — applying results is not a REST endpoint.** `UserGrammarConceptProgressStore.appendResultAndRecompute(userId, grammarConceptId, result)` is the grammar-concept mirror of `UserVocabularyProgressStore.appendResultAndRecompute` above — same SRS algorithm, called directly in-process. F10/F11/F21 — its only (not-yet-implemented) consumers — all live inside this microservice, so a `POST .../applyResults` endpoint had no external consumer and was removed per the coding standard. See [the change record](../features/changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 ### GET /users/:userId/grammarProgress
 **Used for:** Bulk-reading grammar mastery scores for a user — consumed by the selection engine (F08) and the Level Test's weak-areas report (F21).
@@ -251,4 +220,4 @@ The following endpoints are still wired in `src/index.ts` but belong to the pre-
 
 ## API Design compliance
 
-Per the coding standard, only `POST`, `PUT`, `GET`, and `DELETE` are used across this service's `apiEndpoints` configuration (`src/index.ts`) — no other HTTP methods are registered. The two mutation endpoints that conceptually "patch" a resource (`PUT /exercises/:id/timesShown`, `PUT /exercises/:id/userContributedAnswers`) are intentionally wired as `PUT`, since the `totoms` framework supports only `GET`/`POST`/`PUT`/`DELETE`.
+Per the coding standard, only `POST`, `PUT`, `GET`, and `DELETE` are used across this service's `apiEndpoints` configuration (`src/index.ts`) — no other HTTP methods are registered.

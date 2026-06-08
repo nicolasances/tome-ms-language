@@ -51,7 +51,7 @@ This feature also owns the single aggregate read the app uses to render the Home
 | completedAt | string \| null | When the module was passed (ISO 8601) | Nullable |
 | vocabularyItemsPracticed | string[] | `vocabularyItemId`s the user has encountered at least once during this module's practice, accumulated across however many sessions Step 2 takes | Defaults to `[]`; appended by F10 as practice progresses; reaching full coverage of `Module.vocabularyItemIds` completes Step 2 |
 | practiceCompletedAt | string \| null | When full vocabulary coverage was first reached (Step 2 complete) (ISO 8601) | Nullable; set once by F10 the moment coverage is reached; the timestamp `testUnlockDelayHours` counts from |
-| testAttempts | ModuleTestAttempt[] | All module test attempts | Appended by F11 via dedicated endpoint |
+| testAttempts | ModuleTestAttempt[] | All module test attempts | Appended by F11 via `UserModuleProgressStore.appendTestAttempt`, in-process |
 
 #### 2.2.2. Endpoints
 
@@ -65,15 +65,12 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
   - `modules` — the per-module list for the selected level: for each module, `{ moduleId, status, step (grammar|practice|test|done), completionPct, startedAt, completedAt }`. Drives the dashboard continue-card and the module map.
   - For the module currently `in_progress` (if any), the module entry additionally carries the test-timing fields surfaced from F11 so the app can render a local countdown without a second request: `testUnlocksAt` (ISO 8601, absolute — derived from `practiceCompletedAt + testUnlockDelayHours`, so it is `null`/absent until Step 2 coverage is complete) and `testRetryAvailableAt` (ISO 8601, present only when a prior attempt failed and a retry cooldown is active). These are timestamps, not a computed boolean — the client derives "locked / unlocks in 3h59m" itself. The authoritative unlock gate remains server-side in F11.
 
-**Writes**
+> **Note — writes and the completion-gate query are not REST endpoints.** Everything below `GET /me/progress` is driven directly, in-process, by the features that need it — all of them (F10, F11, F21) live inside this microservice, so HTTP endpoints here would have no external consumer. Earlier in the redesign these existed as `PUT /me/moduleProgress/:moduleId`, `POST /me/moduleProgress/:moduleId/practicedVocabulary`, `POST /me/moduleProgress/:moduleId/testAttempts`, and `GET /me/levelProgress`; all four were removed per the coding standard ("only create REST endpoints when consumed by an external consumer") — see the [change](./changes/2026-06-08-remove-internal-module-progress-endpoint.md) [records](./changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
-- `POST /me/moduleProgress/:moduleId/practicedVocabulary` — append `vocabularyItemId`s the user has just encountered in practice to `vocabularyItemsPracticed` (de-duplicated, set-union semantics); called by F10 after each practice session. F10 decides when full coverage is reached and sets `practiceCompletedAt` via the status transition described below.
-- `POST /me/moduleProgress/:moduleId/testAttempts` — append a ModuleTestAttempt record; called by F11.
-
-**Internal**
-
-- `GET /me/levelProgress` — completion-gate query: reads the user's CEFR level from their profile, returns whether all modules at that level are `completed`, consumed by F21.
-- **Status transitions are not a REST endpoint.** `UserModuleProgressStore.transitionStatus(userId, moduleId, status, practiceCompletedAt?)` upserts the status (`in_progress` | `completed`) and timestamps (including `practiceCompletedAt`) directly, in-process. F10 calls it on practice start and when Step 2 coverage completes; F11 calls it on a passing test. There is no separate initialization operation — the first `in_progress` call creates the record. (A `PUT /me/moduleProgress/:moduleId` endpoint existed earlier in the redesign but was removed: its only consumers were F10/F11, both internal to this microservice, so exposing it over HTTP violated the coding standard that REST endpoints must serve an external consumer — see [change record](./changes/2026-06-08-remove-internal-module-progress-endpoint.md).)
+- **Status transitions**: `UserModuleProgressStore.transitionStatus(userId, moduleId, status, practiceCompletedAt?)` upserts the status (`in_progress` | `completed`) and timestamps (including `practiceCompletedAt`) directly. F10 calls it on practice start and when Step 2 coverage completes; F11 calls it on a passing test. There is no separate initialization operation — the first `in_progress` call creates the record.
+- **Practiced-vocabulary accumulation**: `UserModuleProgressStore.appendPracticedVocabulary(userId, moduleId, vocabularyItemIds)` adds ids to `vocabularyItemsPracticed` with de-duplicated, set-union semantics (`$addToSet`). F10 calls it after each practice session, then decides when full coverage is reached and sets `practiceCompletedAt` via `transitionStatus`.
+- **Test-attempt recording**: `UserModuleProgressStore.appendTestAttempt(userId, moduleId, attempt)` appends a `ModuleTestAttempt` record. F11 calls it once a module test is graded.
+- **Completion-gate query**: F21 reads the user's CEFR level (F05's `UserStore`), lists that level's modules (F03's `ModuleStore.list`), and maps each to its progress record via `UserModuleProgressStore.listByUser` (defaulting to `locked` when no record exists) to determine whether every module is `completed`. This is a small in-process aggregation F21 performs itself — not a shared store method — mirroring how `GetMeProgress` already aggregates across F03/F05/F07.
 
 #### 2.2.3. Business Logic
 
@@ -84,7 +81,7 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 - `practiceCompletedAt` is idempotent: set once when full vocabulary coverage is first reached and never overwritten; it is the timestamp F11's `testUnlocksAt` (= `practiceCompletedAt + testUnlockDelayHours`) is derived from. Re-running practice after coverage is reached does not move it.
 - `vocabularyItemsPracticed` accumulates with set-union semantics (no duplicates) and is preserved across status transitions.
 - `testAttempts` are always preserved across status transitions.
-- `GET /me/levelProgress` reads all modules at the user's current CEFR level, maps each to its progress record (defaulting to `locked` if no record exists), and returns `allCompleted` plus a per-module status array.
+- The completion-gate check (F21) reads all modules at the user's current CEFR level, maps each to its progress record (defaulting to `locked` if no record exists), and derives `allCompleted` plus a per-module status array.
 
 ---
 
@@ -104,7 +101,7 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 
 - **Constraint** — Status lives here, never on the Module entity (F03).
 - **Resolved (OQ-01)** — All modules at the user's current level are treated as `available` by default (no sequential locking within a level). A module appears as `locked` only when it has no progress record yet.
-- **Resolved (OQ-02)** — All modules at the level must be `completed` before `GET /me/levelProgress` returns `allCompleted: true`.
+- **Resolved (OQ-02)** — All modules at the level must be `completed` before the completion-gate check (performed in-process by F21, see §2.2.2) reports `allCompleted: true`.
 
 ---
 
