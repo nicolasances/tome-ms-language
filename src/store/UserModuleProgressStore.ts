@@ -44,4 +44,26 @@ export class UserModuleProgressStore {
         if (result.matchedCount === 0) return null;
         return this.findByUserAndModule(userId, moduleId);
     }
+
+    /**
+     * Adds the given vocabulary item ids to the module's vocabularyItemsPracticed set.
+     * Uses set-union semantics ($addToSet) so ids already present are not duplicated.
+     *
+     * @param userId the user id
+     * @param moduleId the module id
+     * @param vocabularyItemIds the vocabulary item ids encountered during practice
+     *
+     * @return the updated progress record, or null if no record exists for (userId, moduleId)
+     */
+    async appendPracticedVocabulary(userId: string, moduleId: string, vocabularyItemIds: string[]): Promise<UserModuleProgress | null> {
+
+        const result = await this.db.collection(COLLECTION).updateOne(
+            { userId, moduleId },
+            { $addToSet: { vocabularyItemsPracticed: { $each: vocabularyItemIds } } } as any
+        );
+
+        if (result.matchedCount === 0) return null;
+
+        return this.findByUserAndModule(userId, moduleId);
+    }
 }
