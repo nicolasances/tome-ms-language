@@ -36,6 +36,43 @@ export class UserModuleProgressStore {
         return progress;
     }
 
+    /**
+     * Transitions a module's status (in_progress | completed) for a user, upserting the record.
+     *
+     * Idempotent timestamps: startedAt is set once on the first in_progress transition and
+     * never overwritten; practiceCompletedAt is set once (whenever first provided) and never
+     * overwritten. completedAt, vocabularyItemsPracticed and testAttempts carry over from any
+     * existing record across transitions.
+     *
+     * @param userId the user id
+     * @param moduleId the module id
+     * @param status the new status: "in_progress" or "completed"
+     * @param practiceCompletedAt optional ISO timestamp marking full vocabulary coverage (Step 2 complete)
+     *
+     * @return the upserted progress record
+     */
+    async transitionStatus(userId: string, moduleId: string, status: "in_progress" | "completed", practiceCompletedAt?: string): Promise<UserModuleProgress> {
+
+        const existing = await this.findByUserAndModule(userId, moduleId);
+
+        const now = new Date().toISOString();
+
+        const updated = new UserModuleProgress({
+            userId,
+            moduleId,
+            status,
+            startedAt: status === "in_progress"
+                ? (existing?.startedAt ?? now)
+                : (existing?.startedAt ?? null),
+            completedAt: status === "completed" ? now : (existing?.completedAt ?? null),
+            vocabularyItemsPracticed: existing?.vocabularyItemsPracticed ?? [],
+            practiceCompletedAt: existing?.practiceCompletedAt ?? practiceCompletedAt ?? null,
+            testAttempts: existing?.testAttempts ?? [],
+        });
+
+        return this.upsert(updated);
+    }
+
     async appendTestAttempt(userId: string, moduleId: string, attempt: ModuleTestAttempt): Promise<UserModuleProgress | null> {
         const result = await this.db.collection(COLLECTION).updateOne(
             { userId, moduleId },
