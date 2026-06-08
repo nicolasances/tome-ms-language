@@ -31,6 +31,8 @@ describe("UserModuleProgress.fromBSON", () => {
             status: "in_progress",
             startedAt: "2026-06-01T09:00:00.000Z",
             completedAt: null,
+            vocabularyItemsPracticed: ["v-1", "v-2"],
+            practiceCompletedAt: "2026-06-02T09:00:00.000Z",
             testAttempts: [],
         });
 
@@ -41,7 +43,17 @@ describe("UserModuleProgress.fromBSON", () => {
         assert.equal(result.status, "in_progress");
         assert.equal(result.startedAt, "2026-06-01T09:00:00.000Z");
         assert.equal(result.completedAt, null);
+        assert.deepEqual(result.vocabularyItemsPracticed, ["v-1", "v-2"]);
+        assert.equal(result.practiceCompletedAt, "2026-06-02T09:00:00.000Z");
         assert.deepEqual(result.testAttempts, []);
+    });
+
+    it("defaults vocabularyItemsPracticed to [] and practiceCompletedAt to null when absent from the document", () => {
+        const doc: any = { userId: "user-1", moduleId: "mod-1", status: "available", startedAt: null, completedAt: null };
+        const result = UserModuleProgress.fromBSON(doc);
+
+        assert.deepEqual(result.vocabularyItemsPracticed, []);
+        assert.equal(result.practiceCompletedAt, null);
     });
 
     it("round-trips embedded testAttempts", () => {
