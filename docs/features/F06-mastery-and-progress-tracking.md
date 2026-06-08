@@ -7,7 +7,7 @@
 This feature tracks, per user, how well each **vocabulary item** and each **grammar concept** is known, as a Mastery Score in [0.0–1.0] computed by a spaced-repetition (SRS) algorithm from exercise history. Mastery is the signal that drives exercise selection (F08) and the weak-areas report (F21). The two progress entities are intentionally identical mirrors (one for vocabulary, one for grammar) sharing the same SRS algorithm, so they are delivered together.
 
 **Out of scope**:
-- *When* mastery is updated — that is decided by the consuming features. Mastery is updated **only** by the Module Test (F11) and Level Test (F21), **never** during practice (F10). This feature provides the update operation; the callers decide when to call it.
+- *When* mastery is updated — that is decided by the consuming features. Mastery is updated **continuously**: every completed exercise — in Practice (F10), the Module Test (F11), and the Level Test (F21) — updates the mastery of its linked item. This feature provides the update operation; the callers decide when to call it.
 - The selection algorithm that reads mastery (→ [F08](./F08-mastery-aware-exercise-selection.md))
 
 ---
@@ -47,8 +47,8 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 | userId | string | User id | Required |
 | vocabularyItemId | string | Vocabulary item id | Required; one record per (userId, vocabularyItemId) |
 | masteryScore | number | Mastery score | [0.0, 1.0]; ≥ 0.8 = mastered |
-| lastReviewed | Date | Last time the item appeared in a test | Nullable |
-| exerciseHistory | ExerciseResult[] | History of test attempts | Appended only at test time (F11/F21) |
+| lastReviewed | Date | Last time the item appeared in an exercise (practice or test) | Nullable |
+| exerciseHistory | ExerciseResult[] | History of exercise attempts | Appended at practice time (F10) and test time (F11/F21) |
 
 **UserGrammarConceptProgress**
 
@@ -57,12 +57,12 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 | userId | string | User id | Required |
 | grammarConceptId | string | Grammar concept id | Required; one record per (userId, grammarConceptId) |
 | masteryScore | number | Mastery score | [0.0, 1.0]; ≥ 0.8 = mastered |
-| lastReviewed | Date | Last time the concept appeared in a test | Nullable |
-| exerciseHistory | ExerciseResult[] | History of test attempts | Appended only at test time (F11/F21) |
+| lastReviewed | Date | Last time the concept appeared in an exercise (practice or test) | Nullable |
+| exerciseHistory | ExerciseResult[] | History of exercise attempts | Appended at practice time (F10) and test time (F11/F21) |
 
 #### 2.2.2. Endpoints
 
-- `POST /users/:userId/vocabularyProgress/applyResults` — given a batch of ExerciseResults from a completed Module Test or Level Test, update the relevant vocab progress records via the SRS algorithm.
+- `POST /users/:userId/vocabularyProgress/applyResults` — given a batch of ExerciseResults from a practice session, Module Test, or Level Test, update the relevant vocab progress records via the SRS algorithm.
 - `POST /users/:userId/grammarProgress/applyResults` — same for grammar concept progress.
 - `GET /users/:userId/vocabularyProgress` — list all vocab mastery records for a user.
 - `GET /users/:userId/vocabularyProgress/:vocabularyItemId` — get mastery for a specific vocab item.
@@ -86,7 +86,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 
 | # | As a Consumer, I want to… | So that… |
 |---|--------------------------|----------|
-| CS-01 | Submit a batch of exercise results after a test to update mastery | the SRS scores reflect the user's latest performance |
+| CS-01 | Submit a batch of exercise results after practice or a test to update mastery | the SRS scores reflect the user's latest performance |
 | CS-02 | Bulk-read mastery scores for a set of vocab item ids | the exercise selection engine (F08) can weight exercises without N+1 queries |
 | CS-03 | Bulk-read mastery scores for a set of grammar concept ids | the selection engine and weak-areas report have full coverage of the user's grammar state |
 | CS-04 | Read the mastery score for a single vocabulary item | the app can display the user's mastery per item |
@@ -96,7 +96,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 ## 4. Constraints and Assumptions
 
 - **Constraint** — Mastery is **global per item per user**, not per module. The same word mastered in module A counts as mastered when module B references it.
-- **Constraint** — Mastery is updated only during tests (F11/F21), not practice (F10).
+- **Constraint** — Mastery is updated continuously, on every completed exercise — in practice (F10) and in tests (F11/F21). Practice and tests update mastery identically; there is no "practice doesn't count" mode.
 - **Assumption** — Decay is deferred for v1 (see Technical Decisions / OQ-01); the SRS algorithm only adjusts the score on correct/incorrect answers.
 
 ---
@@ -109,7 +109,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
   - `isMastered(score) = score >= MASTERY_THRESHOLD`, with `MASTERY_THRESHOLD = 0.8`
   - All three constants are exported and overridable per-call (for testing/tuning); the score is always clamped to `[0.0, 1.0]`.
 - **Decay — deferred** — decay (score erosion for items not reviewed in a long time) is **not** implemented in this iteration. The algorithm only adjusts the score in response to correct/incorrect answers. Adding decay later is a self-contained extension to `SrsAlgorithm.ts` plus a read-time or maintenance-pass trigger; it does not change the data model or endpoint contracts.
-- **`applyResults` payload contract** — `ExerciseResult` itself does not carry the target item id, so the caller (F11/F21) pairs each result with the id of the item/concept it belongs to:
+- **`applyResults` payload contract** — `ExerciseResult` itself does not carry the target item id, so the caller (F10/F11/F21) pairs each result with the id of the item/concept it belongs to:
   ```jsonc
   POST /users/:userId/vocabularyProgress/applyResults
   { "results": [
@@ -117,8 +117,8 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
   ] }
   ```
   (mirrored with `grammarConceptId` for `/grammarProgress/applyResults`). Each entry is processed independently: an absent progress record is created starting from `masteryScore = 0.0`.
-- **Routing** — endpoints take `userId` directly from the route param (no `/me` → email → `UserStore` resolution), since these are consumer/service-facing endpoints (F08, F11, F21 call them on behalf of a user), mirroring how `GetVocabularyItem` reads `req.params.id` directly.
-- **`exerciseHistory` cap** — none for v1; the history grows only at test time (slow growth). Revisit if it becomes a performance concern.
+- **Routing** — endpoints take `userId` directly from the route param (no `/me` → email → `UserStore` resolution), since these are consumer/service-facing endpoints (F08, F10, F11, F21 call them on behalf of a user), mirroring how `GetVocabularyItem` reads `req.params.id` directly.
+- **`exerciseHistory` cap** — none for v1. Note the history now also grows at practice time (F10), not only at test time, so it grows faster than under the previous test-only model. Revisit a cap if it becomes a performance concern.
 
 ---
 

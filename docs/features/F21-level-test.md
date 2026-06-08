@@ -77,7 +77,7 @@ The Level Test is the comprehensive assessment that unlocks the next CEFR level.
 
 - **Constraint** — Offered only after all current-level modules are completed.
 - **Constraint** — Pass threshold 75% (vs 80% for module tests).
-- **Constraint** — Mastery updated here (like F11), and only here + F11.
+- **Constraint** — Mastery updated here, like F11 and practice (F10); all three update mastery via F06's apply-results.
 - **Constraint** — Free retry, no cooldown (idea OQ-04, v2.0).
 - **Assumption** — 20–30 questions drawn per attempt.
 

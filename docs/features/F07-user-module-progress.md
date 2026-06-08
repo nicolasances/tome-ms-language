@@ -49,6 +49,8 @@ This feature also owns the single aggregate read the app uses to render the Home
 | status | string | Current module status | Must be one of: locked, available, in_progress, completed |
 | startedAt | string \| null | When practice was first started (ISO 8601) | Nullable; set once on first `in_progress` transition, never overwritten |
 | completedAt | string \| null | When the module was passed (ISO 8601) | Nullable |
+| vocabularyItemsPracticed | string[] | `vocabularyItemId`s the user has encountered at least once during this module's practice, accumulated across however many sessions Step 2 takes | Defaults to `[]`; appended by F10 as practice progresses; reaching full coverage of `Module.vocabularyItemIds` completes Step 2 |
+| practiceCompletedAt | string \| null | When full vocabulary coverage was first reached (Step 2 complete) (ISO 8601) | Nullable; set once by F10 the moment coverage is reached; the timestamp `testUnlockDelayHours` counts from |
 | testAttempts | ModuleTestAttempt[] | All module test attempts | Appended by F11 via dedicated endpoint |
 
 #### 2.2.2. Endpoints
@@ -61,11 +63,12 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
   - `currentCefrLevel` — the user's active level (from F05).
   - `levels` — the CEFR rollup across all six tiers: for each level, `{ level, status (locked|current|completed), modulesCompleted, modulesTotal }`. Drives the level-track UI and "11 to reach A2".
   - `modules` — the per-module list for the selected level: for each module, `{ moduleId, status, step (grammar|practice|test|done), completionPct, startedAt, completedAt }`. Drives the dashboard continue-card and the module map.
-  - For the module currently `in_progress` (if any), the module entry additionally carries the test-timing fields surfaced from F11 so the app can render a local countdown without a second request: `testUnlocksAt` (ISO 8601, absolute) and `testRetryAvailableAt` (ISO 8601, present only when a prior attempt failed and a retry cooldown is active). These are timestamps, not a computed boolean — the client derives "locked / unlocks in 3h59m" itself. The authoritative unlock gate remains server-side in F11.
+  - For the module currently `in_progress` (if any), the module entry additionally carries the test-timing fields surfaced from F11 so the app can render a local countdown without a second request: `testUnlocksAt` (ISO 8601, absolute — derived from `practiceCompletedAt + testUnlockDelayHours`, so it is `null`/absent until Step 2 coverage is complete) and `testRetryAvailableAt` (ISO 8601, present only when a prior attempt failed and a retry cooldown is active). These are timestamps, not a computed boolean — the client derives "locked / unlocks in 3h59m" itself. The authoritative unlock gate remains server-side in F11.
 
 **Writes**
 
-- `PUT /me/moduleProgress/:moduleId` — upsert status and timestamps (valid statuses: `in_progress`, `completed`). Creates the record if it does not exist yet (no separate initialization endpoint).
+- `PUT /me/moduleProgress/:moduleId` — upsert status and timestamps (valid statuses: `in_progress`, `completed`; settable timestamps include `practiceCompletedAt`). Creates the record if it does not exist yet (no separate initialization endpoint).
+- `POST /me/moduleProgress/:moduleId/practicedVocabulary` — append `vocabularyItemId`s the user has just encountered in practice to `vocabularyItemsPracticed` (de-duplicated, set-union semantics); called by F10 after each practice session. F10 decides when full coverage is reached and sets `practiceCompletedAt` via the `PUT` above.
 - `POST /me/moduleProgress/:moduleId/testAttempts` — append a ModuleTestAttempt record; called by F11.
 
 **Internal**
@@ -78,6 +81,8 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 - `GET /me/progress` is an aggregating read: it resolves the user's CEFR level (F05), lists the modules for the selected level (F03), maps each to its progress record (defaulting to `locked` if no record exists), and computes the per-level rollup. For the `in_progress` module it pulls the test-timing fields from F11.
 - The `PUT` endpoint acts as an upsert — the first call with `in_progress` creates the record. There is no separate initialization endpoint; callers (e.g. `StartSession`) drive directly to `in_progress`.
 - `startedAt` is idempotent: set on the first `in_progress` transition and never overwritten by subsequent transitions.
+- `practiceCompletedAt` is idempotent: set once when full vocabulary coverage is first reached and never overwritten; it is the timestamp F11's `testUnlocksAt` (= `practiceCompletedAt + testUnlockDelayHours`) is derived from. Re-running practice after coverage is reached does not move it.
+- `vocabularyItemsPracticed` accumulates with set-union semantics (no duplicates) and is preserved across status transitions.
 - `testAttempts` are always preserved across status transitions.
 - `GET /me/levelProgress` reads all modules at the user's current CEFR level, maps each to its progress record (defaulting to `locked` if no record exists), and returns `allCompleted` plus a per-module status array.
 

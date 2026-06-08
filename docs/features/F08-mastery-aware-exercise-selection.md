@@ -6,7 +6,7 @@ This feature is the personalization engine: given a pool of exercises (a module 
 
 **Out of scope**:
 - The session/test lifecycle around the selection (→ [F10](./F10-practice-session.md), [F11](./F11-module-test.md), [F21](./F21-level-test.md))
-- The fresh-vs-repeat split specific to module tests (that constraint is applied by F11 on top of this engine)
+- The practice-time **coverage override** (reserving a share of each practice session for unseen vocabulary) — that constraint is applied by F10 on top of this engine; the Module Test (F11) and Level Test (F21) draw purely from the unconstrained algorithm below
 
 ---
 
