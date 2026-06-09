@@ -1,4 +1,6 @@
-# F09 — Grammar Introduction (Module Step 1) ![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+# F09 — Grammar Introduction (Module Step 1) 
+
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
 
 ## 1. Purpose & Scope
 

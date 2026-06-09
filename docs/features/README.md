@@ -33,13 +33,13 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | # | Feature | Primary model | Status | 
 |---|---------|---------------| ------ | 
 | F05 | [User Profile & CEFR Level](./F05-user-profile-and-cefr-level.md) | User | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
-| F06 | [Mastery & Progress Tracking (SRS)](./F06-mastery-and-progress-tracking.md) | UserVocabularyProgress, UserGrammarConceptProgress |  |
+| F06 | [Mastery & Progress Tracking (SRS)](./F06-mastery-and-progress-tracking.md) | UserVocabularyProgress, UserGrammarConceptProgress | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 | F07 | [User Module Progress](./F07-user-module-progress.md) | UserModuleProgress | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group C — Exercise selection engine
-| # | Feature | Primary model |
-|---|---------|---------------|
-| F08 | [Mastery-Aware Exercise Selection](./F08-mastery-aware-exercise-selection.md) | — (algorithm) |
+| # | Feature | Primary model | Status |
+|---|---------|---------------|--------|
+| F08 | [Mastery-Aware Exercise Selection](./F08-mastery-aware-exercise-selection.md) | — (algorithm) | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group D — Module execution flow
 | # | Feature | Primary model | Status | 
