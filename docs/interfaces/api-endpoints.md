@@ -12,6 +12,7 @@
 - [User Module Progress](#user-module-progress)
 - [Vocabulary Mastery & Progress (SRS)](#vocabulary-mastery--progress-srs)
 - [Grammar Mastery & Progress (SRS)](#grammar-mastery--progress-srs)
+- [Practice Sessions (F10)](#practice-sessions-f10)
 - [Legacy endpoints (pending removal)](#legacy-endpoints-pending-removal)
 - [API Design compliance](#api-design-compliance)
 
@@ -193,6 +194,32 @@
 ### GET /users/:userId/grammarProgress/:grammarConceptId
 **Used for:** Reading the mastery record for a single grammar concept, e.g. so the app can display per-concept mastery.
 **Request & Response:** `GetUserGrammarProgressItemRequest` / `GetUserGrammarProgressItemResponse` in `src/dlg/progress/GetUserGrammarProgressItem.ts`
+
+---
+
+## Practice Sessions (F10)
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| POST | `/users/:userId/modules/:moduleId/practiceSessions` | Start a new practice session for a user and module |
+| GET | `/users/:userId/practiceSessions/:sessionId` | Get the current state of a practice session (for resume) |
+| POST | `/users/:userId/practiceSessions/:sessionId/answers` | Submit an answer for one exercise in the session |
+| POST | `/users/:userId/practiceSessions/:sessionId/complete` | Mark the session complete; updates mastery and evaluates vocabulary coverage gate |
+
+### POST /users/:userId/modules/:moduleId/practiceSessions
+**Used for:** Starting Step 2 (practice) for a user and module. Selects `practiceSessionSize` exercises via mastery-aware selection (F08) with the coverage override applied — at least `PRACTICE_MIN_UNSEEN_VOCAB_PERCENT`% of exercises must target vocabulary items the user has not yet encountered in this module. Exercises are ordered by type progression (multiple_choice → sentence_reorder → fill_blank → conjugation_drill → error_correction → translation_active). Transitions `UserModuleProgress` to `in_progress`. Returns the session id and ordered exercise ids. Rejects with 409 if an active session already exists for this user+module.
+**Request & Response:** `StartPracticeSessionRequest` / `StartPracticeSessionResponse` in `src/dlg/practiceSessions/StartPracticeSession.ts`
+
+### GET /users/:userId/practiceSessions/:sessionId
+**Used for:** Resuming an in-progress session after the app is closed and reopened. Returns the full session state — exerciseIds, answers recorded so far, currentPosition, retryQueue, and completedAt.
+**Request & Response:** `GetPracticeSessionRequest` / `GetPracticeSessionResponse` in `src/dlg/practiceSessions/GetPracticeSession.ts`
+
+### POST /users/:userId/practiceSessions/:sessionId/answers
+**Used for:** Submitting a user's answer for one exercise during a practice session. Body: `{ exerciseId, userAnswer }`. Normalizes the answer (lowercase, strip punctuation) and checks it against the exercise's `answer`, `alternativeAnswers`, and `userContributedAnswers`. If correct, advances `currentPosition`. If wrong, adds the exercise to `retryQueue`, advances `currentPosition`, and returns the correct answer. Increments the exercise's `timesShown` via `ExerciseStore`.
+**Request & Response:** `SubmitPracticeAnswerRequest` / `SubmitPracticeAnswerResponse` in `src/dlg/practiceSessions/SubmitPracticeAnswer.ts`
+
+### POST /users/:userId/practiceSessions/:sessionId/complete
+**Used for:** Completing a practice session. Updates mastery scores via the SRS algorithm (F06) for every exercise attempted. Appends the session's encountered vocabulary item ids to `UserModuleProgress.vocabularyItemsPracticed` (F07). Evaluates the coverage gate: if all `Module.vocabularyItemIds` are now covered, sets `practiceCompletedAt` on `UserModuleProgress` (starting the `testUnlockDelayHours` countdown). Returns `{ step2Complete: boolean, unseenVocabCount: number }` so the app knows whether to offer another practice session or route toward the Module Test.
+**Request & Response:** `CompletePracticeSessionRequest` / `CompletePracticeSessionResponse` in `src/dlg/practiceSessions/CompletePracticeSession.ts`
 
 ---
 
