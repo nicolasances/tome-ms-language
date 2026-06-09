@@ -36,6 +36,10 @@ import { GetUserVocabularyProgress } from './dlg/progress/GetUserVocabularyProgr
 import { GetUserVocabularyProgressItem } from './dlg/progress/GetUserVocabularyProgressItem';
 import { GetUserGrammarProgress } from './dlg/progress/GetUserGrammarProgress';
 import { GetUserGrammarProgressItem } from './dlg/progress/GetUserGrammarProgressItem';
+import { StartPracticeSession } from './dlg/practiceSessions/StartPracticeSession';
+import { GetPracticeSession } from './dlg/practiceSessions/GetPracticeSession';
+import { SubmitPracticeAnswer } from './dlg/practiceSessions/SubmitPracticeAnswer';
+import { CompletePracticeSession } from './dlg/practiceSessions/CompletePracticeSession';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -91,6 +95,11 @@ const config: TotoMicroserviceConfiguration = {
 
             { method: 'GET', path: '/users/:userId/grammarProgress', delegate: GetUserGrammarProgress },
             { method: 'GET', path: '/users/:userId/grammarProgress/:grammarConceptId', delegate: GetUserGrammarProgressItem },
+
+            { method: 'POST', path: '/users/:userId/modules/:moduleId/practiceSessions', delegate: StartPracticeSession },
+            { method: 'GET', path: '/users/:userId/practiceSessions/:sessionId', delegate: GetPracticeSession },
+            { method: 'POST', path: '/users/:userId/practiceSessions/:sessionId/answers', delegate: SubmitPracticeAnswer },
+            { method: 'POST', path: '/users/:userId/practiceSessions/:sessionId/complete', delegate: CompletePracticeSession },
         ],
         apiOptions: { noCorrelationId: true }
     },
