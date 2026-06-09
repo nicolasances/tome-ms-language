@@ -9,6 +9,20 @@ import { APIOptions, TotoControllerConfig } from 'totoms';
  */
 export const PRACTICE_MIN_UNSEEN_VOCAB_PERCENT = 50;
 
+/**
+ * Mastery score above which an exercise's linked item is considered mastered
+ * and the exercise is deprioritized during selection (F08), unless the pool
+ * of non-deprioritized exercises is too small to fill the session.
+ */
+export const DEPRIORITIZE_MASTERY_THRESHOLD = 0.85;
+
+/**
+ * Extra weight added to an exercise's selection weight (F08) when its linked
+ * item was answered incorrectly in the user's most recent session, so it
+ * resurfaces sooner.
+ */
+export const RECENT_MISS_BOOST = 0.5;
+
 export class ControllerConfig extends TotoControllerConfig {
 
     getMongoSecretNames(): { userSecretName: string; pwdSecretName: string; } | null {
