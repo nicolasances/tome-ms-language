@@ -102,10 +102,10 @@ Practice is **not a single session**. The user repeats practice sessions until *
 
 | # | Question | Options / Notes |
 |---|----------|-----------------|
-| OQ-01 | Fuzzy-compare tolerance for typed answers | Levenshtein threshold? Per-type? |
 | OQ-03 | Should sessions expire/auto-abandon after inactivity? | Avoid stale active sessions |
 
 _Resolved questions:_
+- **OQ-01** — Fuzzy matching is applied only to `translation_active` and `error_correction` (free-text production types). `fill_blank` and `conjugation_drill` require exact answers. Threshold: ≤10 chars → 1 edit; ≤20 chars → 2 edits; >20 chars → 3 edits. Implemented via Levenshtein distance in `src/util/AnswerChecker.ts`. `CheckAnswerResult.fuzzyMatched` distinguishes exact from fuzzy accepts.
 - **OQ-02** — unlock timer starts from `practiceCompletedAt`, set once (idempotent) by `UserModuleProgressStore.transitionStatus` when coverage is first reached. Re-running practice afterward does not restart it.
 - **OQ-04** — any appearance counts: the session collects vocab ids from all answered exercises (primary pass + retry queue) and passes them to `appendPracticedVocabulary`.
 
