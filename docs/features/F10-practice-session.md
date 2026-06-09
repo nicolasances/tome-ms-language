@@ -1,5 +1,7 @@
 # F10 — Practice Session (Module Step 2)
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 Step 2 is the interactive practice phase of a module. The user works through `practiceSessionSize` (default 20) exercises per session, drawn from the module's exercise pool via mastery-aware selection (F08), ordered by exercise type to follow the recognition → production progression. Wrong answers reveal the correct answer and the user moves on; at the end, all missed exercises are retried until correct.
@@ -101,6 +103,24 @@ Practice is **not a single session**. The user repeats practice sessions until *
 | # | Question | Options / Notes |
 |---|----------|-----------------|
 | OQ-01 | Fuzzy-compare tolerance for typed answers | Levenshtein threshold? Per-type? |
-| OQ-02 | _Resolved_ — the unlock timer starts from `practiceCompletedAt`, which is set once (idempotent) when coverage is first reached. Re-running practice afterward does not restart it. | — |
 | OQ-03 | Should sessions expire/auto-abandon after inactivity? | Avoid stale active sessions |
-| OQ-04 | Should a vocabulary item count as "encountered" only when shown in the primary pass, or also if it first appears in the retry queue? | Default: any appearance shown to the user counts (idea §3.1.1) |
+
+_Resolved questions:_
+- **OQ-02** — unlock timer starts from `practiceCompletedAt`, set once (idempotent) by `UserModuleProgressStore.transitionStatus` when coverage is first reached. Re-running practice afterward does not restart it.
+- **OQ-04** — any appearance counts: the session collects vocab ids from all answered exercises (primary pass + retry queue) and passes them to `appendPracticedVocabulary`.
+
+---
+
+## 6. Technical Decisions
+
+### Coverage override implementation
+The session selection uses a two-step draw: (1) guarantee `ceil(practiceSessionSize × PRACTICE_MIN_UNSEEN_VOCAB_PERCENT / 100)` exercises from the unseen-vocab pool via `selectExercises`; (2) fill the remaining slots from a filler pool of (leftover unseen + seen/grammar) exercises. This ensures the minimum is a hard guarantee while still letting additional unseen exercises fill remaining slots naturally.
+
+### `userId` in URL, not from auth token
+The practice-session endpoints use `/users/:userId/…` matching the pattern established by the progress endpoints (F06/F07). The delegate validates that `req.params.userId` matches the `userContext.userId` from the auth token on all reads/writes — ownership is enforced in the delegate, not the route.
+
+### Coverage gate evaluation on `complete`, not per-answer
+`practiceCompletedAt` is set inside `CompletePracticeSession.do` — not after each `SubmitPracticeAnswer`. This avoids a race condition between partial vocab-append writes and the gate check, and keeps mastery updates and coverage evaluation atomic within the complete call.
+
+### Mastery re-fetch inside complete
+`CompletePracticeSession` re-fetches each exercise's vocab/grammar link via `ExerciseStore.findById` during the mastery-update loop (rather than carrying the exercise data on the session). This avoids storing denormalized exercise content in `PracticeSession.answers` and is acceptable given that exercise count per session is bounded at `practiceSessionSize` (default 20).
