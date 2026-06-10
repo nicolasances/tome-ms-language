@@ -95,17 +95,18 @@ function buildPrompt({ exercise, userAnswer, cefrLevel, vocabOrGrammarBlock }: P
 
     return `You are a Danish language tutor. A student at CEFR level ${cefrLevel} answered an exercise incorrectly.
 
-Exercise prompt: "${exercise.prompt}"
-Correct answer: "${exercise.answer}"
-Student's answer: "${userAnswer}"
+            Exercise prompt: "${exercise.prompt}"
+            Correct answer: "${exercise.answer}"
+            Student's answer: "${userAnswer}"
 
-${vocabOrGrammarBlock}
+            ${vocabOrGrammarBlock}
 
-Return a JSON object with exactly these fields:
-- correctAnswer: the correct answer as a string
-- explanation: why the correct answer is right, tailored to CEFR level ${cefrLevel}
-- rule: the underlying grammar or vocabulary rule, stated simply in English
-- example: a second Danish sentence demonstrating the same rule (different from the exercise prompt)`;
+            Return a JSON object with exactly these fields:
+            - correctAnswer: the correct answer as a string
+            - explanation: why the correct answer is right, tailored to CEFR level ${cefrLevel}
+            - rule: the underlying grammar or vocabulary rule, stated simply in English
+            - example: a second Danish sentence demonstrating the same rule (different from the exercise prompt)
+    `;
 }
 
 interface PromptInput {
