@@ -133,7 +133,7 @@ export class StartPracticeSession extends TotoDelegate<StartPracticeSessionReque
         return {
             sessionId,
             moduleId: req.moduleId,
-            exerciseIds: combined.map(e => e.id),
+            exercises: combined,
             startedAt: now,
         };
     }
@@ -145,8 +145,8 @@ interface StartPracticeSessionRequest {
 }
 
 interface StartPracticeSessionResponse {
-    sessionId: string;
-    moduleId: string;
-    exerciseIds: string[];
-    startedAt: string;
+    sessionId: string;         // The id of the newly created practice session.
+    moduleId: string;          // The id of the module this session belongs to.
+    exercises: Exercise[];     // The full exercise objects selected for this session, ordered by type progression.
+    startedAt: string;         // ISO 8601 timestamp of when the session was started.
 }

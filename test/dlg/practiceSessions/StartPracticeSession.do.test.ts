@@ -113,8 +113,8 @@ describe("StartPracticeSession.do", () => {
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
 
         assert.isString(result.sessionId);
-        assert.isArray(result.exerciseIds);
-        assert.isAbove(result.exerciseIds.length, 0);
+        assert.isArray(result.exercises);
+        assert.isAbove(result.exercises.length, 0);
         assert.isString(result.startedAt);
     });
 
@@ -136,10 +136,7 @@ describe("StartPracticeSession.do", () => {
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
 
         // Multiple_choice exercises must appear before translation_active
-        const positions = result.exerciseIds.map((id: string) => {
-            const ex = exercises.find(e => e.id === id)!;
-            return ex.type;
-        });
+        const positions = result.exercises.map((ex: any) => ex.type);
         const mcIndex = positions.indexOf("multiple_choice");
         const tIndex = positions.indexOf("translation_active");
 
@@ -247,10 +244,34 @@ describe("StartPracticeSession.do", () => {
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
 
         // All selected exercises must target unseen vocab (v-1..v-4, none practiced)
-        assert.lengthOf(result.exerciseIds, 4);
-        for (const id of result.exerciseIds) {
-            const ex = exercises.find(e => e.id === id)!;
+        assert.lengthOf(result.exercises, 4);
+        for (const ex of result.exercises) {
             assert.include(["v-1", "v-2", "v-3", "v-4"], ex.vocabularyItemId);
+        }
+    });
+
+    it("embeds full exercise objects (id, type, prompt, answer) in the exercises field", async () => {
+
+        const mod = makeModule({ practiceSessionSize: 2 });
+        const exercises = [
+            makeExercise("ex-mc-1", "multiple_choice", "v-1"),
+            makeExercise("ex-mc-2", "multiple_choice", "v-2"),
+        ];
+
+        const progress = makeProgress([]);
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.isArray(result.exercises);
+        assert.isAbove(result.exercises.length, 0);
+
+        for (const ex of result.exercises) {
+            assert.isString(ex.id, "exercise must have an id");
+            assert.isString(ex.type, "exercise must have a type");
+            assert.isString(ex.prompt, "exercise must have a prompt");
+            assert.isString(ex.answer, "exercise must have an answer");
         }
     });
 });
