@@ -49,10 +49,10 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | F11 | [Module Test (Step 3)](./F11-module-test.md) | ModuleTestAttempt |
 
 ### Group E — On-demand AI touchpoints
-| # | Feature | Primary model |
-|---|---------|---------------|
-| F12 | [Explain My Mistake](./F12-explain-my-mistake.md) | — |
-| F13 | [Translation Answer Verification](./F13-translation-answer-verification.md) | — |
+| # | Feature | Primary model | Status |
+|---|---------|---------------|--------|
+| F12 | [Explain My Mistake](./F12-explain-my-mistake.md) | — | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+| F13 | [Translation Answer Verification](./F13-translation-answer-verification.md) | — | |
 
 ### Group F — Level progression
 | # | Feature | Primary model |
