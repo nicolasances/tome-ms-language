@@ -88,4 +88,21 @@ export class ExerciseStore {
         return Exercise.fromBSON(doc as any);
     }
 
+    /**
+     * Finds multiple exercises by their ids in a single bulk query.
+     * Returns only the exercises that were found; missing ids are silently ignored.
+     * Returns an empty array when the ids list is empty.
+     *
+     * @param ids - Array of exercise id strings to look up.
+     * @returns Array of matching Exercise instances (order not guaranteed).
+     */
+    async findByIds(ids: string[]): Promise<Exercise[]> {
+
+        if (ids.length === 0) return [];
+
+        const docs = await this.db.collection(EXERCISES_COLLECTION).find({ id: { $in: ids } }).toArray();
+
+        return docs.map(doc => Exercise.fromBSON(doc as any));
+    }
+
 }
