@@ -95,4 +95,35 @@ export class PracticeSessionStore {
             { $set: { completedAt } }
         );
     }
+
+    /**
+     * Appends an exercise id to the session's verifiedExerciseIds array.
+     * Used by the F13 answer verification flow to enforce the one-per-attempt guard.
+     *
+     * @param {string} sessionId - The id of the practice session.
+     * @param {string} exerciseId - The exercise id to mark as having used verification.
+     */
+    async addVerifiedExerciseId(sessionId: string, exerciseId: string): Promise<void> {
+
+        await this.db.collection(COLLECTION).updateOne(
+            { _id: new ObjectId(sessionId) },
+            { $push: { verifiedExerciseIds: exerciseId } } as any
+        );
+    }
+
+    /**
+     * Removes an exercise id from the session's retryQueue.
+     * Called by the F13 answer verification flow when the AI validates the user's translation —
+     * removing the exercise from the retry queue prevents it from being shown again.
+     *
+     * @param {string} sessionId - The id of the practice session.
+     * @param {string} exerciseId - The exercise id to remove from the retry queue.
+     */
+    async removeFromRetryQueue(sessionId: string, exerciseId: string): Promise<void> {
+
+        await this.db.collection(COLLECTION).updateOne(
+            { _id: new ObjectId(sessionId) },
+            { $pull: { retryQueue: exerciseId } } as any
+        );
+    }
 }

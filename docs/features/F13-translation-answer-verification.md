@@ -1,5 +1,7 @@
 # F13 — Translation Answer Verification
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 For `translation_active` exercises only, after an answer is marked wrong by the normalized matching, the user can explicitly ask the AI to verify whether their translation is actually valid (paraphrases, synonyms the pre-generated list missed). If valid, the exercise is marked correct and the user's translation is appended to `userContributedAnswers` for that exercise. If invalid, the AI explains why. One verification per exercise attempt; unlimited across different exercises.
@@ -57,7 +59,18 @@ For `translation_active` exercises only, after an answer is marked wrong by the 
 
 ## 5. Open Questions
 
-| # | Question | Options / Notes |
-|---|----------|-----------------|
-| OQ-01 | In a Module/Level Test, can verification be invoked during the post-submit review, and does it retroactively change the score? | Idea allows "Explain my mistake" in review; verification's scoring impact during tests needs a rule |
-| OQ-02 | Are contributed answers shared across users (on the shared exercise) or per-user? | Affects whether one user's accepted phrasing helps everyone |
+| # | Question | Resolution |
+|---|----------|------------|
+| OQ-01 | In a Module/Level Test, can verification be invoked during the post-submit review, and does it retroactively change the score? | **Deferred.** Initial implementation scoped to practice sessions only. Test session support (and its scoring impact) tracked in [GitHub issue #64](https://github.com/nicolasances/tome-ms-language/issues/64). |
+| OQ-02 | Are contributed answers shared across users (on the shared exercise) or per-user? | **Shared.** A validated answer is appended to the exercise's `userContributedAnswers` via `ExerciseStore.appendUserContributedAnswer` — one user's accepted paraphrase benefits all users of the same exercise. |
+
+---
+
+## 6. Technical Decisions
+
+- **Practice sessions only (initial scope)** — Scoped to `practiceSessions` (F10). Test session support and its scoring impact are tracked separately (see OQ-01 above).
+- **One-per-attempt guard via `verifiedExerciseIds`** — A `verifiedExerciseIds: string[]` field was added to `PracticeSession` (and `PracticeSessionStore`). On verification, the exerciseId is pushed into this array; subsequent calls for the same `(sessionId, exerciseId)` pair are rejected with 409.
+- **Valid outcome removes from retry queue** — `PracticeSessionStore.removeFromRetryQueue` uses MongoDB `$pull` to remove the exerciseId from `retryQueue`, preventing a re-show without updating the stored answer record.
+- **`translation_active` constraint enforced at the delegate** — The delegate rejects any non-`translation_active` exercise with a 400 rather than silently ignoring or branching on grammar-concept logic (those exercises have no vocabulary context to scope the AI judgment).
+- **Vertex AI, same pattern as F12** — Uses the injectable `VertexAIClient` interface backed by `gemini-2.5-flash-lite` via Vertex AI. Unit tests inject a mock client; no live GCP call is required in the test suite.
+- **AI prompt includes accepted answers** — The prompt exposes `exercise.answer` and `exercise.alternativeAnswers` to the model so it can judge against the full accepted set, not just the canonical answer.

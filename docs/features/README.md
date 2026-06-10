@@ -52,7 +52,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | # | Feature | Primary model | Status |
 |---|---------|---------------|--------|
 | F12 | [Explain My Mistake](./F12-explain-my-mistake.md) | — | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
-| F13 | [Translation Answer Verification](./F13-translation-answer-verification.md) | — | |
+| F13 | [Translation Answer Verification](./F13-translation-answer-verification.md) | — | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group F — Level progression
 | # | Feature | Primary model |

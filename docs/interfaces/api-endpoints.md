@@ -8,7 +8,7 @@
 - [Vocabulary Catalog](#vocabulary-catalog)
 - [Grammar Concepts](#grammar-concepts)
 - [Modules](#modules)
-- [Exercises (incl. F12 mistake explanation)](#exercises)
+- [Exercises (incl. F12 mistake explanation, F13 answer verification)](#exercises)
 - [User Module Progress](#user-module-progress)
 - [Vocabulary Mastery & Progress (SRS)](#vocabulary-mastery--progress-srs)
 - [Grammar Mastery & Progress (SRS)](#grammar-mastery--progress-srs)
@@ -130,6 +130,7 @@
 | POST | `/exercises` | Batch-insert exercises into a module's pool |
 | GET | `/exercises/:id` | Get a single exercise by id |
 | POST | `/exercises/:exerciseId/explainMistake` | Request an on-demand AI explanation for a wrong answer (F12) |
+| POST | `/exercises/:exerciseId/verifyAnswer` | Request AI verification of a translation that was marked wrong (F13) |
 
 ### POST /exercises
 **Used for:** Submitting a batch of exercises for a module, building up its content pool (~50 exercises target). Can be called repeatedly to grow the pool over time. Duplicate exercises — same `(moduleId, type, prompt)` — are silently skipped rather than rejected; the response reports how many were inserted vs. skipped.
@@ -142,6 +143,10 @@
 ### POST /exercises/:exerciseId/explainMistake
 **Used for:** On-demand AI explanation of a wrong answer — available both during a practice session (after a wrong answer) and in a post-test review (per incorrect item). Fetches the exercise and its linked vocabulary item or grammar concept, builds a CEFR-aware prompt, calls Vertex AI (`gemini-2.5-flash-lite`), and returns a structured four-field explanation. Explanation is not stored; this endpoint is stateless.
 **Request & Response:** `PostExerciseMistakeExplanationRequest` / `PostExerciseMistakeExplanationResponse` in `src/dlg/exercises/PostExerciseMistakeExplanation.ts`
+
+### POST /exercises/:exerciseId/verifyAnswer
+**Used for:** On-demand AI re-verification of a `translation_active` answer that was marked wrong by the normalised matcher — for cases where the user believes their phrasing is a valid paraphrase or synonym. Only one verification is allowed per `(sessionId, exerciseId)` pair (one-per-attempt guard). If the AI validates the translation, the exercise is removed from the practice session's retry queue and the user's answer is appended to the exercise's `userContributedAnswers` (shared across all users). If the AI rejects it, a brief explanation is returned and no state is mutated.
+**Request & Response:** `PostExerciseAnswerVerificationRequest` / `PostExerciseAnswerVerificationResponse` in `src/dlg/exercises/PostExerciseAnswerVerification.ts`
 
 > **Note — pool retrieval and runtime mutations are not REST endpoints.** `ExerciseStore.listByModuleId(moduleId)`, `ExerciseStore.incrementTimesShown(id)`, and `ExerciseStore.appendUserContributedAnswer(id, answer)` are called directly, in-process: the selection engine (F08) lists a module's pool; the practice/test features (F10/F11) increment `timesShown`; F13 appends a verified translation. All consumers live inside this microservice, so the formerly-wired `GET /exercises`, `PUT /exercises/:id/timesShown`, and `PUT /exercises/:id/userContributedAnswers` had no external consumer and were removed per the coding standard. See [the change record](../features/changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
