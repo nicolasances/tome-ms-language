@@ -28,6 +28,7 @@ import { GetModules } from './dlg/modules/GetModules';
 import { PostModule } from './dlg/modules/PostModule';
 import { GetExercise } from './dlg/exercises/GetExercise';
 import { PostExercises } from './dlg/exercises/PostExercises';
+import { PostExerciseMistakeExplanation } from './dlg/exercises/PostExerciseMistakeExplanation';
 import { RemoveSentenceAlternative } from './dlg/sentences/RemoveSentenceAlternative';
 import { StartSession } from './dlg/session/StartSession';
 import { SubmitAnswer } from './dlg/session/SubmitAnswer';
@@ -57,6 +58,7 @@ const config: TotoMicroserviceConfiguration = {
 
             { method: 'POST', path: '/exercises', delegate: PostExercises },
             { method: 'GET', path: '/exercises/:id', delegate: GetExercise },
+            { method: 'POST', path: '/exercises/:exerciseId/explainMistake', delegate: PostExerciseMistakeExplanation },
 
             { method: 'POST', path: '/modules', delegate: PostModule },
             { method: 'GET', path: '/modules/:id', delegate: GetModule },

@@ -8,7 +8,7 @@
 - [Vocabulary Catalog](#vocabulary-catalog)
 - [Grammar Concepts](#grammar-concepts)
 - [Modules](#modules)
-- [Exercises](#exercises)
+- [Exercises (incl. F12 mistake explanation)](#exercises)
 - [User Module Progress](#user-module-progress)
 - [Vocabulary Mastery & Progress (SRS)](#vocabulary-mastery--progress-srs)
 - [Grammar Mastery & Progress (SRS)](#grammar-mastery--progress-srs)
@@ -129,6 +129,7 @@
 | ------ | -------- | ----------- |
 | POST | `/exercises` | Batch-insert exercises into a module's pool |
 | GET | `/exercises/:id` | Get a single exercise by id |
+| POST | `/exercises/:exerciseId/explainMistake` | Request an on-demand AI explanation for a wrong answer (F12) |
 
 ### POST /exercises
 **Used for:** Submitting a batch of exercises for a module, building up its content pool (~50 exercises target). Can be called repeatedly to grow the pool over time. Duplicate exercises — same `(moduleId, type, prompt)` — are silently skipped rather than rejected; the response reports how many were inserted vs. skipped.
@@ -137,6 +138,10 @@
 ### GET /exercises/:id
 **Used for:** Fetching a single exercise to render or score it, e.g. when the app needs the full prompt/answer/distractor set for one item in a session.
 **Request & Response:** `GetExerciseRequest` / `GetExerciseResponse` in `src/dlg/exercises/GetExercise.ts`
+
+### POST /exercises/:exerciseId/explainMistake
+**Used for:** On-demand AI explanation of a wrong answer — available both during a practice session (after a wrong answer) and in a post-test review (per incorrect item). Fetches the exercise and its linked vocabulary item or grammar concept, builds a CEFR-aware prompt, calls Vertex AI (`gemini-2.5-flash-lite`), and returns a structured four-field explanation. Explanation is not stored; this endpoint is stateless.
+**Request & Response:** `PostExerciseMistakeExplanationRequest` / `PostExerciseMistakeExplanationResponse` in `src/dlg/exercises/PostExerciseMistakeExplanation.ts`
 
 > **Note — pool retrieval and runtime mutations are not REST endpoints.** `ExerciseStore.listByModuleId(moduleId)`, `ExerciseStore.incrementTimesShown(id)`, and `ExerciseStore.appendUserContributedAnswer(id, answer)` are called directly, in-process: the selection engine (F08) lists a module's pool; the practice/test features (F10/F11) increment `timesShown`; F13 appends a verified translation. All consumers live inside this microservice, so the formerly-wired `GET /exercises`, `PUT /exercises/:id/timesShown`, and `PUT /exercises/:id/userContributedAnswers` had no external consumer and were removed per the coding standard. See [the change record](../features/changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
