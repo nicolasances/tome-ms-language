@@ -195,6 +195,7 @@ describe("StartPracticeSession.do", () => {
         } catch (err: any) {
 
             assert.equal(err.code, 409);
+            assert.equal(err.sessionId, activeSessionBSON._id.toString());
         }
     });
 

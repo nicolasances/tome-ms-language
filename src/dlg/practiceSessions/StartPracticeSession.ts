@@ -25,6 +25,16 @@ const TYPE_ORDER: Record<string, number> = {
     translation_active: 5,
 };
 
+class ActiveSessionError extends ValidationError {
+
+    sessionId: string;
+
+    constructor(sessionId: string) {
+        super(409, "An active practice session already exists for this module");
+        this.sessionId = sessionId;
+    }
+}
+
 export class StartPracticeSession extends TotoDelegate<StartPracticeSessionRequest, StartPracticeSessionResponse> {
 
     parseRequest(req: Request): StartPracticeSessionRequest {
@@ -48,7 +58,7 @@ export class StartPracticeSession extends TotoDelegate<StartPracticeSessionReque
 
         const existing = await practiceSessionStore.findActiveByUserAndModule(userId, req.moduleId);
 
-        if (existing) throw new ValidationError(409, "An active practice session already exists for this module");
+        if (existing) throw new ActiveSessionError(existing.id!);
 
         const moduleStore = new ModuleStore(db);
         const module = await moduleStore.findById(req.moduleId);
