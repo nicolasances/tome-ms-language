@@ -1,4 +1,4 @@
-# F12 — Explain My Mistake
+# F12 — Explain My Mistake ![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
 
 ## 1. Purpose & Scope
 
