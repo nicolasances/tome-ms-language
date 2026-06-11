@@ -6,6 +6,8 @@
 
 For `translation_active` exercises only, after an answer is marked wrong by the normalized matching, the user can explicitly ask the AI to verify whether their translation is actually valid (paraphrases, synonyms the pre-generated list missed). If valid, the exercise is marked correct and the user's translation is appended to `userContributedAnswers` for that exercise. If invalid, the AI explains why. One verification per exercise attempt; unlimited across different exercises.
 
+This applies identically in **practice sessions (F10)** and **module tests (F11)**, since the Module Test behaves like a graded practice session (per-answer checking with immediate feedback). In a test, a valid verification flips the exercise's stored result to correct **at answer time, before the test is scored on submit** — so it requires no post-submit score mutation.
+
 **Out of scope**:
 - All non-translation exercise types (not applicable)
 - Automatic verification (must be explicit, on demand)
@@ -26,15 +28,15 @@ For `translation_active` exercises only, after an answer is marked wrong by the 
 #### 2.2.2. Endpoints
 
 - `POST /exercises/:exerciseId/verifyAnswer` — request AI verification of a translation that was marked wrong.
-  - Body: `{ userAnswer: string, sessionId: string, cefrLevel: string }`.
+  - Body: `{ userAnswer: string, sessionId: string, cefrLevel: string }`. `sessionId` is the id of the practice session (F10) **or** the module test attempt (F11) the answer belongs to.
   - Returns: `{ valid: boolean, explanation?: string }`.
 
 #### 2.2.4. Business Logic
 
 - The AI checks validity scoped by the exercise prompt and any `context` note on the linked vocabulary item, and pitched at the user's CEFR level.
-- **Valid** outcome: the exercise is marked correct for this attempt (update session state to remove it from the retry queue in practice, or adjust score calculation if in a test); append the user's answer to `userContributedAnswers` via F04's mutation endpoint.
+- **Valid** outcome: the exercise is marked correct for this attempt. In a **practice session** (F10), remove it from the `retryQueue`; in a **module test** (F11), flip the exercise's stored `isCorrect` to correct on the `ModuleTestAttempt` so the score computed on submit reflects it. In both cases, append the user's answer to `userContributedAnswers` via F04's mutation endpoint.
 - **Invalid** outcome: return an AI explanation of why the translation is not valid; session state is unchanged.
-- One-per-attempt guard: only one verification is allowed per (sessionId, exerciseId) combination. Subsequent calls for the same pair are rejected.
+- One-per-attempt guard: only one verification is allowed per (sessionId, exerciseId) combination — tracked via `verifiedExerciseIds` on the `PracticeSession` (F10) or the `ModuleTestAttempt` (F11). Subsequent calls for the same pair are rejected.
 - Goes through the shared AI API client (mockable for testing).
 
 ---
@@ -61,16 +63,16 @@ For `translation_active` exercises only, after an answer is marked wrong by the 
 
 | # | Question | Resolution |
 |---|----------|------------|
-| OQ-01 | In a Module/Level Test, can verification be invoked during the post-submit review, and does it retroactively change the score? | **Deferred.** Initial implementation scoped to practice sessions only. Test session support (and its scoring impact) tracked in [GitHub issue #64](https://github.com/nicolasances/tome-ms-language/issues/64). |
+| OQ-01 | In a Module/Level Test, can verification be invoked during the test, and does it retroactively change the score? | **Resolved.** The Module Test (F11) now behaves like a graded practice session with per-answer checking and immediate feedback, so verification is invoked **during** the test exactly as in practice. A valid verification flips the exercise's stored result to correct *before* the test is scored on submit, so there is **no retroactive score mutation**. Tracked in [GitHub issue #64](https://github.com/nicolasances/tome-ms-language/issues/64) (resolved). |
 | OQ-02 | Are contributed answers shared across users (on the shared exercise) or per-user? | **Shared.** A validated answer is appended to the exercise's `userContributedAnswers` via `ExerciseStore.appendUserContributedAnswer` — one user's accepted paraphrase benefits all users of the same exercise. |
 
 ---
 
 ## 6. Technical Decisions
 
-- **Practice sessions only (initial scope)** — Scoped to `practiceSessions` (F10). Test session support and its scoring impact are tracked separately (see OQ-01 above).
-- **One-per-attempt guard via `verifiedExerciseIds`** — A `verifiedExerciseIds: string[]` field was added to `PracticeSession` (and `PracticeSessionStore`). On verification, the exerciseId is pushed into this array; subsequent calls for the same `(sessionId, exerciseId)` pair are rejected with 409.
-- **Valid outcome removes from retry queue** — `PracticeSessionStore.removeFromRetryQueue` uses MongoDB `$pull` to remove the exerciseId from `retryQueue`, preventing a re-show without updating the stored answer record.
+- **Practice sessions and module tests** — Verification applies in both F10 practice sessions and F11 module tests. Because the Module Test behaves like a graded practice session (per-answer checking with immediate feedback), a valid verification flips the answer to correct at answer time, before scoring on submit — no post-submit score mutation. Issue #64 is resolved by this unified model (see OQ-01).
+- **One-per-attempt guard via `verifiedExerciseIds`** — A `verifiedExerciseIds: string[]` field lives on both `PracticeSession` (F10) and `ModuleTestAttempt` (F11). On verification, the exerciseId is pushed into this array; subsequent calls for the same `(sessionId, exerciseId)` pair are rejected with 409.
+- **Valid outcome in practice removes from retry queue** — `PracticeSessionStore.removeFromRetryQueue` uses MongoDB `$pull` to remove the exerciseId from `retryQueue`, preventing a re-show without updating the stored answer record. (Module tests have no retry queue; the valid outcome flips the stored `isCorrect` on the attempt instead.)
 - **`translation_active` constraint enforced at the delegate** — The delegate rejects any non-`translation_active` exercise with a 400 rather than silently ignoring or branching on grammar-concept logic (those exercises have no vocabulary context to scope the AI judgment).
 - **Vertex AI, same pattern as F12** — Uses the injectable `VertexAIClient` interface backed by `gemini-2.5-flash-lite` via Vertex AI. Unit tests inject a mock client; no live GCP call is required in the test suite.
 - **AI prompt includes accepted answers** — The prompt exposes `exercise.answer` and `exercise.alternativeAnswers` to the model so it can judge against the full accepted set, not just the canonical answer.
