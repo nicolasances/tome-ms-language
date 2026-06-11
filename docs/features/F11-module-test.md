@@ -1,5 +1,7 @@
 # F11 — Module Test (Module Step 3)
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 Step 3 is the graded assessment that completes a module. It is **time-locked** until `testUnlockDelayHours` (default 4) after **Step 2 is complete** — i.e. after the user has reached full vocabulary coverage (`practiceCompletedAt`), not merely after a single practice session — enforcing spaced repetition. Once unlocked, the user takes a **20-question** test, answering each question with immediate feedback (as in practice), then sees the score and full review. Passing (≥ `testPassThreshold`, default 80%) marks the module `completed`. Mastery scores are updated here (as they are during practice). Failed attempts are recorded; retry is allowed after `testRetryDelayMinutes` (default 20).
@@ -112,5 +114,5 @@ The test draws from the **same exercise pool** as practice, using the **same mas
 |---|----------|-----------------|
 | OQ-01 | _Resolved_ — fixed at 20 questions per module test in v2.0. | — |
 | OQ-02 | _Resolved_ — the unlock timer is anchored to `practiceCompletedAt`, set once when coverage is first reached; re-running practice does not reset it (see F10 OQ-02). | — |
-| OQ-03 | Does a passed module's test remain replayable for practice? | Idea implies retake draws from the pool; clarify whether it re-grades mastery |
-| OQ-04 | Should in-progress attempts expire/auto-abandon after inactivity? | Avoid stale un-submitted attempts blocking resume vs. retry (mirrors F10 OQ-03) |
+| OQ-03 | _Resolved_ — no retakes after a module is `completed`. `POST …/tests` returns 400 when the module status is `completed`. | — |
+| OQ-04 | _Open_ — should in-progress attempts expire/auto-abandon after inactivity? Avoid stale un-submitted attempts blocking resume vs. retry (mirrors F10 OQ-03). Deferred to a future improvement. | — |

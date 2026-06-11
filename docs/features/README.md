@@ -46,7 +46,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 |---|---------|---------------|--------|
 | F09 | [Grammar Introduction (Step 1)](./F09-grammar-introduction.md) | — | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 | F10 | [Practice Session (Step 2)](./F10-practice-session.md) | PracticeSession | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
-| F11 | [Module Test (Step 3)](./F11-module-test.md) | ModuleTestAttempt |
+| F11 | [Module Test (Step 3)](./F11-module-test.md) | ModuleTestAttempt | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group E — On-demand AI touchpoints
 | # | Feature | Primary model | Status |
