@@ -1,5 +1,5 @@
 import { assert } from "chai";
-import { UserModuleProgress, ModuleTestAttempt } from "../../src/model/UserModuleProgress";
+import { UserModuleProgress, TestAttemptRecord } from "../../src/model/UserModuleProgress";
 import { UserModuleProgressStore } from "../../src/store/UserModuleProgressStore";
 
 function makeProgress(overrides: Partial<ConstructorParameters<typeof UserModuleProgress>[0]> = {}): UserModuleProgress {
@@ -60,7 +60,7 @@ describe("UserModuleProgressStore.upsert", () => {
     });
 
     it("preserves testAttempts stored on the record", async () => {
-        const attempt = new ModuleTestAttempt({ id: "att-1", score: 80, passed: true, takenAt: "2026-06-02T10:00:00.000Z" });
+        const attempt = new TestAttemptRecord({ id: "att-1", score: 80, passed: true, takenAt: "2026-06-02T10:00:00.000Z" });
         const existing = makeProgress({ status: "in_progress", testAttempts: [attempt] }).toBSON();
         const docs: any[] = [existing];
         const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });

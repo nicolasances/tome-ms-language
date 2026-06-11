@@ -1,5 +1,5 @@
 import { assert } from "chai";
-import { UserModuleProgress, ModuleTestAttempt } from "../../src/model/UserModuleProgress";
+import { UserModuleProgress, TestAttemptRecord } from "../../src/model/UserModuleProgress";
 import { UserModuleProgressStore } from "../../src/store/UserModuleProgressStore";
 
 function makeProgress(overrides: Partial<ConstructorParameters<typeof UserModuleProgress>[0]> = {}): UserModuleProgress {

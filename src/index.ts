@@ -42,6 +42,12 @@ import { StartPracticeSession } from './dlg/practiceSessions/StartPracticeSessio
 import { GetPracticeSession } from './dlg/practiceSessions/GetPracticeSession';
 import { SubmitPracticeAnswer } from './dlg/practiceSessions/SubmitPracticeAnswer';
 import { CompletePracticeSession } from './dlg/practiceSessions/CompletePracticeSession';
+import { GetTestEligibility } from './dlg/moduleTests/GetTestEligibility';
+import { StartModuleTest } from './dlg/moduleTests/StartModuleTest';
+import { GetModuleTest } from './dlg/moduleTests/GetModuleTest';
+import { SubmitTestAnswer } from './dlg/moduleTests/SubmitTestAnswer';
+import { SubmitModuleTest } from './dlg/moduleTests/SubmitModuleTest';
+import { GetTestReview } from './dlg/moduleTests/GetTestReview';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -104,6 +110,13 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'GET', path: '/users/:userId/practiceSessions/:sessionId', delegate: GetPracticeSession },
             { method: 'POST', path: '/users/:userId/practiceSessions/:sessionId/answers', delegate: SubmitPracticeAnswer },
             { method: 'POST', path: '/users/:userId/practiceSessions/:sessionId/complete', delegate: CompletePracticeSession },
+
+            { method: 'GET', path: '/users/:userId/modules/:moduleId/testEligibility', delegate: GetTestEligibility },
+            { method: 'POST', path: '/users/:userId/modules/:moduleId/tests', delegate: StartModuleTest },
+            { method: 'GET', path: '/users/:userId/moduleTests/:attemptId', delegate: GetModuleTest },
+            { method: 'POST', path: '/users/:userId/moduleTests/:attemptId/answers', delegate: SubmitTestAnswer },
+            { method: 'POST', path: '/users/:userId/moduleTests/:attemptId/submit', delegate: SubmitModuleTest },
+            { method: 'GET', path: '/users/:userId/moduleTests/:attemptId/review', delegate: GetTestReview },
         ],
         apiOptions: { noCorrelationId: true }
     },

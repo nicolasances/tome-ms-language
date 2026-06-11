@@ -2,7 +2,7 @@
 import { Request } from "express";
 import { User } from "../../../src/model/User";
 import { Module } from "../../../src/model/Module";
-import { UserModuleProgress, ModuleTestAttempt } from "../../../src/model/UserModuleProgress";
+import { UserModuleProgress, TestAttemptRecord } from "../../../src/model/UserModuleProgress";
 import { GetMeProgress } from "../../../src/dlg/user/GetMeProgress";
 
 const userContext = { email: "alice@example.com", userId: "u1", authProvider: "test" };
@@ -23,7 +23,7 @@ function makeProgress(moduleId: string, status: string, overrides: Partial<{
     startedAt: string | null;
     completedAt: string | null;
     practiceCompletedAt: string | null;
-    testAttempts: ModuleTestAttempt[];
+    testAttempts: TestAttemptRecord[];
 }> = {}): UserModuleProgress {
     return new UserModuleProgress({
         userId: "uuid-001", moduleId, status: status as any,
@@ -32,8 +32,8 @@ function makeProgress(moduleId: string, status: string, overrides: Partial<{
     });
 }
 
-function makeAttempt(passed: boolean, takenAt: string): ModuleTestAttempt {
-    return new ModuleTestAttempt({ id: "att-1", score: passed ? 90 : 50, passed, takenAt });
+function makeAttempt(passed: boolean, takenAt: string): TestAttemptRecord {
+    return new TestAttemptRecord({ id: "att-1", score: passed ? 90 : 50, passed, takenAt });
 }
 
 /**

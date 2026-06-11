@@ -1,5 +1,5 @@
 import { assert } from "chai";
-import { UserModuleProgress, ModuleTestAttempt } from "../../src/model/UserModuleProgress";
+import { UserModuleProgress, TestAttemptRecord } from "../../src/model/UserModuleProgress";
 import { UserModuleProgressStore } from "../../src/store/UserModuleProgressStore";
 
 function makeProgress(overrides: Partial<ConstructorParameters<typeof UserModuleProgress>[0]> = {}): UserModuleProgress {
@@ -68,7 +68,7 @@ describe("UserModuleProgressStore.transitionStatus", () => {
     });
 
     it("preserves testAttempts from the existing record during a status transition", async () => {
-        const attempt = new ModuleTestAttempt({ id: "att-1", score: 75, passed: false, takenAt: "2026-06-01T10:00:00.000Z" });
+        const attempt = new TestAttemptRecord({ id: "att-1", score: 75, passed: false, takenAt: "2026-06-01T10:00:00.000Z" });
         const docs = [makeProgress({ status: "in_progress", testAttempts: [attempt] }).toBSON()];
         const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });
 

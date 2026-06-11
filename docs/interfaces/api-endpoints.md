@@ -13,6 +13,7 @@
 - [Vocabulary Mastery & Progress (SRS)](#vocabulary-mastery--progress-srs)
 - [Grammar Mastery & Progress (SRS)](#grammar-mastery--progress-srs)
 - [Practice Sessions (F10)](#practice-sessions-f10)
+- [Module Tests (F11)](#module-tests-f11)
 - [Legacy endpoints (pending removal)](#legacy-endpoints-pending-removal)
 - [API Design compliance](#api-design-compliance)
 
@@ -230,6 +231,42 @@
 ### POST /users/:userId/practiceSessions/:sessionId/complete
 **Used for:** Completing a practice session. Updates mastery scores via the SRS algorithm (F06) for every exercise attempted. Appends the session's encountered vocabulary item ids to `UserModuleProgress.vocabularyItemsPracticed` (F07). Evaluates the coverage gate: if all `Module.vocabularyItemIds` are now covered, sets `practiceCompletedAt` on `UserModuleProgress` (starting the `testUnlockDelayHours` countdown). Returns `{ step2Complete: boolean, unseenVocabCount: number }` so the app knows whether to offer another practice session or route toward the Module Test.
 **Request & Response:** `CompletePracticeSessionRequest` / `CompletePracticeSessionResponse` in `src/dlg/practiceSessions/CompletePracticeSession.ts`
+
+---
+
+## Module Tests (F11)
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| GET | `/users/:userId/modules/:moduleId/testEligibility` | Authoritative unlock check for a module test |
+| POST | `/users/:userId/modules/:moduleId/tests` | Start a new module test attempt |
+| GET | `/users/:userId/moduleTests/:attemptId` | Get the current state of a module test attempt (for resume) |
+| POST | `/users/:userId/moduleTests/:attemptId/answers` | Submit an answer for one exercise in the test |
+| POST | `/users/:userId/moduleTests/:attemptId/submit` | Finalise the attempt; compute score and update mastery |
+| GET | `/users/:userId/moduleTests/:attemptId/review` | Fetch the full graded review for a submitted attempt |
+
+### GET /users/:userId/modules/:moduleId/testEligibility
+**Used for:** Checking whether the Module Test is currently unlocked for a given user and module. Returns `eligible: true` when all conditions are met; returns `eligible: false` with `testUnlocksAt` / `testRetryAvailableAt` / `remainingMs` when a delay is still active. The test requires: (1) `practiceCompletedAt` set (Step 2 fully complete — full vocabulary coverage), (2) `TEST_UNLOCK_DELAY_HOURS` (4 h) elapsed since `practiceCompletedAt`, (3) if a failed attempt exists, `TEST_RETRY_DELAY_MINUTES` (20 min) elapsed since its `takenAt`. Returns `{ eligible: false }` when the module is already `completed` (no retakes). This endpoint is the authoritative gate enforced by `POST .../tests`; the client-side countdown rendered from the timestamps is only a hint.
+**Request & Response:** `GetTestEligibilityRequest` / `GetTestEligibilityResponse` in `src/dlg/moduleTests/GetTestEligibility.ts`
+
+### POST /users/:userId/modules/:moduleId/tests
+**Used for:** Starting a new Module Test attempt for a user and module (Step 3). Verifies all eligibility conditions (see above). Draws exactly 20 exercises via F08's mastery-aware selection — unconstrained (no fresh/repeat split, no coverage override). Returns the 20 questions **without** correct answers plus the full exercise objects so the client can render immediately. Returns **409** with `{ code: 409, message: "...", attemptId }` if an active (un-submitted) attempt already exists — the client resumes it via `GET .../moduleTests/:attemptId`. Returns **400** if the module is already `completed` (no retakes).
+**Request & Response:** `StartModuleTestRequest` / `StartModuleTestResponse` in `src/dlg/moduleTests/StartModuleTest.ts`
+
+### GET /users/:userId/moduleTests/:attemptId
+**Used for:** Resuming an in-progress module test after the app is closed. Returns the full attempt state — `exerciseIds`, `answers` recorded so far, `currentPosition` — plus the full exercise objects **without** correct answers, so the client restores the in-progress UI. An in-progress attempt is always resumable regardless of unlock timing (it started legitimately).
+**Request & Response:** `GetModuleTestRequest` / `GetModuleTestResponse` in `src/dlg/moduleTests/GetModuleTest.ts`
+
+### POST /users/:userId/moduleTests/:attemptId/answers
+**Used for:** Submitting a user's answer for one exercise during a module test. Body: `{ exerciseId, userAnswer }`. Normalises the answer (same logic as F10) and checks it against the exercise's `answer`, `alternativeAnswers`, and `userContributedAnswers`. **The first answer is final for grading — there is no retry queue and no re-attempts.** Returns immediate feedback: `{ isCorrect, correctAnswer }`. The correct answer is always returned so the client can show it on a wrong answer, exactly as in practice. Increments `timesShown` on the exercise.
+**Request & Response:** `SubmitTestAnswerRequest` / `SubmitTestAnswerResponse` in `src/dlg/moduleTests/SubmitTestAnswer.ts`
+
+### POST /users/:userId/moduleTests/:attemptId/submit
+**Used for:** Finalising a module test attempt. Computes the score as `% of exerciseIds whose final isCorrect is true`; unanswered exercises count as wrong. Determines pass/fail against `TEST_PASS_THRESHOLD` (80%). Updates mastery (F06) for every answered exercise — same SRS loop as practice completion. Records a `TestAttemptRecord` summary in `UserModuleProgress.testAttempts`. On pass: transitions `UserModuleProgress.status` to `completed`. Returns `{ score, passed }`.
+**Request & Response:** `SubmitModuleTestRequest` / `SubmitModuleTestResponse` in `src/dlg/moduleTests/SubmitModuleTest.ts`
+
+### GET /users/:userId/moduleTests/:attemptId/review
+**Used for:** Fetching the full graded review for a submitted module test attempt. Returns `score`, `passed`, and a `questions` array containing every exercise's `prompt`, `isCorrect`, `userAnswer`, and `correctAnswer`. Unlike `GET .../moduleTests/:attemptId`, this endpoint **exposes correct answers** — it is only valid after the attempt has been submitted (`takenAt` set). Unanswered exercises appear with `isCorrect: false` and `userAnswer: ""`. Enables "Explain my mistake" (F12) per incorrect item.
+**Request & Response:** `GetTestReviewRequest` / `GetTestReviewResponse` in `src/dlg/moduleTests/GetTestReview.ts`
 
 ---
 
