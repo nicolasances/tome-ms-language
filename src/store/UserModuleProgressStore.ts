@@ -1,6 +1,6 @@
 import { Db } from "mongodb";
 import { ControllerConfig } from "../Config";
-import { UserModuleProgress, ModuleTestAttempt } from "../model/UserModuleProgress";
+import { UserModuleProgress, TestAttemptRecord } from "../model/UserModuleProgress";
 
 const COLLECTION = "userModuleProgress";
 
@@ -73,7 +73,7 @@ export class UserModuleProgressStore {
         return this.upsert(updated);
     }
 
-    async appendTestAttempt(userId: string, moduleId: string, attempt: ModuleTestAttempt): Promise<UserModuleProgress | null> {
+    async appendTestAttempt(userId: string, moduleId: string, attempt: TestAttemptRecord): Promise<UserModuleProgress | null> {
         const result = await this.db.collection(COLLECTION).updateOne(
             { userId, moduleId },
             { $push: { testAttempts: attempt.toBSON() } } as any

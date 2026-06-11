@@ -1,11 +1,11 @@
 import { strict as assert } from "assert";
-import { ModuleTestAttempt, UserModuleProgress } from "../../src/model/UserModuleProgress";
+import { TestAttemptRecord, UserModuleProgress } from "../../src/model/UserModuleProgress";
 
-describe("ModuleTestAttempt.fromBSON", () => {
+describe("TestAttemptRecord.fromBSON", () => {
 
     it("round-trips all fields through toBSON and fromBSON", () => {
-        const attempt = new ModuleTestAttempt({ id: "att-1", score: 85, passed: true, takenAt: "2026-06-01T10:00:00.000Z" });
-        const result = ModuleTestAttempt.fromBSON(attempt.toBSON());
+        const attempt = new TestAttemptRecord({ id: "att-1", score: 85, passed: true, takenAt: "2026-06-01T10:00:00.000Z" });
+        const result = TestAttemptRecord.fromBSON(attempt.toBSON());
 
         assert.equal(result.id, "att-1");
         assert.equal(result.score, 85);
@@ -14,8 +14,8 @@ describe("ModuleTestAttempt.fromBSON", () => {
     });
 
     it("preserves a failed attempt", () => {
-        const attempt = new ModuleTestAttempt({ id: "att-2", score: 40, passed: false, takenAt: "2026-06-02T08:00:00.000Z" });
-        const result = ModuleTestAttempt.fromBSON(attempt.toBSON());
+        const attempt = new TestAttemptRecord({ id: "att-2", score: 40, passed: false, takenAt: "2026-06-02T08:00:00.000Z" });
+        const result = TestAttemptRecord.fromBSON(attempt.toBSON());
 
         assert.equal(result.passed, false);
         assert.equal(result.score, 40);
@@ -57,7 +57,7 @@ describe("UserModuleProgress.fromBSON", () => {
     });
 
     it("round-trips embedded testAttempts", () => {
-        const attempt = new ModuleTestAttempt({ id: "att-1", score: 90, passed: true, takenAt: "2026-06-03T12:00:00.000Z" });
+        const attempt = new TestAttemptRecord({ id: "att-1", score: 90, passed: true, takenAt: "2026-06-03T12:00:00.000Z" });
         const progress = new UserModuleProgress({
             userId: "user-1",
             moduleId: "mod-1",
