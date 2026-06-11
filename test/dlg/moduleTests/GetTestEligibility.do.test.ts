@@ -1,5 +1,6 @@
 import { assert } from "chai";
 import { GetTestEligibility } from "../../../src/dlg/moduleTests/GetTestEligibility";
+import { TEST_UNLOCK_DELAY_HOURS, TEST_RETRY_DELAY_MINUTES } from "../../../src/Config";
 import { UserModuleProgress, TestAttemptRecord } from "../../../src/model/UserModuleProgress";
 
 // ---------------------------------------------------------------------------
@@ -77,37 +78,60 @@ describe("GetTestEligibility.do", () => {
         assert.isUndefined(result.testUnlocksAt);
     });
 
-    it("returns not eligible with testUnlocksAt when unlock delay has not elapsed", async () => {
+    it("testUnlocksAt equals practiceCompletedAt + TEST_UNLOCK_DELAY_HOURS when still locked", async () => {
 
-        // practiceCompletedAt was 2 hours ago — unlock requires 4 hours
-        const progress = makeProgress({ practiceCompletedAt: hoursBeforeNow(2) });
+        // practiceCompletedAt 2 hours ago — unlock requires 4 hours
+        const practiceCompletedAt = hoursBeforeNow(2);
+        const progress = makeProgress({ practiceCompletedAt });
         const config = makeMockConfig(progress.toBSON());
         const delegate = new GetTestEligibility({} as any, config);
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: NOW }, {} as any);
 
+        const expectedTestUnlocksAt = new Date(new Date(practiceCompletedAt).getTime() + TEST_UNLOCK_DELAY_HOURS * 60 * 60 * 1000).toISOString();
+
         assert.isFalse(result.eligible);
-        assert.isString(result.testUnlocksAt);
-        assert.isNumber(result.remainingMs);
+        assert.equal(result.testUnlocksAt, expectedTestUnlocksAt, "testUnlocksAt must be practiceCompletedAt + TEST_UNLOCK_DELAY_HOURS");
+    });
+
+    it("remainingMs equals the exact milliseconds until testUnlocksAt when still locked", async () => {
+
+        const practiceCompletedAt = hoursBeforeNow(2);
+        const progress = makeProgress({ practiceCompletedAt });
+        const config = makeMockConfig(progress.toBSON());
+        const delegate = new GetTestEligibility({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: NOW }, {} as any);
+
+        const expectedTestUnlocksAt = new Date(new Date(practiceCompletedAt).getTime() + TEST_UNLOCK_DELAY_HOURS * 60 * 60 * 1000);
+        const expectedRemainingMs = expectedTestUnlocksAt.getTime() - NOW.getTime();
+
+        assert.equal(result.remainingMs, expectedRemainingMs, "remainingMs must be exact ms until testUnlocksAt");
         assert.isAbove(result.remainingMs!, 0);
     });
 
-    it("returns eligible when unlock delay has elapsed and no prior failed attempt", async () => {
+    it("testUnlocksAt is still returned when eligible (for client countdown reference)", async () => {
 
-        // practiceCompletedAt was 5 hours ago — more than the 4-hour delay
-        const progress = makeProgress({ practiceCompletedAt: hoursBeforeNow(5) });
+        // practiceCompletedAt 5 hours ago — more than the 4-hour delay
+        const practiceCompletedAt = hoursBeforeNow(5);
+        const progress = makeProgress({ practiceCompletedAt });
         const config = makeMockConfig(progress.toBSON());
         const delegate = new GetTestEligibility({} as any, config);
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: NOW }, {} as any);
 
+        const expectedTestUnlocksAt = new Date(new Date(practiceCompletedAt).getTime() + TEST_UNLOCK_DELAY_HOURS * 60 * 60 * 1000).toISOString();
+
         assert.isTrue(result.eligible);
+        assert.equal(result.testUnlocksAt, expectedTestUnlocksAt, "testUnlocksAt must always be returned when practiceCompletedAt is set");
+        assert.isUndefined(result.remainingMs, "remainingMs must be absent when eligible");
     });
 
-    it("returns not eligible when retry delay has not elapsed after a failed attempt", async () => {
+    it("testRetryAvailableAt equals takenAt + TEST_RETRY_DELAY_MINUTES when retry locked", async () => {
 
-        // practiceCompletedAt: unlocked long ago; failed attempt 10 minutes ago (delay is 20 min)
-        const failedAttempt = new TestAttemptRecord({ id: "att-1", score: 50, passed: false, takenAt: minutesBeforeNow(10) });
+        // Failed attempt 10 minutes ago — retry delay is 20 min
+        const takenAt = minutesBeforeNow(10);
+        const failedAttempt = new TestAttemptRecord({ id: "att-1", score: 50, passed: false, takenAt });
         const progress = makeProgress({
             practiceCompletedAt: hoursBeforeNow(10),
             testAttempts: [failedAttempt],
@@ -117,16 +141,16 @@ describe("GetTestEligibility.do", () => {
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: NOW }, {} as any);
 
+        const expectedRetryAt = new Date(new Date(takenAt).getTime() + TEST_RETRY_DELAY_MINUTES * 60 * 1000).toISOString();
+
         assert.isFalse(result.eligible);
-        assert.isString(result.testRetryAvailableAt);
-        assert.isNumber(result.remainingMs);
-        assert.isAbove(result.remainingMs!, 0);
+        assert.equal(result.testRetryAvailableAt, expectedRetryAt, "testRetryAvailableAt must be takenAt + TEST_RETRY_DELAY_MINUTES");
     });
 
-    it("returns eligible after retry delay has elapsed following a failed attempt", async () => {
+    it("remainingMs equals the exact milliseconds until testRetryAvailableAt when retry locked", async () => {
 
-        // Failed attempt 25 minutes ago (delay is 20 min)
-        const failedAttempt = new TestAttemptRecord({ id: "att-1", score: 50, passed: false, takenAt: minutesBeforeNow(25) });
+        const takenAt = minutesBeforeNow(10);
+        const failedAttempt = new TestAttemptRecord({ id: "att-1", score: 50, passed: false, takenAt });
         const progress = makeProgress({
             practiceCompletedAt: hoursBeforeNow(10),
             testAttempts: [failedAttempt],
@@ -136,7 +160,32 @@ describe("GetTestEligibility.do", () => {
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: NOW }, {} as any);
 
+        const expectedRetryAt = new Date(new Date(takenAt).getTime() + TEST_RETRY_DELAY_MINUTES * 60 * 1000);
+        const expectedRemainingMs = expectedRetryAt.getTime() - NOW.getTime();
+
+        assert.equal(result.remainingMs, expectedRemainingMs, "remainingMs must be exact ms until testRetryAvailableAt");
+        assert.isAbove(result.remainingMs!, 0);
+    });
+
+    it("testRetryAvailableAt is still returned when eligible after retry delay has elapsed", async () => {
+
+        // Failed attempt 25 min ago (delay 20 min → now eligible)
+        const takenAt = minutesBeforeNow(25);
+        const failedAttempt = new TestAttemptRecord({ id: "att-1", score: 50, passed: false, takenAt });
+        const progress = makeProgress({
+            practiceCompletedAt: hoursBeforeNow(10),
+            testAttempts: [failedAttempt],
+        });
+        const config = makeMockConfig(progress.toBSON());
+        const delegate = new GetTestEligibility({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: NOW }, {} as any);
+
+        const expectedRetryAt = new Date(new Date(takenAt).getTime() + TEST_RETRY_DELAY_MINUTES * 60 * 1000).toISOString();
+
         assert.isTrue(result.eligible);
+        assert.equal(result.testRetryAvailableAt, expectedRetryAt, "testRetryAvailableAt must still be returned when eligible, for client display");
+        assert.isUndefined(result.remainingMs, "remainingMs must be absent when eligible");
     });
 
     it("returns not eligible when the module is already completed (OQ-03: no retakes)", async () => {
@@ -153,7 +202,7 @@ describe("GetTestEligibility.do", () => {
         assert.isFalse(result.eligible);
     });
 
-    it("ignores passed attempts when computing retry delay — only failed submitted attempts count", async () => {
+    it("ignores passed attempts — testRetryAvailableAt is absent when there are no failed attempts", async () => {
 
         const passedAttempt = new TestAttemptRecord({ id: "att-1", score: 90, passed: true, takenAt: minutesBeforeNow(5) });
         const progress = makeProgress({
@@ -163,13 +212,13 @@ describe("GetTestEligibility.do", () => {
         const config = makeMockConfig(progress.toBSON());
         const delegate = new GetTestEligibility({} as any, config);
 
-        // A passed attempt should not trigger the retry delay
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: NOW }, {} as any);
 
         assert.isTrue(result.eligible);
+        assert.isUndefined(result.testRetryAvailableAt, "testRetryAvailableAt must be absent when there are no failed attempts");
     });
 
-    it("uses the most recent failed attempt for the retry delay when multiple failed attempts exist", async () => {
+    it("uses the most recent failed attempt's takenAt when computing testRetryAvailableAt", async () => {
 
         // Two failed attempts — the more recent one is 10 min ago (delay 20 min → still locked)
         const olderFailed = new TestAttemptRecord({ id: "att-1", score: 50, passed: false, takenAt: minutesBeforeNow(30) });
@@ -183,6 +232,9 @@ describe("GetTestEligibility.do", () => {
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: NOW }, {} as any);
 
+        const expectedRetryAt = new Date(new Date(recentFailed.takenAt).getTime() + TEST_RETRY_DELAY_MINUTES * 60 * 1000).toISOString();
+
         assert.isFalse(result.eligible);
+        assert.equal(result.testRetryAvailableAt, expectedRetryAt, "must anchor to the most recent failed attempt, not the older one");
     });
 });
