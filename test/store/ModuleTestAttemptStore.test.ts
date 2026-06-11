@@ -50,7 +50,14 @@ function makeMockCollection(initialDocs: any[] = []) {
             return docs.find(d => Object.keys(filter).every(k => d[k] === filter[k])) ?? null;
         },
         updateOne: async (filter: any, update: any) => {
-            const doc = docs.find(d => filter._id ? d._id.equals(filter._id) : Object.keys(filter).every(k => d[k] === filter[k]));
+            const doc = docs.find(d => filter._id ? d._id.equals(filter._id) : Object.keys(filter).every(k => {
+                if (k.includes('.')) {
+                    // nested filter like "answers.exerciseId": "ex-1"
+                    const [field, subField] = k.split('.');
+                    return Array.isArray(d[field]) && d[field].some((item: any) => item[subField] === filter[k]);
+                }
+                return d[k] === filter[k];
+            }));
             if (!doc) return { matchedCount: 0 };
             if (update.$push) {
                 for (const [field, value] of Object.entries(update.$push as Record<string, any>)) {
@@ -64,7 +71,20 @@ function makeMockCollection(initialDocs: any[] = []) {
             }
             if (update.$set) {
                 for (const [field, value] of Object.entries(update.$set as Record<string, any>)) {
-                    doc[field] = value;
+                    // Handle positional operator e.g. "answers.$.isCorrect"
+                    const positional = field.match(/^(\w+)\.\$\.(.+)$/);
+                    if (positional) {
+                        const [, arrayField, subField] = positional;
+                        const arrayMatchKey = Object.keys(filter).find(k => k.startsWith(`${arrayField}.`));
+                        if (arrayMatchKey) {
+                            const matchSubField = arrayMatchKey.split('.')[1];
+                            const matchValue = filter[arrayMatchKey];
+                            const item = (doc[arrayField] ?? []).find((x: any) => x[matchSubField] === matchValue);
+                            if (item) item[subField] = value;
+                        }
+                    } else {
+                        doc[field] = value;
+                    }
                 }
             }
             return { matchedCount: 1 };
