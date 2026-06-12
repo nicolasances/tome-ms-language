@@ -9,19 +9,17 @@ import { CEFR_LEVELS, CefrLevel } from "../../model/CefrLevels";
 type ModuleStep = "grammar" | "practice" | "test" | "done";
 
 /**
- * Derives the current step in the module flow from the module's status.
- * 
- * - locked    â†’ null (module not started or not yet unlocked)
- * - available â†’ "grammar" (first step: read the grammar intro)
- * - in_progress â†’ "practice" (grammar done, practice underway)
- *   Note: cannot distinguish "practice" from "test" without F10 session data;
- *   this will be refined when F10 is implemented.
- * - completed â†’ "done"
+ * Derives the current step in the module flow from the module’s status.
+ *
+ * - locked      → null
+ * - available   → "grammar"
+ * - in_progress → "test" if practiceCompletedAt is set, otherwise "practice"
+ * - completed   → "done"
  */
-function deriveStep(status: string): ModuleStep | null {
+function deriveStep(status: string, practiceCompletedAt?: string | null): ModuleStep | null {
     switch (status) {
         case "available":   return "grammar";
-        case "in_progress": return "practice";
+        case "in_progress": return practiceCompletedAt ? "test" : "practice";
         case "completed":   return "done";
         default:            return null;
     }
@@ -50,7 +48,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
         const allProgress = await new UserModuleProgressStore({ db, config }).listByUser(user.id, allModuleIds);
         const progressMap = new Map(allProgress.map(p => [p.moduleId, p]));
 
-        // 3. Levels rollup â€” status derived purely from the user's position in the CEFR sequence
+        // 3. Levels rollup - status derived purely from the user's position in the CEFR sequence
         const userLevelIdx = CEFR_LEVELS.indexOf(user.cefrLevel as CefrLevel);
 
         const levels: LevelSummary[] = CEFR_LEVELS.map((level, idx) => {
@@ -83,8 +81,8 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
             } 
             else status = status ?? "locked";
 
-            const step = deriveStep(status);
-            const completionPct = status === "completed" ? 100 : 0;
+            const step = deriveStep(status, progress?.practiceCompletedAt);
+            const completionPct = m.vocabularyItemIds.length > 0 ? Math.round(((progress?.vocabularyItemsPracticed.length ?? 0) / m.vocabularyItemIds.length) * 100) : 0;
 
             // testUnlocksAt: practiceCompletedAt (Step 2 complete) + module unlock delay; null until Step 2 completes
             let testUnlocksAt: string | null = null;
@@ -116,6 +114,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 completedAt: progress?.completedAt ?? null,
                 testUnlocksAt,
                 testRetryAvailableAt,
+                vocabularyItemsPracticedCount: progress?.vocabularyItemsPracticed.length ?? 0,
             };
         });
 
@@ -135,15 +134,16 @@ interface LevelSummary {
 }
 
 interface ModuleProgressEntry {
-    moduleId: string;
-    title: string;
-    status: string;
-    step: ModuleStep | null;
-    completionPct: number;
-    startedAt: string | null;
-    completedAt: string | null;
-    testUnlocksAt: string | null;
-    testRetryAvailableAt: string | null;
+    moduleId: string;                           // The module's unique identifier
+    title: string;                              // The module's display title
+    status: string;                             // Module status: locked | available | in_progress | completed
+    step: ModuleStep | null;                    // Current step within the module flow; null when locked
+    completionPct: number;                      // Overall module completion percentage (0 or 100)
+    startedAt: string | null;                   // ISO-8601 timestamp of when the user first started the module
+    completedAt: string | null;                 // ISO-8601 timestamp of when the module was completed
+    testUnlocksAt: string | null;               // ISO-8601 timestamp of when the Module Test unlocks; null until Step 2 coverage is complete
+    testRetryAvailableAt: string | null;        // ISO-8601 timestamp of when a failed test retry becomes available; null when no failed attempts exist
+    vocabularyItemsPracticedCount: number;      // Number of unique vocabulary items the user has encountered across all practice sessions for this module
 }
 
 interface GetMeProgressResponse {
