@@ -1,5 +1,7 @@
 # F20 — Level Test Bank
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 Each CEFR level has a dedicated exercise bank (~60 exercises) purpose-built for cross-module breadth — a single exercise may combine vocabulary from different modules or test a grammar concept across themes. This bank is submitted by an **external tool** at seeding time and stored as a LevelTestBank. It is the pool the Level Test (F21) draws from.
@@ -69,7 +71,17 @@ Each CEFR level has a dedicated exercise bank (~60 exercises) purpose-built for 
 
 ## 5. Open Questions
 
-| # | Question | Options / Notes |
-|---|----------|-----------------|
-| OQ-01 | Higher levels (C1/C2) have few pre-built modules at launch — how is their level bank scoped? | Idea §8: user-generated modules fill gaps; level bank may be sparse initially |
-| OQ-02 | Does the level bank need a top-up mechanism if depleted? | Free Level Test retries may cycle through ~60 exercises; add append endpoint (already included) |
+| # | Question | Resolution |
+|---|----------|------------|
+| OQ-01 | Higher levels (C1/C2) have few pre-built modules at launch — how is their level bank scoped? | **Closed** — no impact on this microservice. It stores whatever the external tool submits; banks may be sparse and there is no minimum-size enforcement. Scoping is the external seeding tool's concern. |
+| OQ-02 | Does the level bank need a top-up mechanism if depleted? | **Closed** — resolved by the append endpoint `POST /levelTestBanks/:cefrLevel/exercises`, which increments `totalGenerated` and updates `generatedAt`. |
+
+---
+
+## 6. Implementation Notes
+
+- **Exercises share the `exercises` collection.** Level-test exercises are not stored separately; they are inserted into the same `exercises` collection as module exercises, with `moduleId = null` (enforced server-side on insert). The `LevelTestBank` document only holds their ids. This lets F08/F21 reuse the existing `ExerciseStore` to fetch them.
+- **Validation is shared with `POST /exercises`** via `parseExerciseInput` — each level-test exercise still obeys the vocabularyItemId XOR grammarConceptId linkage and per-type rules.
+- **Existence is checked before inserting exercises** in both create and append, so a rejected request (409 duplicate level / 404 missing bank) never leaves orphan exercises behind.
+- **Bank `id`** is an auto-generated `ObjectId` (hex string); lookups are by `cefrLevel`. One bank per level is enforced in `LevelTestBankStore.insertOne`.
+- Code: model `src/model/LevelTestBank.ts`, store `src/store/LevelTestBankStore.ts`, delegates under `src/dlg/levelTestBanks/`. Endpoints documented in `docs/interfaces/api-endpoints.md`.
