@@ -11,10 +11,10 @@ function makeUser(cefrLevel = "A1") {
     return new User({ id: "uuid-001", email: "alice@example.com", cefrLevel: cefrLevel as any, createdAt: "2026-01-01T00:00:00.000Z" });
 }
 
-function makeModule(id: string, cefrLevel = "A1", overrides: Partial<{ testRetryDelayMinutes: number; testUnlockDelayHours: number }> = {}) {
+function makeModule(id: string, cefrLevel = "A1", vocabularyItemIds: string[] = [], overrides: Partial<{ testRetryDelayMinutes: number; testUnlockDelayHours: number }> = {}) {
     return new Module({
         id, title: `Module ${id}`, theme: "T", communicationGoal: "G",
-        cefrLevel: cefrLevel as any, vocabularyItemIds: [], grammarConceptIds: [],
+        cefrLevel: cefrLevel as any, vocabularyItemIds, grammarConceptIds: [],
         isUserGenerated: false, ...overrides,
     });
 }
@@ -276,8 +276,8 @@ describe("GetMeProgress.do - per-module status and step", () => {
     it("module with 'completed' status has 'done' step and completionPct 100", async () => {
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
-            [makeModule("a1-1", "A1").toBSON()],
-            [makeProgress("a1-1", "completed", { completedAt: "2026-01-02T10:00:00.000Z" }).toBSON()]
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3"]).toBSON()],
+            [makeProgress("a1-1", "completed", { vocabularyItemsPracticed: ["v1", "v2", "v3"], completedAt: "2026-01-02T10:00:00.000Z" }).toBSON()]
         );
         const delegate = new GetMeProgress({} as any, config);
 
@@ -321,7 +321,7 @@ describe("GetMeProgress.do - per-module status and step", () => {
 });
 
 
-describe("GetMeProgress.do â€” test timing", () => {
+describe("GetMeProgress.do - test timing", () => {
 
     it("testUnlocksAt is null when practiceCompletedAt is not set (Step 2 incomplete)", async () => {
         const config = makeMockConfig(
@@ -337,7 +337,7 @@ describe("GetMeProgress.do â€” test timing", () => {
     });
 
     it("testUnlocksAt is practiceCompletedAt plus testUnlockDelayHours when Step 2 is complete", async () => {
-        const module = makeModule("a1-1", "A1", { testUnlockDelayHours: 4 });
+        const module = makeModule("a1-1", "A1", [], { testUnlockDelayHours: 4 });
         const progress = makeProgress("a1-1", "in_progress", { practiceCompletedAt: "2026-01-10T09:00:00.000Z" });
         const config = makeMockConfig([makeUser("A1").toBSON()], [module.toBSON()], [progress.toBSON()]);
         const delegate = new GetMeProgress({} as any, config);
@@ -378,7 +378,7 @@ describe("GetMeProgress.do â€” test timing", () => {
     });
 
     it("testRetryAvailableAt is last-failed-attempt takenAt plus testRetryDelayMinutes", async () => {
-        const module = makeModule("a1-1", "A1", { testRetryDelayMinutes: 20 });
+        const module = makeModule("a1-1", "A1", [], { testRetryDelayMinutes: 20 });
         const progress = makeProgress("a1-1", "in_progress", {
             testAttempts: [makeAttempt(false, "2026-01-10T09:00:00.000Z")],
         });
@@ -392,7 +392,7 @@ describe("GetMeProgress.do â€” test timing", () => {
     });
 
     it("uses the most recent failed attempt when multiple attempts exist", async () => {
-        const module = makeModule("a1-1", "A1", { testRetryDelayMinutes: 20 });
+        const module = makeModule("a1-1", "A1", [], { testRetryDelayMinutes: 20 });
         const progress = makeProgress("a1-1", "in_progress", {
             testAttempts: [
                 makeAttempt(false, "2026-01-10T08:00:00.000Z"),  // earlier failure
@@ -409,7 +409,7 @@ describe("GetMeProgress.do â€” test timing", () => {
     });
 });
 
-describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
+describe("GetMeProgress.do - vocabularyItemsPracticedCount", () => {
 
     it("returns 0 when no progress record exists for the module", async () => {
         const config = makeMockConfig(
@@ -422,6 +422,7 @@ describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
         const result = await delegate.do({}, userContext);
 
         assert.equal(result.modules[0].vocabularyItemsPracticedCount, 0);
+        assert.equal(result.modules[0].completionPct, 0);
     });
 
     it("returns the count of vocabulary items seen so far during practice", async () => {
@@ -430,7 +431,7 @@ describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
         });
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
-            [makeModule("a1-1", "A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3", "v4", "v5"]).toBSON()],
             [progress.toBSON()]
         );
         const delegate = new GetMeProgress({} as any, config);
@@ -438,6 +439,7 @@ describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
         const result = await delegate.do({}, userContext);
 
         assert.equal(result.modules[0].vocabularyItemsPracticedCount, 3);
+        assert.equal(result.modules[0].completionPct, 60); // 3 out of 5 items practiced
     });
 
     it("returns the full vocabulary count when all items have been practiced", async () => {
@@ -447,7 +449,7 @@ describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
         });
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
-            [makeModule("a1-1", "A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3", "v4", "v5"]).toBSON()],
             [progress.toBSON()]
         );
         const delegate = new GetMeProgress({} as any, config);
@@ -455,6 +457,7 @@ describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
         const result = await delegate.do({}, userContext);
 
         assert.equal(result.modules[0].vocabularyItemsPracticedCount, 5);
+        assert.equal(result.modules[0].completionPct, 100); // 5 out of 5 items practiced
     });
 
     it("returns 0 when progress record exists but vocabularyItemsPracticed is empty", async () => {
@@ -463,7 +466,7 @@ describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
         });
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
-            [makeModule("a1-1", "A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3", "v4", "v5"]).toBSON()],
             [progress.toBSON()]
         );
         const delegate = new GetMeProgress({} as any, config);
@@ -471,6 +474,7 @@ describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
         const result = await delegate.do({}, userContext);
 
         assert.equal(result.modules[0].vocabularyItemsPracticedCount, 0);
+        assert.equal(result.modules[0].completionPct, 0);
     });
 });
 

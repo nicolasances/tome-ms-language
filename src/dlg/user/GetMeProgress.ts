@@ -50,7 +50,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
         const allProgress = await new UserModuleProgressStore({ db, config }).listByUser(user.id, allModuleIds);
         const progressMap = new Map(allProgress.map(p => [p.moduleId, p]));
 
-        // 3. Levels rollup â€” status derived purely from the user's position in the CEFR sequence
+        // 3. Levels rollup - status derived purely from the user's position in the CEFR sequence
         const userLevelIdx = CEFR_LEVELS.indexOf(user.cefrLevel as CefrLevel);
 
         const levels: LevelSummary[] = CEFR_LEVELS.map((level, idx) => {
@@ -84,7 +84,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
             else status = status ?? "locked";
 
             const step = deriveStep(status);
-            const completionPct = status === "completed" ? 100 : 0;
+            const completionPct = m.vocabularyItemIds.length > 0 ? Math.round(((progress?.vocabularyItemsPracticed.length ?? 0) / m.vocabularyItemIds.length) * 100) : 0;
 
             // testUnlocksAt: practiceCompletedAt (Step 2 complete) + module unlock delay; null until Step 2 completes
             let testUnlocksAt: string | null = null;
