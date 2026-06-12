@@ -116,6 +116,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 completedAt: progress?.completedAt ?? null,
                 testUnlocksAt,
                 testRetryAvailableAt,
+                vocabularyItemsPracticedCount: progress?.vocabularyItemsPracticed.length ?? 0,
             };
         });
 
@@ -135,15 +136,16 @@ interface LevelSummary {
 }
 
 interface ModuleProgressEntry {
-    moduleId: string;
-    title: string;
-    status: string;
-    step: ModuleStep | null;
-    completionPct: number;
-    startedAt: string | null;
-    completedAt: string | null;
-    testUnlocksAt: string | null;
-    testRetryAvailableAt: string | null;
+    moduleId: string;                           // The module's unique identifier
+    title: string;                              // The module's display title
+    status: string;                             // Module status: locked | available | in_progress | completed
+    step: ModuleStep | null;                    // Current step within the module flow; null when locked
+    completionPct: number;                      // Overall module completion percentage (0 or 100)
+    startedAt: string | null;                   // ISO-8601 timestamp of when the user first started the module
+    completedAt: string | null;                 // ISO-8601 timestamp of when the module was completed
+    testUnlocksAt: string | null;               // ISO-8601 timestamp of when the Module Test unlocks; null until Step 2 coverage is complete
+    testRetryAvailableAt: string | null;        // ISO-8601 timestamp of when a failed test retry becomes available; null when no failed attempts exist
+    vocabularyItemsPracticedCount: number;      // Number of unique vocabulary items the user has encountered across all practice sessions for this module
 }
 
 interface GetMeProgressResponse {

@@ -24,6 +24,7 @@ function makeProgress(moduleId: string, status: string, overrides: Partial<{
     completedAt: string | null;
     practiceCompletedAt: string | null;
     testAttempts: TestAttemptRecord[];
+    vocabularyItemsPracticed: string[];
 }> = {}): UserModuleProgress {
     return new UserModuleProgress({
         userId: "uuid-001", moduleId, status: status as any,
@@ -405,6 +406,71 @@ describe("GetMeProgress.do â€” test timing", () => {
 
         // 10:00 + 20 minutes = 10:20 (not 08:20)
         assert.equal(result.modules[0].testRetryAvailableAt, "2026-01-10T10:20:00.000Z");
+    });
+});
+
+describe("GetMeProgress.do — vocabularyItemsPracticedCount", () => {
+
+    it("returns 0 when no progress record exists for the module", async () => {
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1").toBSON()],
+            []
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].vocabularyItemsPracticedCount, 0);
+    });
+
+    it("returns the count of vocabulary items seen so far during practice", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            vocabularyItemsPracticed: ["v1", "v2", "v3"],
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1").toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].vocabularyItemsPracticedCount, 3);
+    });
+
+    it("returns the full vocabulary count when all items have been practiced", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            vocabularyItemsPracticed: ["v1", "v2", "v3", "v4", "v5"],
+            practiceCompletedAt: "2026-01-10T10:00:00.000Z",
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1").toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].vocabularyItemsPracticedCount, 5);
+    });
+
+    it("returns 0 when progress record exists but vocabularyItemsPracticed is empty", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            vocabularyItemsPracticed: [],
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1").toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].vocabularyItemsPracticedCount, 0);
     });
 });
 
