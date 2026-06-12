@@ -55,10 +55,10 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | F13 | [Translation Answer Verification](./F13-translation-answer-verification.md) | — | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group F — Level progression
-| # | Feature | Primary model |
-|---|---------|---------------|
-| F20 | [Level Test Bank](./F20-level-test-bank.md) | LevelTestBank |
-| F21 | [Level Test](./F21-level-test.md) | LevelTestAttempt |
+| # | Feature | Primary model | Status |
+|---|---------|---------------|--------|
+| F20 | [Level Test Bank](./F20-level-test-bank.md) | LevelTestBank | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+| F21 | [Level Test](./F21-level-test.md) | LevelTestAttempt | |
 
 ### Group G — User-added vocabulary
 | # | Feature | Primary model |

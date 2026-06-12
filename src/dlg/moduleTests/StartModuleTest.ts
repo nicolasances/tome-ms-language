@@ -144,23 +144,10 @@ export class StartModuleTest extends TotoDelegate<StartModuleTestRequest, StartM
 
         const attemptId = await attemptStore.create(attempt);
 
-        // Strip correct answers before returning to the client
-        const exercisesWithoutAnswers = selected.map(e => stripAnswer(e));
-
-        return { attemptId, moduleId: req.moduleId, exercises: exercisesWithoutAnswers, startedAt };
+        // Return the full exercise objects — identical payload/shape to a practice session, since the
+        // frontend reuses the same exercise components (multiple_choice needs both `answer` and `distractors`).
+        return { attemptId, moduleId: req.moduleId, exercises: selected, startedAt };
     }
-}
-
-/**
- * Returns a copy of the exercise with the `answer`, `alternativeAnswers`, and
- * `userContributedAnswers` fields removed so the client cannot see the correct answer
- * before submitting.
- */
-function stripAnswer(exercise: Exercise): any {
-
-    const { answer: _a, alternativeAnswers: _alt, userContributedAnswers: _uca, ...rest } = exercise as any;
-
-    return rest;
 }
 
 interface StartModuleTestRequest {
@@ -172,6 +159,6 @@ interface StartModuleTestRequest {
 interface StartModuleTestResponse {
     attemptId: string;      // The id of the newly created attempt
     moduleId: string;       // The module id
-    exercises: any[];       // Selected exercises without correct answers
+    exercises: Exercise[];  // Selected exercises — full objects, same shape as a practice session
     startedAt: string;      // ISO-8601 timestamp of when the attempt was started
 }

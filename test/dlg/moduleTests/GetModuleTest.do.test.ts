@@ -37,6 +37,20 @@ function makeExerciseBSON(id: string): any {
     }).toBSON();
 }
 
+function makeMultipleChoiceBSON(id: string): any {
+    return new Exercise({
+        id,
+        moduleId: "mod-1",
+        type: "multiple_choice",
+        prompt: `prompt-${id}`,
+        promptTranslation: `translation-${id}`,
+        answer: "spiser",
+        distractors: ["drikker", "løber"],
+        vocabularyItemId: "v-1",
+        grammarConceptId: null,
+    }).toBSON();
+}
+
 function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[]) {
 
     const collections: Record<string, any> = {
@@ -64,7 +78,7 @@ function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[]) {
 
 describe("GetModuleTest.do", () => {
 
-    it("returns the attempt state with exercises and answers but without correct answers", async () => {
+    it("returns the attempt state with full exercise objects and answers (same payload as practice)", async () => {
 
         const oid = new ObjectId();
         const config = makeMockConfig(makeAttemptBSON(oid), [makeExerciseBSON("ex-1"), makeExerciseBSON("ex-2")]);
@@ -78,10 +92,36 @@ describe("GetModuleTest.do", () => {
         assert.equal(result.exercises.length, 2);
         assert.equal(result.answers.length, 1);
 
-        // Correct answers must not be exposed during an in-progress attempt
+        // Full exercise payload — same shape as a practice session (frontend reuses the components)
         for (const ex of result.exercises) {
-            assert.isUndefined((ex as any).answer, "exercises must not expose correct answer");
+            assert.isString((ex as any).answer, "exercises must include the answer, like a practice session");
         }
+    });
+
+    it("returns multiple_choice exercises with both answer and distractors (same payload as practice)", async () => {
+
+        const oid = new ObjectId();
+        const config = makeMockConfig(makeAttemptBSON(oid, { exerciseIds: ["ex-mc"], currentPosition: 0, answers: [] }), [makeMultipleChoiceBSON("ex-mc")]);
+        const delegate = new GetModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        const mc = result.exercises[0] as any;
+        assert.equal(mc.answer, "spiser", "answer must be present for component reuse");
+        assert.deepEqual(mc.distractors, ["drikker", "løber"], "distractors must be present");
+    });
+
+    it("returns exercises in the stored exerciseIds order, not the storage order", async () => {
+
+        const oid = new ObjectId();
+        // exerciseIds order is ex-2 then ex-1; storage returns them ex-1 then ex-2
+        const attempt = makeAttemptBSON(oid, { exerciseIds: ["ex-2", "ex-1"], currentPosition: 0, answers: [] });
+        const config = makeMockConfig(attempt, [makeExerciseBSON("ex-1"), makeExerciseBSON("ex-2")]);
+        const delegate = new GetModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        assert.deepEqual(result.exercises.map((e: any) => e.id), ["ex-2", "ex-1"]);
     });
 
     it("throws 404 when the attempt is not found", async () => {

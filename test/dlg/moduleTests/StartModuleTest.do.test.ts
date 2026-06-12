@@ -102,7 +102,7 @@ function makeMockConfig(moduleBSON: any, exerciseBSONs: any[], progressBSON: any
 
 describe("StartModuleTest.do", () => {
 
-    it("returns an attemptId, startedAt, and the selected exercises (without answers)", async () => {
+    it("returns an attemptId, startedAt, and the selected full exercise objects (same payload as practice)", async () => {
 
         const mod = makeModule();
         const exercises = makeLargeExercisePool();
@@ -118,10 +118,27 @@ describe("StartModuleTest.do", () => {
         assert.isArray(result.exercises);
         assert.equal(result.exercises.length, 20);
 
-        // Answers must be stripped from exercises returned to the client
+        // Full exercise payload — same shape as a practice session (frontend reuses the components)
         for (const ex of result.exercises) {
-            assert.isUndefined((ex as any).answer, "exercises must not expose the correct answer");
+            assert.isString((ex as any).answer, "exercises must include the answer, like a practice session");
         }
+    });
+
+    it("returns multiple_choice exercises with both answer and distractors (same payload as practice)", async () => {
+
+        const mod = makeModule();
+        const mc = new Exercise({ id: "ex-mc", moduleId: "mod-1", type: "multiple_choice", prompt: "Choose", promptTranslation: "Choose", answer: "spiser", distractors: ["drikker", "løber"], vocabularyItemId: "v-1", grammarConceptId: null });
+        const progress = makeProgress();
+
+        const config = makeMockConfig(mod.toBSON(), [mc.toBSON()], progress.toBSON());
+        const delegate = new StartModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: new Date("2026-06-11T14:00:00.000Z") }, {} as any);
+
+        const out = result.exercises.find((e: any) => e.id === "ex-mc") as any;
+        assert.isDefined(out);
+        assert.equal(out.answer, "spiser", "answer must be present for component reuse");
+        assert.deepEqual(out.distractors, ["drikker", "løber"], "distractors must be present");
     });
 
     it("draws exactly 20 exercises when the pool is large enough", async () => {

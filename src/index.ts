@@ -48,6 +48,9 @@ import { GetModuleTest } from './dlg/moduleTests/GetModuleTest';
 import { SubmitTestAnswer } from './dlg/moduleTests/SubmitTestAnswer';
 import { SubmitModuleTest } from './dlg/moduleTests/SubmitModuleTest';
 import { GetTestReview } from './dlg/moduleTests/GetTestReview';
+import { PostLevelTestBank } from './dlg/levelTestBanks/PostLevelTestBank';
+import { PostLevelTestBankExercises } from './dlg/levelTestBanks/PostLevelTestBankExercises';
+import { GetLevelTestBank } from './dlg/levelTestBanks/GetLevelTestBank';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -117,6 +120,10 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/users/:userId/moduleTests/:attemptId/answers', delegate: SubmitTestAnswer },
             { method: 'POST', path: '/users/:userId/moduleTests/:attemptId/submit', delegate: SubmitModuleTest },
             { method: 'GET', path: '/users/:userId/moduleTests/:attemptId/review', delegate: GetTestReview },
+
+            { method: 'POST', path: '/levelTestBanks', delegate: PostLevelTestBank },
+            { method: 'POST', path: '/levelTestBanks/:cefrLevel/exercises', delegate: PostLevelTestBankExercises },
+            { method: 'GET', path: '/levelTestBanks/:cefrLevel', delegate: GetLevelTestBank },
         ],
         apiOptions: { noCorrelationId: true }
     },
