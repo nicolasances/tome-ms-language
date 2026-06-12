@@ -124,6 +124,25 @@ describe("StartModuleTest.do", () => {
         }
     });
 
+    it("exposes choices (answer + distractors) for multiple_choice exercises and hides the answer", async () => {
+
+        const mod = makeModule();
+        const mc = new Exercise({ id: "ex-mc", moduleId: "mod-1", type: "multiple_choice", prompt: "Choose", promptTranslation: "Choose", answer: "spiser", distractors: ["drikker", "løber"], vocabularyItemId: "v-1", grammarConceptId: null });
+        const progress = makeProgress();
+
+        const config = makeMockConfig(mod.toBSON(), [mc.toBSON()], progress.toBSON());
+        const delegate = new StartModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: new Date("2026-06-11T14:00:00.000Z") }, {} as any);
+
+        const out = result.exercises.find((e: any) => e.id === "ex-mc") as any;
+        assert.isDefined(out);
+        assert.isUndefined(out.answer, "answer must not be exposed");
+        assert.isUndefined(out.distractors, "distractors must not be exposed alongside choices");
+        assert.includeMembers(out.choices, ["spiser", "drikker", "løber"]);
+        assert.lengthOf(out.choices, 3);
+    });
+
     it("draws exactly 20 exercises when the pool is large enough", async () => {
 
         const mod = makeModule();

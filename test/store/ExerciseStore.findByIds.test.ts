@@ -49,6 +49,32 @@ describe("ExerciseStore.findByIds", () => {
         assert.isTrue(result.some(e => e.id === "ex-3"));
     });
 
+    it("returns the exercises in the same order as the requested ids, regardless of storage order", async () => {
+
+        const ex1 = makeExercise("ex-1");
+        const ex2 = makeExercise("ex-2");
+        const ex3 = makeExercise("ex-3");
+        // Stored in 1,2,3 order; requested in 3,1,2 order
+        const col = makeMockCollection([ex1.toBSON(), ex2.toBSON(), ex3.toBSON()]);
+        const store = new ExerciseStore(makeMockDb(col));
+
+        const result = await store.findByIds(["ex-3", "ex-1", "ex-2"]);
+
+        assert.deepEqual(result.map(e => e.id), ["ex-3", "ex-1", "ex-2"]);
+    });
+
+    it("preserves requested order and skips missing ids", async () => {
+
+        const ex1 = makeExercise("ex-1");
+        const ex3 = makeExercise("ex-3");
+        const col = makeMockCollection([ex1.toBSON(), ex3.toBSON()]);
+        const store = new ExerciseStore(makeMockDb(col));
+
+        const result = await store.findByIds(["ex-3", "ex-missing", "ex-1"]);
+
+        assert.deepEqual(result.map(e => e.id), ["ex-3", "ex-1"]);
+    });
+
     it("returns an empty array when none of the ids match", async () => {
 
         const ex1 = makeExercise("ex-1");

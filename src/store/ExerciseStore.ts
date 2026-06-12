@@ -90,11 +90,13 @@ export class ExerciseStore {
 
     /**
      * Finds multiple exercises by their ids in a single bulk query.
-     * Returns only the exercises that were found; missing ids are silently ignored.
+     * Returns the exercises in the same order as the requested `ids` — MongoDB does not preserve
+     * `$in` order, so callers that rely on a stored ordering (e.g. a session/test whose currentPosition
+     * indexes into exerciseIds) get a deterministic result. Missing ids are silently skipped.
      * Returns an empty array when the ids list is empty.
      *
      * @param ids - Array of exercise id strings to look up.
-     * @returns Array of matching Exercise instances (order not guaranteed).
+     * @returns Array of matching Exercise instances, ordered to match `ids`.
      */
     async findByIds(ids: string[]): Promise<Exercise[]> {
 
@@ -102,7 +104,9 @@ export class ExerciseStore {
 
         const docs = await this.db.collection(EXERCISES_COLLECTION).find({ id: { $in: ids } }).toArray();
 
-        return docs.map(doc => Exercise.fromBSON(doc as any));
+        const byId = new Map(docs.map((doc: any) => [doc.id, Exercise.fromBSON(doc as any)]));
+
+        return ids.map(id => byId.get(id)).filter((e): e is Exercise => e !== undefined);
     }
 
 }

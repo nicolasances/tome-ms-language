@@ -37,6 +37,20 @@ function makeExerciseBSON(id: string): any {
     }).toBSON();
 }
 
+function makeMultipleChoiceBSON(id: string): any {
+    return new Exercise({
+        id,
+        moduleId: "mod-1",
+        type: "multiple_choice",
+        prompt: `prompt-${id}`,
+        promptTranslation: `translation-${id}`,
+        answer: "spiser",
+        distractors: ["drikker", "løber"],
+        vocabularyItemId: "v-1",
+        grammarConceptId: null,
+    }).toBSON();
+}
+
 function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[]) {
 
     const collections: Record<string, any> = {
@@ -82,6 +96,34 @@ describe("GetModuleTest.do", () => {
         for (const ex of result.exercises) {
             assert.isUndefined((ex as any).answer, "exercises must not expose correct answer");
         }
+    });
+
+    it("exposes choices (answer + distractors) for multiple_choice exercises without revealing the answer", async () => {
+
+        const oid = new ObjectId();
+        const config = makeMockConfig(makeAttemptBSON(oid, { exerciseIds: ["ex-mc"], currentPosition: 0, answers: [] }), [makeMultipleChoiceBSON("ex-mc")]);
+        const delegate = new GetModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        const mc = result.exercises[0] as any;
+        assert.isUndefined(mc.answer, "answer must not be exposed");
+        assert.isUndefined(mc.distractors, "distractors must not be exposed alongside choices");
+        assert.includeMembers(mc.choices, ["spiser", "drikker", "løber"]);
+        assert.lengthOf(mc.choices, 3, "choices must include the correct answer plus the distractors");
+    });
+
+    it("returns exercises in the stored exerciseIds order, not the storage order", async () => {
+
+        const oid = new ObjectId();
+        // exerciseIds order is ex-2 then ex-1; storage returns them ex-1 then ex-2
+        const attempt = makeAttemptBSON(oid, { exerciseIds: ["ex-2", "ex-1"], currentPosition: 0, answers: [] });
+        const config = makeMockConfig(attempt, [makeExerciseBSON("ex-1"), makeExerciseBSON("ex-2")]);
+        const delegate = new GetModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        assert.deepEqual(result.exercises.map((e: any) => e.id), ["ex-2", "ex-1"]);
     });
 
     it("throws 404 when the attempt is not found", async () => {

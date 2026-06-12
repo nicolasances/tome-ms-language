@@ -2,7 +2,6 @@ import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { MODULE_TEST_SIZE, TEST_RETRY_DELAY_MINUTES, TEST_UNLOCK_DELAY_HOURS } from "../../Config";
 import { ControllerConfig } from "../../Config";
-import { Exercise } from "../../model/Exercise";
 import { ModuleTestAttempt } from "../../model/ModuleTestAttempt";
 import { ExerciseStore } from "../../store/ExerciseStore";
 import { ModuleStore } from "../../store/ModuleStore";
@@ -11,6 +10,7 @@ import { UserGrammarConceptProgressStore } from "../../store/UserGrammarConceptP
 import { UserModuleProgressStore } from "../../store/UserModuleProgressStore";
 import { UserVocabularyProgressStore } from "../../store/UserVocabularyProgressStore";
 import { selectExercises } from "../../util/ExerciseSelector";
+import { ClientTestExercise, toClientTestExercise } from "../../util/TestExercisePresentation";
 
 /**
  * Thrown when an active (un-submitted) test attempt already exists for the user + module.
@@ -144,23 +144,11 @@ export class StartModuleTest extends TotoDelegate<StartModuleTestRequest, StartM
 
         const attemptId = await attemptStore.create(attempt);
 
-        // Strip correct answers before returning to the client
-        const exercisesWithoutAnswers = selected.map(e => stripAnswer(e));
+        // Strip correct answers (and expose multiple_choice choices) before returning to the client
+        const exercisesWithoutAnswers = selected.map(e => toClientTestExercise(e));
 
         return { attemptId, moduleId: req.moduleId, exercises: exercisesWithoutAnswers, startedAt };
     }
-}
-
-/**
- * Returns a copy of the exercise with the `answer`, `alternativeAnswers`, and
- * `userContributedAnswers` fields removed so the client cannot see the correct answer
- * before submitting.
- */
-function stripAnswer(exercise: Exercise): any {
-
-    const { answer: _a, alternativeAnswers: _alt, userContributedAnswers: _uca, ...rest } = exercise as any;
-
-    return rest;
 }
 
 interface StartModuleTestRequest {
@@ -172,6 +160,6 @@ interface StartModuleTestRequest {
 interface StartModuleTestResponse {
     attemptId: string;      // The id of the newly created attempt
     moduleId: string;       // The module id
-    exercises: any[];       // Selected exercises without correct answers
+    exercises: ClientTestExercise[];    // Selected exercises without correct answers (multiple_choice carry `choices`)
     startedAt: string;      // ISO-8601 timestamp of when the attempt was started
 }
