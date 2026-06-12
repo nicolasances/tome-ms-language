@@ -14,6 +14,7 @@
 - [Grammar Mastery & Progress (SRS)](#grammar-mastery--progress-srs)
 - [Practice Sessions (F10)](#practice-sessions-f10)
 - [Module Tests (F11)](#module-tests-f11)
+- [Level Test Banks (F20)](#level-test-banks-f20)
 - [Legacy endpoints (pending removal)](#legacy-endpoints-pending-removal)
 - [API Design compliance](#api-design-compliance)
 
@@ -267,6 +268,27 @@
 ### GET /users/:userId/moduleTests/:attemptId/review
 **Used for:** Fetching the full graded review for a submitted module test attempt. Returns `score`, `passed`, and a `questions` array containing every exercise's `prompt`, `isCorrect`, `userAnswer`, and `correctAnswer`. Unlike `GET .../moduleTests/:attemptId`, this endpoint **exposes correct answers** — it is only valid after the attempt has been submitted (`takenAt` set). Unanswered exercises appear with `isCorrect: false` and `userAnswer: ""`. Enables "Explain my mistake" (F12) per incorrect item.
 **Request & Response:** `GetTestReviewRequest` / `GetTestReviewResponse` in `src/dlg/moduleTests/GetTestReview.ts`
+
+---
+
+## Level Test Banks (F20)
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| POST | `/levelTestBanks` | Create the level test bank for a CEFR level (one per level) |
+| POST | `/levelTestBanks/:cefrLevel/exercises` | Append additional exercises to an existing level bank |
+| GET | `/levelTestBanks/:cefrLevel` | Get the level test bank (metadata + exerciseIds) for a level |
+
+### POST /levelTestBanks
+**Used for:** An external seeding tool submitting a CEFR level's cross-module exercise bank (~60 purpose-built exercises spanning vocab/grammar from multiple modules). Body: `{ cefrLevel, exercises[] }` where each exercise is validated by the same rules as `POST /exercises`. The exercises are inserted into the shared `exercises` collection with **`moduleId = null`** (enforced server-side), then a `LevelTestBank` document is created referencing their ids. One bank per level: returns **409** if a bank already exists for the level (no orphan exercises are inserted in that case). The bank is the pool the Level Test (F21) draws from.
+**Request & Response:** `PostLevelTestBankRequest` / `PostLevelTestBankResponse` in `src/dlg/levelTestBanks/PostLevelTestBank.ts`
+
+### POST /levelTestBanks/:cefrLevel/exercises
+**Used for:** Topping up an existing level bank when the unique exercise pool depletes (e.g. free Level Test retries cycle through the ~60 exercises). Inserts the submitted exercises with `moduleId = null`, appends their ids to the bank, increments `totalGenerated` and updates `generatedAt`. Returns **404** if no bank exists for the level (create it first via `POST /levelTestBanks`).
+**Request & Response:** `PostLevelTestBankExercisesRequest` / `PostLevelTestBankExercisesResponse` in `src/dlg/levelTestBanks/PostLevelTestBankExercises.ts`
+
+### GET /levelTestBanks/:cefrLevel
+**Used for:** The selection engine (F08) drawing from the full pool when assembling a Level Test (F21). Returns the bank metadata plus its `exerciseIds`. Returns **404** if no bank exists for the level.
+**Request & Response:** `GetLevelTestBankRequest` / `GetLevelTestBankResponse` in `src/dlg/levelTestBanks/GetLevelTestBank.ts`
 
 ---
 
