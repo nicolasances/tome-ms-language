@@ -9,19 +9,17 @@ import { CEFR_LEVELS, CefrLevel } from "../../model/CefrLevels";
 type ModuleStep = "grammar" | "practice" | "test" | "done";
 
 /**
- * Derives the current step in the module flow from the module's status.
- * 
- * - locked    â†’ null (module not started or not yet unlocked)
- * - available â†’ "grammar" (first step: read the grammar intro)
- * - in_progress â†’ "practice" (grammar done, practice underway)
- *   Note: cannot distinguish "practice" from "test" without F10 session data;
- *   this will be refined when F10 is implemented.
- * - completed â†’ "done"
+ * Derives the current step in the module flow from the module’s status.
+ *
+ * - locked      → null
+ * - available   → "grammar"
+ * - in_progress → "test" if practiceCompletedAt is set, otherwise "practice"
+ * - completed   → "done"
  */
-function deriveStep(status: string): ModuleStep | null {
+function deriveStep(status: string, practiceCompletedAt?: string | null): ModuleStep | null {
     switch (status) {
         case "available":   return "grammar";
-        case "in_progress": return "practice";
+        case "in_progress": return practiceCompletedAt ? "test" : "practice";
         case "completed":   return "done";
         default:            return null;
     }
@@ -83,7 +81,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
             } 
             else status = status ?? "locked";
 
-            const step = deriveStep(status);
+            const step = deriveStep(status, progress?.practiceCompletedAt);
             const completionPct = m.vocabularyItemIds.length > 0 ? Math.round(((progress?.vocabularyItemsPracticed.length ?? 0) / m.vocabularyItemIds.length) * 100) : 0;
 
             // testUnlocksAt: practiceCompletedAt (Step 2 complete) + module unlock delay; null until Step 2 completes
