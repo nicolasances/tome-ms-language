@@ -1,16 +1,16 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { ControllerConfig } from "../../Config";
+import { Exercise } from "../../model/Exercise";
 import { ExerciseStore } from "../../store/ExerciseStore";
 import { ModuleTestAttemptStore } from "../../store/ModuleTestAttemptStore";
 import { TestAnswer } from "../../model/ModuleTestAttempt";
-import { ClientTestExercise, toClientTestExercise } from "../../util/TestExercisePresentation";
 
 /**
  * Returns the current state of a Module Test attempt for resume after an app close (F11).
  *
- * Exercises are returned without correct answers — the client restores the in-progress
- * UI without seeing answers it has not yet submitted.
+ * Exercises are returned as full objects in the stored exerciseIds order — the same payload/shape
+ * as a practice session, so the frontend can reuse the same exercise components.
  * An in-progress attempt is always resumable regardless of unlock timing.
  */
 export class GetModuleTest extends TotoDelegate<GetModuleTestRequest, GetModuleTestResponse> {
@@ -50,7 +50,7 @@ export class GetModuleTest extends TotoDelegate<GetModuleTestRequest, GetModuleT
         return {
             attemptId: attempt.id!,
             moduleId: attempt.moduleId,
-            exercises: exercises.map(e => toClientTestExercise(e)),
+            exercises,
             answers: attempt.answers,
             currentPosition: attempt.currentPosition,
             startedAt: attempt.startedAt,
@@ -67,7 +67,7 @@ interface GetModuleTestRequest {
 interface GetModuleTestResponse {
     attemptId: string;          // The attempt id
     moduleId: string;           // The module id
-    exercises: ClientTestExercise[];    // Exercise objects without correct answers (multiple_choice carry `choices`)
+    exercises: Exercise[];      // Full exercise objects, same shape as a practice session
     answers: TestAnswer[];      // Answers submitted so far
     currentPosition: number;    // 0-based index of the next unanswered exercise
     startedAt: string;          // ISO-8601 timestamp of when the attempt was started

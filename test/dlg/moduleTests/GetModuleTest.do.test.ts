@@ -78,7 +78,7 @@ function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[]) {
 
 describe("GetModuleTest.do", () => {
 
-    it("returns the attempt state with exercises and answers but without correct answers", async () => {
+    it("returns the attempt state with full exercise objects and answers (same payload as practice)", async () => {
 
         const oid = new ObjectId();
         const config = makeMockConfig(makeAttemptBSON(oid), [makeExerciseBSON("ex-1"), makeExerciseBSON("ex-2")]);
@@ -92,13 +92,13 @@ describe("GetModuleTest.do", () => {
         assert.equal(result.exercises.length, 2);
         assert.equal(result.answers.length, 1);
 
-        // Correct answers must not be exposed during an in-progress attempt
+        // Full exercise payload — same shape as a practice session (frontend reuses the components)
         for (const ex of result.exercises) {
-            assert.isUndefined((ex as any).answer, "exercises must not expose correct answer");
+            assert.isString((ex as any).answer, "exercises must include the answer, like a practice session");
         }
     });
 
-    it("exposes choices (answer + distractors) for multiple_choice exercises without revealing the answer", async () => {
+    it("returns multiple_choice exercises with both answer and distractors (same payload as practice)", async () => {
 
         const oid = new ObjectId();
         const config = makeMockConfig(makeAttemptBSON(oid, { exerciseIds: ["ex-mc"], currentPosition: 0, answers: [] }), [makeMultipleChoiceBSON("ex-mc")]);
@@ -107,10 +107,8 @@ describe("GetModuleTest.do", () => {
         const result = await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
 
         const mc = result.exercises[0] as any;
-        assert.isUndefined(mc.answer, "answer must not be exposed");
-        assert.isUndefined(mc.distractors, "distractors must not be exposed alongside choices");
-        assert.includeMembers(mc.choices, ["spiser", "drikker", "løber"]);
-        assert.lengthOf(mc.choices, 3, "choices must include the correct answer plus the distractors");
+        assert.equal(mc.answer, "spiser", "answer must be present for component reuse");
+        assert.deepEqual(mc.distractors, ["drikker", "løber"], "distractors must be present");
     });
 
     it("returns exercises in the stored exerciseIds order, not the storage order", async () => {

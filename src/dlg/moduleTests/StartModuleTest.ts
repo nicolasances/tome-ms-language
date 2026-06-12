@@ -2,6 +2,7 @@ import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { MODULE_TEST_SIZE, TEST_RETRY_DELAY_MINUTES, TEST_UNLOCK_DELAY_HOURS } from "../../Config";
 import { ControllerConfig } from "../../Config";
+import { Exercise } from "../../model/Exercise";
 import { ModuleTestAttempt } from "../../model/ModuleTestAttempt";
 import { ExerciseStore } from "../../store/ExerciseStore";
 import { ModuleStore } from "../../store/ModuleStore";
@@ -10,7 +11,6 @@ import { UserGrammarConceptProgressStore } from "../../store/UserGrammarConceptP
 import { UserModuleProgressStore } from "../../store/UserModuleProgressStore";
 import { UserVocabularyProgressStore } from "../../store/UserVocabularyProgressStore";
 import { selectExercises } from "../../util/ExerciseSelector";
-import { ClientTestExercise, toClientTestExercise } from "../../util/TestExercisePresentation";
 
 /**
  * Thrown when an active (un-submitted) test attempt already exists for the user + module.
@@ -144,10 +144,9 @@ export class StartModuleTest extends TotoDelegate<StartModuleTestRequest, StartM
 
         const attemptId = await attemptStore.create(attempt);
 
-        // Strip correct answers (and expose multiple_choice choices) before returning to the client
-        const exercisesWithoutAnswers = selected.map(e => toClientTestExercise(e));
-
-        return { attemptId, moduleId: req.moduleId, exercises: exercisesWithoutAnswers, startedAt };
+        // Return the full exercise objects — identical payload/shape to a practice session, since the
+        // frontend reuses the same exercise components (multiple_choice needs both `answer` and `distractors`).
+        return { attemptId, moduleId: req.moduleId, exercises: selected, startedAt };
     }
 }
 
@@ -160,6 +159,6 @@ interface StartModuleTestRequest {
 interface StartModuleTestResponse {
     attemptId: string;      // The id of the newly created attempt
     moduleId: string;       // The module id
-    exercises: ClientTestExercise[];    // Selected exercises without correct answers (multiple_choice carry `choices`)
+    exercises: Exercise[];  // Selected exercises — full objects, same shape as a practice session
     startedAt: string;      // ISO-8601 timestamp of when the attempt was started
 }
