@@ -5,6 +5,7 @@ import { UserStore } from "../../store/UserStore";
 import { UserModuleProgressStore } from "../../store/UserModuleProgressStore";
 import { ModuleStore } from "../../store/ModuleStore";
 import { CEFR_LEVELS, CefrLevel } from "../../model/CefrLevels";
+import { Module } from "../../model/Module";
 
 type ModuleStep = "grammar" | "practice" | "test" | "done";
 
@@ -18,10 +19,10 @@ type ModuleStep = "grammar" | "practice" | "test" | "done";
  */
 function deriveStep(status: string, practiceCompletedAt?: string | null): ModuleStep | null {
     switch (status) {
-        case "available":   return "grammar";
+        case "available": return "grammar";
         case "in_progress": return practiceCompletedAt ? "test" : "practice";
-        case "completed":   return "done";
-        default:            return null;
+        case "completed": return "done";
+        default: return null;
     }
 }
 
@@ -59,9 +60,9 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
             ).length;
 
             let status: "locked" | "current" | "completed";
-            if (idx < userLevelIdx)      status = "completed";
+            if (idx < userLevelIdx) status = "completed";
             else if (idx === userLevelIdx) status = "current";
-            else                           status = "locked";
+            else status = "locked";
 
             return { level, status, modulesCompleted, modulesTotal };
         });
@@ -70,16 +71,29 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
         // Modules are sorted by ascending id
         const viewedModules = allModules.filter(m => m.cefrLevel === viewedLevel).sort((a, b) => a.id > b.id ? 1 : -1);
 
-        const modules: ModuleProgressEntry[] = viewedModules.map((m, idx) => {
+        const modules: ModuleProgressEntry[] = [];
 
-            const progress = progressMap.get(m.id);
+        let previousModule: Module | null = null;
+        for (let idx = 0; idx < viewedModules.length; idx++) {
+
+            const m = viewedModules[idx];
             
+            const progress = progressMap.get(m.id);
+
             let status = progress?.status;
-            if (!status && idx === 0) {
-                // First module of the level is available if no progress record exists
-                status = "available";
-            } 
-            else status = status ?? "locked";
+
+            if (!status) {
+
+                if (!previousModule) status = "available"; // First module of the level is available if no progress record exists
+                else {
+                    const previousProgress = progressMap.get(previousModule.id);
+                    
+                    if (!previousProgress) status = "locked"; // Previous module has no progress record, so this one is locked
+                    else if (previousProgress.status === "completed") status = "available"; // Previous module is completed, so this one is available
+                    else status = "locked"; // Previous module is not completed, so this one is locked
+                }
+
+            }
 
             const step = deriveStep(status, progress?.practiceCompletedAt);
             const completionPct = m.vocabularyItemIds.length > 0 ? Math.round(((progress?.vocabularyItemsPracticed.length ?? 0) / m.vocabularyItemIds.length) * 100) : 0;
@@ -104,7 +118,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 }
             }
 
-            return {
+            modules.push({
                 moduleId: m.id,
                 title: m.title,
                 status,
@@ -115,8 +129,10 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 testUnlocksAt,
                 testRetryAvailableAt,
                 vocabularyItemsPracticedCount: progress?.vocabularyItemsPracticed.length ?? 0,
-            };
-        });
+            });
+
+            previousModule = m;
+        };
 
         return { currentCefrLevel: user.cefrLevel, levels, modules };
     }

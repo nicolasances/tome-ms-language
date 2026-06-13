@@ -288,6 +288,21 @@ describe("GetMeProgress.do - per-module status and step", () => {
         assert.equal(m.completionPct, 100);
     });
 
+    it("module after a 'completed' module is 'available' if no progress is recorded", async () => {
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3"]).toBSON(), makeModule("a1-2", "A1").toBSON()],
+            [makeProgress("a1-1", "completed", { vocabularyItemsPracticed: ["v1", "v2", "v3"], completedAt: "2026-01-02T10:00:00.000Z" }).toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+        const m = result.modules[1];
+
+        assert.equal(m.status, "available");
+        assert.equal(m.step, "grammar");
+    });
+
     it("module includes startedAt and completedAt from the progress record", async () => {
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
