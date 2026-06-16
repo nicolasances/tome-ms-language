@@ -58,7 +58,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | # | Feature | Primary model | Status |
 |---|---------|---------------|--------|
 | F20 | [Level Test Bank](./F20-level-test-bank.md) | LevelTestBank | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
-| F21 | [Level Test](./F21-level-test.md) | LevelTestAttempt | |
+| F21 | [Level Test](./F21-level-test.md) | LevelTestAttempt | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group G — User-added vocabulary
 | # | Feature | Primary model |
