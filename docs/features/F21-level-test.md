@@ -1,5 +1,7 @@
 # F21 — Level Test
 
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
+
 ## 1. Purpose & Scope
 
 The Level Test is the comprehensive assessment that unlocks the next CEFR level. It covers the full scope of the current level (all vocabulary + all grammar concepts represented in the level test bank). It is offered only after the user has completed all curated modules at the level (F07 gate). It is a **graded parallel of the practice session (F10) / module test (F11)**: a stateful, resumable session where the user answers one question at a time, each answer is checked and stored in the backend with **immediate per-answer feedback**, the cursor advances, and the attempt is resumable after an app close (via a **409-resume** on start). It differs from practice only by being **graded**, **eligibility-gated**, **single-pass** (first answer is final — no retry queue), and drawn from the level test bank.

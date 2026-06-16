@@ -51,6 +51,12 @@ import { GetTestReview } from './dlg/moduleTests/GetTestReview';
 import { PostLevelTestBank } from './dlg/levelTestBanks/PostLevelTestBank';
 import { PostLevelTestBankExercises } from './dlg/levelTestBanks/PostLevelTestBankExercises';
 import { GetLevelTestBank } from './dlg/levelTestBanks/GetLevelTestBank';
+import { GetLevelTestEligibility } from './dlg/levelTests/GetLevelTestEligibility';
+import { StartLevelTest } from './dlg/levelTests/StartLevelTest';
+import { GetLevelTest } from './dlg/levelTests/GetLevelTest';
+import { SubmitLevelTestAnswer } from './dlg/levelTests/SubmitLevelTestAnswer';
+import { SubmitLevelTest } from './dlg/levelTests/SubmitLevelTest';
+import { GetLevelTestReview } from './dlg/levelTests/GetLevelTestReview';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -124,6 +130,13 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/levelTestBanks', delegate: PostLevelTestBank },
             { method: 'POST', path: '/levelTestBanks/:cefrLevel/exercises', delegate: PostLevelTestBankExercises },
             { method: 'GET', path: '/levelTestBanks/:cefrLevel', delegate: GetLevelTestBank },
+
+            { method: 'GET', path: '/users/:userId/levelTest/eligibility', delegate: GetLevelTestEligibility },
+            { method: 'POST', path: '/users/:userId/levelTests', delegate: StartLevelTest },
+            { method: 'GET', path: '/users/:userId/levelTests/:attemptId', delegate: GetLevelTest },
+            { method: 'POST', path: '/users/:userId/levelTests/:attemptId/answers', delegate: SubmitLevelTestAnswer },
+            { method: 'POST', path: '/users/:userId/levelTests/:attemptId/submit', delegate: SubmitLevelTest },
+            { method: 'GET', path: '/users/:userId/levelTests/:attemptId/review', delegate: GetLevelTestReview },
         ],
         apiOptions: { noCorrelationId: true }
     },
