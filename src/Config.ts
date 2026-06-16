@@ -48,6 +48,25 @@ export const TEST_PASS_THRESHOLD = 80;
  */
 export const TEST_RETRY_DELAY_MINUTES = 20;
 
+/**
+ * Number of questions drawn for each Level Test (F21).
+ * Fixed at 40 in v2.0.
+ */
+export const LEVEL_TEST_SIZE = 40;
+
+/**
+ * Minimum percentage of correct answers required to pass a Level Test (F21).
+ * Expressed as a value between 0 and 100. Lower than the Module Test (80%).
+ */
+export const LEVEL_TEST_PASS_THRESHOLD = 75;
+
+/**
+ * Minutes that must elapse after the most recent submitted Level Test attempt's
+ * `takenAt` timestamp before the user may start a new attempt at the same level (F21).
+ * This is the inter-attempt cooldown.
+ */
+export const LEVEL_TEST_RETRY_DELAY_MINUTES = 30;
+
 export class ControllerConfig extends TotoControllerConfig {
 
     getMongoSecretNames(): { userSecretName: string; pwdSecretName: string; } | null {
