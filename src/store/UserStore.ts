@@ -27,6 +27,23 @@ export class UserStore {
     }
 
     /**
+     * Finds a user by their internal id (the `id` field used across progress records).
+     * Returns null if not found.
+     *
+     * @param {string} userId - The user's internal id.
+     *
+     * @returns {Promise<User | null>} The user, or null.
+     */
+    async findById(userId: string): Promise<User | null> {
+
+        const doc = await this.db.collection(USERS_COLLECTION).findOne({ id: userId });
+
+        if (!doc) return null;
+
+        return User.fromBSON(doc as any);
+    }
+
+    /**
      * Inserts a new user document. Returns the created user.
      */
     async create(user: User): Promise<User> {

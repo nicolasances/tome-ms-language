@@ -15,6 +15,7 @@
 - [Practice Sessions (F10)](#practice-sessions-f10)
 - [Module Tests (F11)](#module-tests-f11)
 - [Level Test Banks (F20)](#level-test-banks-f20)
+- [Level Test (F21)](#level-test-f21)
 - [Legacy endpoints (pending removal)](#legacy-endpoints-pending-removal)
 - [API Design compliance](#api-design-compliance)
 
@@ -289,6 +290,42 @@
 ### GET /levelTestBanks/:cefrLevel
 **Used for:** The selection engine (F08) drawing from the full pool when assembling a Level Test (F21). Returns the bank metadata plus its `exerciseIds`. Returns **404** if no bank exists for the level.
 **Request & Response:** `GetLevelTestBankRequest` / `GetLevelTestBankResponse` in `src/dlg/levelTestBanks/GetLevelTestBank.ts`
+
+---
+
+## Level Test (F21)
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| GET | `/users/:userId/levelTest/eligibility` | Authoritative eligibility + cooldown check for the level test |
+| POST | `/users/:userId/levelTests` | Start a new level test attempt (409-resume if one is active) |
+| GET | `/users/:userId/levelTests/:attemptId` | Get the current state of a level test attempt (for resume) |
+| POST | `/users/:userId/levelTests/:attemptId/answers` | Submit an answer for one exercise in the test |
+| POST | `/users/:userId/levelTests/:attemptId/submit` | Finalise the attempt; grade, update mastery, advance level on pass |
+| GET | `/users/:userId/levelTests/:attemptId/review` | Fetch the full graded review + weak-areas for a submitted attempt |
+
+### GET /users/:userId/levelTest/eligibility
+**Used for:** Checking whether the Level Test is available for the user's current CEFR level. Eligible requires all **curated** (non-user-generated) modules at the level to be `completed` (F07); user-generated modules do not block, and a level with no curated modules is not eligible. An in-progress attempt makes the user eligible to *resume* it (returns `activeAttemptId`), bypassing the cooldown. Otherwise the 30-minute inter-attempt cooldown (`LEVEL_TEST_RETRY_DELAY_MINUTES`) must have elapsed since the most recent submitted attempt's `takenAt`, else returns `{ eligible: false, retryAvailableAt, remainingMs }`. The user's level is resolved from their profile.
+**Request & Response:** `GetLevelTestEligibilityRequest` / `GetLevelTestEligibilityResponse` in `src/dlg/levelTests/GetLevelTestEligibility.ts`
+
+### POST /users/:userId/levelTests
+**Used for:** Starting a new Level Test attempt at the user's current level. Verifies all eligibility conditions (all curated modules completed, cooldown elapsed). Draws exactly **40** exercises from the level test bank (F20) via F08's mastery-aware selection, using a **level-wide mastery map** (the user's mastery for every vocab/grammar item the bank's exercises link to) so the lowest-mastery items are prioritized. Returns the 40 questions as **full exercise objects — the same payload/shape as a practice session**. Returns **409** with `{ code: 409, message, attemptId }` if an active (un-submitted) attempt already exists — the client resumes it via `GET .../levelTests/:attemptId`. Returns **404** if no level test bank exists for the level.
+**Request & Response:** `StartLevelTestRequest` / `StartLevelTestResponse` in `src/dlg/levelTests/StartLevelTest.ts`
+
+### GET /users/:userId/levelTests/:attemptId
+**Used for:** Resuming an in-progress level test after the app is closed. Returns the full attempt state — `cefrLevel`, `answers` recorded so far, `currentPosition` — plus the full exercise objects (same payload/shape as a practice session) in stored `exerciseIds` order. An in-progress attempt is always resumable regardless of cooldown timing. Verifies ownership (403 otherwise).
+**Request & Response:** `GetLevelTestRequest` / `GetLevelTestResponse` in `src/dlg/levelTests/GetLevelTest.ts`
+
+### POST /users/:userId/levelTests/:attemptId/answers
+**Used for:** Submitting a user's answer for one exercise during a level test. Body: `{ exerciseId, userAnswer }`. Normalises and checks the answer (same logic as F10/F11). **The first answer is final for grading — no retry queue.** Returns immediate feedback `{ isCorrect, correctAnswer }` (correct answer always returned so the client can show it on a wrong answer). Increments `timesShown` on the exercise.
+**Request & Response:** `SubmitLevelTestAnswerRequest` / `SubmitLevelTestAnswerResponse` in `src/dlg/levelTests/SubmitLevelTestAnswer.ts`
+
+### POST /users/:userId/levelTests/:attemptId/submit
+**Used for:** Finalising a level test attempt. Computes the score as `% of exerciseIds whose final isCorrect is true`; unanswered exercises count as wrong. Determines pass/fail against `LEVEL_TEST_PASS_THRESHOLD` (75%). Updates mastery (F06) for every answered exercise — same SRS loop as practice completion. On pass: advances the user's CEFR level (F05) to the next tier — a no-op if already at the highest level (C2). Returns `{ score, passed, advancedTo }` where `advancedTo` is the new level or `null`.
+**Request & Response:** `SubmitLevelTestRequest` / `SubmitLevelTestResponse` in `src/dlg/levelTests/SubmitLevelTest.ts`
+
+### GET /users/:userId/levelTests/:attemptId/review
+**Used for:** Fetching the full graded review for a submitted level test attempt. Returns `score`, `passed`, a `questions` array (each exercise's `prompt`, `isCorrect`, `userAnswer`, `correctAnswer`), and a `weakAreas` summary `{ vocabulary[], grammar[] }` — the distinct vocab items and grammar concepts the user answered incorrectly (any incorrect answer flags the item — OQ-03). Only valid after submission (`takenAt` set); **exposes correct answers**. Unanswered exercises appear with `isCorrect: false` and `userAnswer: ""`. Enables "Explain my mistake" (F12) per incorrect item. Verifies ownership (403 otherwise).
+**Request & Response:** `GetLevelTestReviewRequest` / `GetLevelTestReviewResponse` in `src/dlg/levelTests/GetLevelTestReview.ts`
 
 ---
 
