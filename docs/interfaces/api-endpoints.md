@@ -16,7 +16,6 @@
 - [Module Tests (F11)](#module-tests-f11)
 - [Level Test Banks (F20)](#level-test-banks-f20)
 - [Level Test (F21)](#level-test-f21)
-- [Legacy endpoints (pending removal)](#legacy-endpoints-pending-removal)
 - [API Design compliance](#api-design-compliance)
 
 ---
@@ -326,28 +325,6 @@
 ### GET /users/:userId/levelTests/:attemptId/review
 **Used for:** Fetching the full graded review for a submitted level test attempt. Returns `score`, `passed`, a `questions` array (each exercise's `prompt`, `isCorrect`, `userAnswer`, `correctAnswer`), and a `weakAreas` summary `{ vocabulary[], grammar[] }` — the distinct vocab items and grammar concepts the user answered incorrectly (any incorrect answer flags the item — OQ-03). Only valid after submission (`takenAt` set); **exposes correct answers**. Unanswered exercises appear with `isCorrect: false` and `userAnswer: ""`. Enables "Explain my mistake" (F12) per incorrect item. Verifies ownership (403 otherwise).
 **Request & Response:** `GetLevelTestReviewRequest` / `GetLevelTestReviewResponse` in `src/dlg/levelTests/GetLevelTestReview.ts`
-
----
-
-## Legacy endpoints (pending removal)
-
-The following endpoints are still wired in `src/index.ts` but belong to the pre-redesign vocabulary/sentence/generic-session model. `docs/features/README.md` already flags this code as **superseded by the F01–F23 feature set and slated for removal** ("the current vocabulary / sentence / generic-session code... is superseded by these features and will largely be removed"). They're listed here only so the endpoint inventory stays complete — they're intentionally **not** written up to the full template. Once the routes and delegates are removed, delete this section too.
-
-| Method | Endpoint | Delegate |
-| ------ | -------- | -------- |
-| GET | `/sentences/:language` | `GetSentences` |
-| GET | `/sentences/:language/with-stats` | `GetSentencesWithStats` |
-| POST | `/sentences/:language` | `PostSentence` |
-| POST | `/sentences/:language/batch` | `PostSentences` |
-| GET | `/sentences/:language/:sentenceId` | `GetSentence` |
-| POST | `/sentences/:language/:sentenceId/alternatives` | `AddSentenceAlternative` |
-| DELETE | `/sentences/:language/:sentenceId/alternatives/:id` | `RemoveSentenceAlternative` |
-| POST | `/languages/:language/sessions` | `StartSession` |
-| GET | `/sessions/active` | `GetActiveSession` |
-| GET | `/sessions/stats/weekly` | `GetWeeklySessionStats` |
-| GET | `/sessions/stats/rolling` | `GetRollingSessionStats` |
-| POST | `/sessions/:sessionId/answers` | `SubmitAnswer` |
-| POST | `/sessions/:sessionId/completion` | `CompleteSession` |
 
 ---
 
