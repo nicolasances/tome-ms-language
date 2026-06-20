@@ -2,7 +2,7 @@
 
 This folder breaks down the [Language Learning idea](../../../tome/docs/specs/language-learning/idea.md) (v2.0) into **self-contained, independently deployable and testable features** for the `tome-ms-language` **backend microservice**.
 
-> **Redesign note.** The idea is the master. This breakdown assumes a full redesign of the microservice. The current vocabulary / sentence / generic-session code (`PostWord`, `PostSentence`, `StartSession`, etc.) is **superseded** by these features and will largely be removed. Do not try to fit the idea into the existing model.
+> **Redesign note.** The idea is the master. This breakdown assumes a full redesign of the microservice. The pre-v2.0 vocabulary / sentence / generic-session code has been **removed** — the F01–F23 feature set is the sole codebase.
 
 ## Scope boundary
 

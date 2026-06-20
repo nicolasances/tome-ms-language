@@ -3,23 +3,13 @@ import { ControllerConfig } from "./Config";
 import { GetMe } from './dlg/user/GetMe';
 import { PostUsers } from './dlg/user/PostUsers';
 import { PutMeCefrLevel } from './dlg/user/PutMeCefrLevel';
-import { AddSentenceAlternative } from './dlg/sentences/AddSentenceAlternative';
 import { GetGrammarConcept } from './dlg/grammar/GetGrammarConcept';
 import { GetGrammarConcepts } from './dlg/grammar/GetGrammarConcepts';
 import { PostGrammarConcept } from './dlg/grammar/PostGrammarConcept';
 import { PostGrammarConceptBatch } from './dlg/grammar/PostGrammarConceptBatch';
-import { CompleteSession } from './dlg/session/CompleteSession';
-import { GetActiveSession } from './dlg/session/GetActiveSession';
-import { GetRollingSessionStats } from './dlg/session/GetRollingSessionStats';
-import { GetSentence } from './dlg/sentences/GetSentence';
-import { GetSentences } from './dlg/sentences/GetSentences';
-import { GetSentencesWithStats } from './dlg/sentences/GetSentencesWithStats';
 import { GetVocabularyItem } from './dlg/vocabulary/GetVocabularyItem';
 import { GetVocabularyItems } from './dlg/vocabulary/GetVocabularyItems';
-import { GetWeeklySessionStats } from './dlg/session/GetWeeklySessionStats';
 import { LookupVocabularyItems } from './dlg/vocabulary/LookupVocabularyItems';
-import { PostSentence } from './dlg/sentences/PostSentence';
-import { PostSentences } from './dlg/sentences/PostSentences';
 import { PostVocabularyItem } from './dlg/vocabulary/PostVocabularyItem';
 import { PostVocabularyItemBatch } from './dlg/vocabulary/PostVocabularyItemBatch';
 import { GetGrammarIntroduction } from './dlg/modules/GetGrammarIntroduction';
@@ -30,9 +20,6 @@ import { GetExercise } from './dlg/exercises/GetExercise';
 import { PostExercises } from './dlg/exercises/PostExercises';
 import { PostExerciseMistakeExplanation } from './dlg/exercises/PostExerciseMistakeExplanation';
 import { PostExerciseAnswerVerification } from './dlg/exercises/PostExerciseAnswerVerification';
-import { RemoveSentenceAlternative } from './dlg/sentences/RemoveSentenceAlternative';
-import { StartSession } from './dlg/session/StartSession';
-import { SubmitAnswer } from './dlg/session/SubmitAnswer';
 import { GetMeProgress } from './dlg/user/GetMeProgress';
 import { GetUserVocabularyProgress } from './dlg/progress/GetUserVocabularyProgress';
 import { GetUserVocabularyProgressItem } from './dlg/progress/GetUserVocabularyProgressItem';
@@ -92,20 +79,6 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/vocabularyItems/lookup', delegate: LookupVocabularyItems },
             { method: 'GET', path: '/vocabularyItems', delegate: GetVocabularyItems },
             { method: 'GET', path: '/vocabularyItems/:id', delegate: GetVocabularyItem },
-            
-            { method: 'GET', path: '/sentences/:language', delegate: GetSentences },
-            { method: 'GET', path: '/sentences/:language/with-stats', delegate: GetSentencesWithStats },
-            { method: 'POST', path: '/sentences/:language', delegate: PostSentence },
-            { method: 'POST', path: '/sentences/:language/batch', delegate: PostSentences },
-            { method: 'GET', path: '/sentences/:language/:sentenceId', delegate: GetSentence },
-            { method: 'POST', path: '/sentences/:language/:sentenceId/alternatives', delegate: AddSentenceAlternative },
-            { method: 'DELETE', path: '/sentences/:language/:sentenceId/alternatives/:id', delegate: RemoveSentenceAlternative },
-            { method: 'POST', path: '/languages/:language/sessions', delegate: StartSession },
-            { method: 'GET', path: '/sessions/active', delegate: GetActiveSession },
-            { method: 'GET', path: '/sessions/stats/weekly', delegate: GetWeeklySessionStats },
-            { method: 'GET', path: '/sessions/stats/rolling', delegate: GetRollingSessionStats },
-            { method: 'POST', path: '/sessions/:sessionId/answers', delegate: SubmitAnswer },
-            { method: 'POST', path: '/sessions/:sessionId/completion', delegate: CompleteSession },
 
             { method: 'GET', path: '/me/progress', delegate: GetMeProgress },
 
