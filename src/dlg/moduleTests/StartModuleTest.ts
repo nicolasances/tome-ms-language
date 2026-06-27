@@ -1,6 +1,6 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
-import { MODULE_TEST_SIZE, TEST_RETRY_DELAY_MINUTES, TEST_UNLOCK_DELAY_HOURS } from "../../Config";
+import { TEST_RETRY_DELAY_MINUTES, TEST_UNLOCK_DELAY_HOURS } from "../../Config";
 import { ControllerConfig } from "../../Config";
 import { Exercise } from "../../model/Exercise";
 import { ModuleTestAttempt } from "../../model/ModuleTestAttempt";
