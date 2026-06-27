@@ -127,8 +127,12 @@ function buildPrompt({ exercise, userAnswer, cefrLevel, vocabContext, vocabDanis
             Linked vocabulary item: "${vocabDanish}" (${vocabEnglish}) — ${vocabContext}
             Student's CEFR level: ${cefrLevel}
 
-            Determine whether the student's answer is a valid translation of the exercise prompt given the vocabulary context.
+            Determine whether the student's answer is a valid translation of the exercise prompt.
             A minor spelling variation or a valid synonym is acceptable. An incorrect meaning or wrong grammar is not.
+            
+            Other considerations to keep in mind: 
+            - Ignore case, always. 
+            - Be mindful of the broader context: the user is learning Danish and may use some other correct formulations, maybe not using the exact words in the prompt. That's ok, as long as the meaning is correct, the grammar is correct and this is a valid Danish sentence, that is valid in an everyday context.
 
             Return a JSON object with exactly these fields:
             - valid: boolean — true if the translation is acceptable, false otherwise
