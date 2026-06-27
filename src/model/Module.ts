@@ -1,4 +1,5 @@
 import { WithId } from "mongodb";
+import { MODULE_TEST_SIZE } from "../Config";
 import { CEFR_LEVELS } from "./CefrLevels";
 
 export { CEFR_LEVELS };
@@ -19,6 +20,7 @@ export class Module {
     testUnlockDelayHours: number;
     testRetryDelayMinutes: number;
     testPassThreshold: number;
+    testQuestionCount: number;          // Number of questions drawn for a module test; defaults to MODULE_TEST_SIZE
 
     constructor(input: ModuleInput) {
 
@@ -36,6 +38,7 @@ export class Module {
         this.testUnlockDelayHours = input.testUnlockDelayHours ?? 4;
         this.testRetryDelayMinutes = input.testRetryDelayMinutes ?? 20;
         this.testPassThreshold = input.testPassThreshold ?? 80;
+        this.testQuestionCount = input.testQuestionCount ?? MODULE_TEST_SIZE;
     }
 
     /**
@@ -58,6 +61,7 @@ export class Module {
             testUnlockDelayHours: data.testUnlockDelayHours ?? 4,
             testRetryDelayMinutes: data.testRetryDelayMinutes ?? 20,
             testPassThreshold: data.testPassThreshold ?? 80,
+            testQuestionCount: data.testQuestionCount ?? MODULE_TEST_SIZE,
         });
     }
 
@@ -81,6 +85,7 @@ export class Module {
             testUnlockDelayHours: this.testUnlockDelayHours,
             testRetryDelayMinutes: this.testRetryDelayMinutes,
             testPassThreshold: this.testPassThreshold,
+            testQuestionCount: this.testQuestionCount,
         };
     }
 }
@@ -100,4 +105,5 @@ export interface ModuleInput {
     testUnlockDelayHours?: number;
     testRetryDelayMinutes?: number;
     testPassThreshold?: number;
+    testQuestionCount?: number;         // Number of questions drawn for a module test; defaults to MODULE_TEST_SIZE
 }
