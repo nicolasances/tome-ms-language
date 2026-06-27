@@ -47,6 +47,7 @@ Modules are created by an **external tool** (a seeding script or a custom module
 | testUnlockDelayHours | number | Hours after Step 2 is complete (every vocabulary item practiced at least once) before the test unlocks | Default: 4 |
 | testRetryDelayMinutes | number | Minutes after a failed test before retry | Default: 20 |
 | testPassThreshold | number | % correct needed to pass the test | Default: 80 |
+| testQuestionCount | number | Number of questions drawn for a module test | Default: 20 (`MODULE_TEST_SIZE`); overridable per module |
 
 > **`practiceMinUnseenVocabPercent` is NOT a per-module field.** It is a **microservice-level tuning constant** (`PRACTICE_MIN_UNSEEN_VOCAB_PERCENT`, default 50, exported from `Config.ts`) — the minimum share of each practice session reserved for unseen vocabulary, which guarantees full vocabulary coverage within a bounded number of sessions. It governs selection behavior uniformly across all modules, so it is not stored on the Module document. Consumed by the practice-session coverage override (F10).
 
