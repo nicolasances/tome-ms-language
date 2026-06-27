@@ -10,7 +10,7 @@ export class PostModule extends TotoDelegate<PostModuleRequest, PostModuleRespon
 
     parseRequest(req: Request): PostModuleRequest {
 
-        const { id, title, theme, communicationGoal, cefrLevel, vocabularyItemIds, grammarConceptIds, isUserGenerated, createdByUserId, practiceSessionSize, testUnlockDelayHours, testRetryDelayMinutes, testPassThreshold } = req.body ?? {};
+        const { id, title, theme, communicationGoal, cefrLevel, vocabularyItemIds, grammarConceptIds, isUserGenerated, createdByUserId, practiceSessionSize, testUnlockDelayHours, testRetryDelayMinutes, testPassThreshold, testQuestionCount } = req.body ?? {};
 
         if (!id) throw new ValidationError(400, "id is required");
         if (!title) throw new ValidationError(400, "title is required");
@@ -32,6 +32,7 @@ export class PostModule extends TotoDelegate<PostModuleRequest, PostModuleRespon
             testUnlockDelayHours: testUnlockDelayHours ?? 4,
             testRetryDelayMinutes: testRetryDelayMinutes ?? 20,
             testPassThreshold: testPassThreshold ?? 80,
+            testQuestionCount: testQuestionCount ?? 20,
         };
     }
 
@@ -81,6 +82,7 @@ interface PostModuleRequest {
     testUnlockDelayHours: number;
     testRetryDelayMinutes: number;
     testPassThreshold: number;
+    testQuestionCount: number;          // Number of questions drawn for a module test
 }
 
 interface PostModuleResponse {
