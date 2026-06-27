@@ -50,6 +50,7 @@ describe("PostModule.parseRequest", () => {
         assert.equal(parsed.testUnlockDelayHours, 4);
         assert.equal(parsed.testRetryDelayMinutes, 20);
         assert.equal(parsed.testPassThreshold, 80);
+        assert.equal(parsed.testQuestionCount, 20);
     });
 
     it("does not carry a testFreshExercisePercent parameter", () => {
@@ -69,12 +70,14 @@ describe("PostModule.parseRequest", () => {
             testUnlockDelayHours: 2,
             testRetryDelayMinutes: 30,
             testPassThreshold: 90,
+            testQuestionCount: 15,
         }));
 
         assert.equal(parsed.practiceSessionSize, 10);
         assert.equal(parsed.testUnlockDelayHours, 2);
         assert.equal(parsed.testRetryDelayMinutes, 30);
         assert.equal(parsed.testPassThreshold, 90);
+        assert.equal(parsed.testQuestionCount, 15);
     });
 
     it("throws 400 when id is missing", () => {
