@@ -155,6 +155,22 @@ describe("StartModuleTest.do", () => {
         assert.equal(result.exercises.length, 20);
     });
 
+    it("draws module.testQuestionCount exercises, not the global MODULE_TEST_SIZE constant", async () => {
+
+        // Module configured with 10 questions instead of the default 20
+        const mod = makeModule({ testQuestionCount: 10 });
+        // Pool of 22 exercises — big enough that any clamping to pool size would not affect the assertion
+        const exercises = makeLargeExercisePool();
+        const progress = makeProgress();
+
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
+        const delegate = new StartModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: new Date("2026-06-11T14:00:00.000Z") }, {} as any);
+
+        assert.equal(result.exercises.length, 10);
+    });
+
     it("throws 409 with attemptId when an active attempt already exists", async () => {
 
         const mod = makeModule();

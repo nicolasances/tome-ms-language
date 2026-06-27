@@ -123,7 +123,7 @@ export class StartModuleTest extends TotoDelegate<StartModuleTestRequest, StartM
             pool: allExercises,
             masteryByItemId,
             recentMisses: new Set(),
-            targetCount: MODULE_TEST_SIZE,
+            targetCount: module.testQuestionCount,
         });
 
         const startedAt = now.toISOString();
