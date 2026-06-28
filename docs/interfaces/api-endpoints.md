@@ -16,6 +16,7 @@
 - [Module Tests (F11)](#module-tests-f11)
 - [Level Test Banks (F20)](#level-test-banks-f20)
 - [Level Test (F21)](#level-test-f21)
+- [Activity Stats (F24)](#activity-stats-f24)
 - [API Design compliance](#api-design-compliance)
 
 ---
@@ -325,6 +326,17 @@
 ### GET /users/:userId/levelTests/:attemptId/review
 **Used for:** Fetching the full graded review for a submitted level test attempt. Returns `score`, `passed`, a `questions` array (each exercise's `prompt`, `isCorrect`, `userAnswer`, `correctAnswer`), and a `weakAreas` summary `{ vocabulary[], grammar[] }` — the distinct vocab items and grammar concepts the user answered incorrectly (any incorrect answer flags the item — OQ-03). Only valid after submission (`takenAt` set); **exposes correct answers**. Unanswered exercises appear with `isCorrect: false` and `userAnswer: ""`. Enables "Explain my mistake" (F12) per incorrect item. Verifies ownership (403 otherwise).
 **Request & Response:** `GetLevelTestReviewRequest` / `GetLevelTestReviewResponse` in `src/dlg/levelTests/GetLevelTestReview.ts`
+
+---
+
+## Activity Stats (F24)
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| GET | `/me/stats/dailyActivity` | Per-day activity counts over the rolling 7-day window ending today |
+
+### GET /me/stats/dailyActivity
+**Used for:** Backing the Home Dashboard's "This week" activity chart. Returns per-day counts of completed practice sessions, passed module tests, and passed level tests across a rolling 7-day window. The user is resolved from the auth token. Optional `from` query param (YYYYMMDD) sets the first day of the window; defaults to `today − 6` so the window always ends today. Returns exactly 7 entries (oldest → newest), zero-filled for days with no activity.
+**Request & Response:** `GetDailyActivityRequest` / `GetDailyActivityResponse` in `src/dlg/stats/GetDailyActivity.ts`
 
 ---
 
