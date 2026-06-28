@@ -46,9 +46,12 @@
   `passed = true` and `takenAt` on day `d`; failed/un-submitted excluded.
 - User resolved from the auth token (no `:userId` in path); another user's
   activity is never included.
-- `from` omitted ⇒ window ends today; invalid `from` ⇒ 400.
-- Day bucketing uses a single fixed service reference timezone (OQ-01); the call
-  mutates no state.
+- `from` omitted ⇒ window ends today; invalid `from` ⇒ 400. Window length is
+  fixed at 7 days (no `to`/`days` param). Response is per-day only — **no**
+  window-level `totals` object (client sums for the headline).
+- Day bucketing uses a single configured service timezone (a `Config.ts` value,
+  default `Europe/Copenhagen`), not UTC and not per-user; the call mutates no
+  state.
 
 ## Affected feature files
 - `docs/features/F24-activity-stats.md` (new)
