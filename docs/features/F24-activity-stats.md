@@ -1,6 +1,6 @@
 # F24 — Activity Stats (Rolling Window)
 
-![Status](https://img.shields.io/badge/status-todo-lightgrey?style=flat-square)
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
 
 ## 1. Purpose & Scope
 
