@@ -70,6 +70,11 @@ Features are grouped by layer. Lower groups depend on higher ones.
 |---|---------|---------------|
 | F23 | [Content Analysis Report](./F23-analyze-content.md) | ContentReport |
 
+### Group I — Activity & engagement stats
+| # | Feature | Primary model | Status |
+|---|---------|---------------|--------|
+| F24 | [Activity Stats (Rolling Window)](./F24-activity-stats.md) | — (read-only aggregate over PracticeSession, ModuleTestAttempt, LevelTestAttempt) | ![Todo](https://img.shields.io/badge/status-todo-lightgrey?style=flat-square) |
+
 ## Build order
 
 | Priority | Features | Notes |
@@ -79,7 +84,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | 3 — Core loop | F08, F09, F10, F11 | Selection + full module execution flow |
 | 4 — AI touchpoints | F12, F13 | On-demand; can be added after core loop works |
 | 5 — Level progression | F20, F21 | After at least one full level's modules are seeded |
-| 6 — Extended | F22, F23 | User vocabulary capture + content analysis reports |
+| 6 — Extended | F22, F23, F24 | User vocabulary capture + content analysis reports + activity stats (F24 depends on F10/F11/F21) |
 
 ## MVP slice
 
