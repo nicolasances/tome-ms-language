@@ -5,6 +5,7 @@ import { ControllerConfig, REFERENCE_TIMEZONE } from "../../Config";
 import { PracticeSessionStore } from "../../store/PracticeSessionStore";
 import { ModuleTestAttemptStore } from "../../store/ModuleTestAttemptStore";
 import { LevelTestAttemptStore } from "../../store/LevelTestAttemptStore";
+import { UserStore } from "../../store/UserStore";
 
 export class GetDailyActivity extends TotoDelegate<GetDailyActivityRequest, GetDailyActivityResponse> {
 
@@ -22,12 +23,15 @@ export class GetDailyActivity extends TotoDelegate<GetDailyActivityRequest, GetD
         const toDate = moment.tz(fromDate, "YYYYMMDD", tz).add(6, "days").format("YYYYMMDD");
 
         const db = await config.getMongoDb(config.getDBName());
-        const userId = userContext!.userId;
+        
+        const user = await new UserStore({ db, config }).findByEmail(userContext!.email); 
+
+        if (!user) throw new ValidationError(404, "User not found");
 
         const [practiceMap, moduleTestMap, levelTestMap] = await Promise.all([
-            new PracticeSessionStore({ db, config }).countCompletedByDay(userId, fromDate, toDate, tz),
-            new ModuleTestAttemptStore({ db, config }).countPassedByDay(userId, fromDate, toDate, tz),
-            new LevelTestAttemptStore({ db, config }).countPassedByDay(userId, fromDate, toDate, tz),
+            new PracticeSessionStore({ db, config }).countCompletedByDay(user.id, fromDate, toDate, tz),
+            new ModuleTestAttemptStore({ db, config }).countPassedByDay(user.id, fromDate, toDate, tz),
+            new LevelTestAttemptStore({ db, config }).countPassedByDay(user.id, fromDate, toDate, tz),
         ]);
 
         const days: DayActivity[] = [];

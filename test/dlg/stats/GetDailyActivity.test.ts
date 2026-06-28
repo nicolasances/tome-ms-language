@@ -2,13 +2,13 @@ import { assert } from "chai";
 import { Request } from "express";
 import { GetDailyActivity } from "../../../src/dlg/stats/GetDailyActivity";
 
-const userContext = { email: "alice@example.com", userId: "u1", authProvider: "test" };
+const userContext = { email: "u1@u1.com", authProvider: "test", userId: "SHOULD-NOT-BE-USED" };
 
 // ---------------------------------------------------------------------------
 // Mock collection factory — supports find().toArray() per collection name
 // ---------------------------------------------------------------------------
 
-function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTestDocs: any[]) {
+function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTestDocs: any[], user: {userId: string, email: string} = {userId: "u1", email: "u1@u1.com"}) {
     function makeCol(docs: any[], timestampField: string, passedFilter?: boolean) {
         return {
             find: (filter: any) => ({
@@ -27,11 +27,23 @@ function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTest
         };
     }
 
+    function makeUserCol(user: {email: string, userId: string}) {
+        return {
+            findOne: async (filter: any) => {
+                if (filter.email === user.email) {
+                    return { id: user.userId, email: user.email };
+                }
+                return null;
+            }
+        }
+    }
+
     return {
         collection: (name: string) => {
             if (name === "practiceSessions") return makeCol(practiceSessionDocs, "completedAt");
             if (name === "moduleTestAttempts") return makeCol(moduleTestDocs, "takenAt", true);
             if (name === "levelTestAttempts") return makeCol(levelTestDocs, "takenAt", true);
+            if (name === "users") return makeUserCol(user);
             throw new Error(`Unknown collection: ${name}`);
         },
     } as any;
@@ -105,6 +117,32 @@ describe("GetDailyActivity.do", () => {
         assert.equal(day27.practiceSessions, 0);
         assert.equal(day27.successfulModuleTests, 0);
         assert.equal(day27.successfulLevelTests, 1);
+    });
+
+    it("returns empty days when no data is available for the user", async () => {
+        const practiceSessionDocs = [
+            { userId: "u2", completedAt: "2026-06-21T10:00:00.000Z" },
+            { userId: "u2", completedAt: "2026-06-21T14:00:00.000Z" },
+            { userId: "u2", completedAt: "2026-06-23T09:00:00.000Z" },
+        ];
+        const moduleTestDocs = [
+            { userId: "u2", passed: true, takenAt: "2026-06-23T11:00:00.000Z" },
+        ];
+        const levelTestDocs = [
+            { userId: "u2", passed: true, takenAt: "2026-06-27T15:00:00.000Z" },
+        ];
+
+        const db = makeMockDb(practiceSessionDocs, moduleTestDocs, levelTestDocs);
+        const delegate = new GetDailyActivity({} as any, makeMockConfig(db));
+
+        const result = await delegate.do({ from: "20260621" }, userContext);
+        
+        assert.equal(result.days.length, 7);
+        for (const day of result.days) {
+            assert.equal(day.practiceSessions, 0);
+            assert.equal(day.successfulModuleTests, 0);
+            assert.equal(day.successfulLevelTests, 0);
+        }
     });
 
     it("fills empty days with zero counts so the array is always dense", async () => {
