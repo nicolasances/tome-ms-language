@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import * as moment from "moment-timezone";
 import { ControllerConfig } from "../Config";
 import { PracticeAnswer, PracticeSession } from "../model/PracticeSession";
 
@@ -125,5 +126,35 @@ export class PracticeSessionStore {
             { _id: new ObjectId(sessionId) },
             { $pull: { retryQueue: exerciseId } } as any
         );
+    }
+
+    /**
+     * Returns a map of YYYYMMDD → completed-session count for the given user and date window.
+     * Only sessions with a non-null completedAt that falls within [from, to] (inclusive, in
+     * the given timezone) are counted. Days with no activity are absent from the map.
+     *
+     * @param {string} userId - The user whose sessions to count.
+     * @param {string} from - First day of the window (YYYYMMDD).
+     * @param {string} to - Last day of the window (YYYYMMDD).
+     * @param {string} timezone - IANA timezone for civil-day bucketing.
+     */
+    async countCompletedByDay(userId: string, from: string, to: string, timezone: string): Promise<Map<string, number>> {
+
+        const startIso = moment.tz(from, "YYYYMMDD", timezone).startOf("day").toISOString();
+        const endIso = moment.tz(to, "YYYYMMDD", timezone).endOf("day").toISOString();
+
+        const docs = await this.db.collection(COLLECTION).find({
+            userId,
+            completedAt: { $gte: startIso, $lte: endIso },
+        }).toArray();
+
+        const counts = new Map<string, number>();
+        for (const doc of docs) {
+            if (!doc.completedAt) continue;
+            const day = moment.tz(doc.completedAt as string, timezone).format("YYYYMMDD");
+            counts.set(day, (counts.get(day) ?? 0) + 1);
+        }
+
+        return counts;
     }
 }

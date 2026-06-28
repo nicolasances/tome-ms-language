@@ -73,7 +73,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 ### Group I — Activity & engagement stats
 | # | Feature | Primary model | Status |
 |---|---------|---------------|--------|
-| F24 | [Activity Stats (Rolling Window)](./F24-activity-stats.md) | — (read-only aggregate over PracticeSession, ModuleTestAttempt, LevelTestAttempt) | ![Todo](https://img.shields.io/badge/status-todo-lightgrey?style=flat-square) |
+| F24 | [Activity Stats (Rolling Window)](./F24-activity-stats.md) | — (read-only aggregate over PracticeSession, ModuleTestAttempt, LevelTestAttempt) | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ## Build order
 

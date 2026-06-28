@@ -67,6 +67,12 @@ export const LEVEL_TEST_PASS_THRESHOLD = 75;
  */
 export const LEVEL_TEST_RETRY_DELAY_MINUTES = 30;
 
+/**
+ * IANA timezone used as the single reference civil-day boundary for F24 activity bucketing.
+ * All per-day counts bucket timestamps into this timezone — not UTC, not per-user.
+ */
+export const REFERENCE_TIMEZONE = 'Europe/Copenhagen';
+
 export class ControllerConfig extends TotoControllerConfig {
 
     getMongoSecretNames(): { userSecretName: string; pwdSecretName: string; } | null {
