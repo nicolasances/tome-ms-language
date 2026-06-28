@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import * as moment from "moment-timezone";
 import { ControllerConfig } from "../Config";
 import { LevelTestAttempt } from "../model/LevelTestAttempt";
 import { TestAnswer } from "../model/ModuleTestAttempt";
@@ -166,6 +167,37 @@ export class LevelTestAttemptStore {
                 },
             } as any
         );
+    }
+
+    /**
+     * Returns a map of YYYYMMDD → passed-attempt count for the given user and date window.
+     * Only attempts with `passed = true` and a non-null `takenAt` that falls within [from, to]
+     * (inclusive, in the given timezone) are counted. Days with no qualifying attempts are absent.
+     *
+     * @param {string} userId - The user whose attempts to count.
+     * @param {string} from - First day of the window (YYYYMMDD).
+     * @param {string} to - Last day of the window (YYYYMMDD).
+     * @param {string} timezone - IANA timezone for civil-day bucketing.
+     */
+    async countPassedByDay(userId: string, from: string, to: string, timezone: string): Promise<Map<string, number>> {
+
+        const startIso = moment.tz(from, "YYYYMMDD", timezone).startOf("day").toISOString();
+        const endIso = moment.tz(to, "YYYYMMDD", timezone).endOf("day").toISOString();
+
+        const docs = await this.db.collection(COLLECTION).find({
+            userId,
+            passed: true,
+            takenAt: { $gte: startIso, $lte: endIso },
+        }).toArray();
+
+        const counts = new Map<string, number>();
+        for (const doc of docs) {
+            if (!doc.takenAt) continue;
+            const day = moment.tz(doc.takenAt as string, timezone).format("YYYYMMDD");
+            counts.set(day, (counts.get(day) ?? 0) + 1);
+        }
+
+        return counts;
     }
 }
 
