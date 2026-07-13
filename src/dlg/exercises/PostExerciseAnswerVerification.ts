@@ -3,6 +3,7 @@ import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { ControllerConfig } from "../../Config";
 import { ExerciseStore } from "../../store/ExerciseStore";
 import { PracticeSessionStore } from "../../store/PracticeSessionStore";
+import { ModuleTestAttemptStore } from "../../store/ModuleTestAttemptStore";
 import { VocabularyItemStore } from "../../store/VocabularyItemStore";
 import { VertexAIClient, buildVertexAIClient } from "../../ai/VertexAIClient";
 
@@ -38,9 +39,13 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
      *
      * Business rules:
      * - Only translation_active exercises are eligible.
+     * - The container is resolved from either a practice session (F10) or a module test attempt (F11) —
+     *   sessionId is tried against PracticeSessionStore first, then ModuleTestAttemptStore.
      * - Only one verification is allowed per (sessionId, exerciseId) pair.
-     * - If the AI validates the answer: removes the exercise from the session's retry queue,
-     *   appends the answer to the exercise's userContributedAnswers, and records the verification.
+     * - If the AI validates the answer: for a practice session, removes the exercise from the retry
+     *   queue; for a module test attempt, flips the stored answer's isCorrect flag (there is no retry
+     *   queue). In both cases, appends the answer to the exercise's userContributedAnswers and records
+     *   the verification.
      * - If the AI rejects the answer: returns an explanation; no state is mutated.
      *
      * @param {PostExerciseAnswerVerificationRequest} req - The validated request.
@@ -56,6 +61,7 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
 
         const exerciseStore = new ExerciseStore(db);
         const sessionStore = new PracticeSessionStore({ db, config });
+        const attemptStore = new ModuleTestAttemptStore({ db, config });
 
         const exercise = await exerciseStore.findById(req.exerciseId);
 
@@ -66,17 +72,19 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
         }
 
         const session = await sessionStore.findById(req.sessionId);
+        const attempt = session ? null : await attemptStore.findById(req.sessionId);
 
-        if (!session) throw new ValidationError(404, `Practice session not found for id '${req.sessionId}'`);
+        if (!session && !attempt) throw new ValidationError(404, `Session/attempt not found for id '${req.sessionId}'`);
 
-        const sessionExerciseIds = [...session.exerciseIds, ...session.retryQueue];
+        const containerExerciseIds = session ? [...session.exerciseIds, ...session.retryQueue] : attempt!.exerciseIds;
+        const verifiedExerciseIds = session ? session.verifiedExerciseIds : attempt!.verifiedExerciseIds;
 
-        if (!sessionExerciseIds.includes(req.exerciseId)) {
-            throw new ValidationError(400, `Exercise '${req.exerciseId}' is not part of session '${req.sessionId}'`);
+        if (!containerExerciseIds.includes(req.exerciseId)) {
+            throw new ValidationError(400, `Exercise '${req.exerciseId}' is not part of session/attempt '${req.sessionId}'`);
         }
 
-        if (session.verifiedExerciseIds.includes(req.exerciseId)) {
-            throw new ValidationError(409, `Answer verification was already used for exercise '${req.exerciseId}' in this session`);
+        if (verifiedExerciseIds.includes(req.exerciseId)) {
+            throw new ValidationError(409, `Answer verification was already used for exercise '${req.exerciseId}' in this session/attempt`);
         }
 
         const vocab = await new VocabularyItemStore(db).findById(exercise.vocabularyItemId!);
@@ -94,11 +102,15 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
 
         if (parsed.valid) {
 
-            await sessionStore.removeFromRetryQueue(req.sessionId, req.exerciseId);
+            if (session) {
+                await sessionStore.removeFromRetryQueue(req.sessionId, req.exerciseId);
+                await sessionStore.addVerifiedExerciseId(req.sessionId, req.exerciseId);
+            } else {
+                await attemptStore.flipAnswerToCorrect(req.sessionId, req.exerciseId);
+                await attemptStore.addVerifiedExerciseId(req.sessionId, req.exerciseId);
+            }
 
             await exerciseStore.appendUserContributedAnswer(req.exerciseId, req.userAnswer);
-
-            await sessionStore.addVerifiedExerciseId(req.sessionId, req.exerciseId);
 
             return { valid: true };
         }
