@@ -304,4 +304,61 @@ describe("StartModuleTest.do", () => {
             assert.equal(err.code, 400);
         }
     });
+
+    it("selects at least 60% translation_active exercises when the pool is large enough (F11 floor)", async () => {
+
+        const mod = makeModule();
+        const progress = makeProgress();
+
+        // 20 translation_active + 80 multiple_choice = 100 exercises, each with a unique vocab ID.
+        // Without the split-selection fix the unconstrained F08 draw produces ~4 ta exercises (20%),
+        // which is well below the 60% floor and would fail the assertion.
+        const translationExercises = Array.from({ length: 20 }, (_, i) =>
+            new Exercise({ id: `ta-${i + 1}`, moduleId: "mod-1", type: "translation_active", prompt: `p-ta-${i}`, answer: `a-ta-${i}`, vocabularyItemId: `ta-v-${i + 1}`, grammarConceptId: null })
+        );
+        const multipleChoiceExercises = Array.from({ length: 80 }, (_, i) =>
+            new Exercise({ id: `mc-${i + 1}`, moduleId: "mod-1", type: "multiple_choice", prompt: `p-mc-${i}`, answer: `a-mc-${i}`, vocabularyItemId: `mc-v-${i + 1}`, grammarConceptId: null, distractors: ["d1", "d2"] })
+        );
+        const pool = [...translationExercises, ...multipleChoiceExercises];
+
+        const config = makeMockConfig(mod.toBSON(), pool.map(e => e.toBSON()), progress.toBSON());
+        const delegate = new StartModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: new Date("2026-06-11T14:00:00.000Z") }, {} as any);
+
+        const translationCount = result.exercises.filter((e: any) => e.type === "translation_active").length;
+        const minExpected = Math.ceil(20 * 0.60); // 12
+
+        assert.equal(result.exercises.length, 20);
+        assert.isAtLeast(translationCount, minExpected, `Expected at least ${minExpected} translation_active exercises, got ${translationCount}`);
+    });
+
+    it("uses all available translation_active exercises and fills remainder from other types when translation_active pool is too small (F11 graceful cap)", async () => {
+
+        const mod = makeModule();
+        const progress = makeProgress();
+
+        // 3 translation_active + 50 multiple_choice = 53 exercises, each with a unique vocab ID.
+        // Without the fix the unconstrained draw produces on average ~1 ta exercise (3/53 * 20),
+        // so the assertion of exactly 3 ta exercises would reliably fail without the fix.
+        const translationExercises = Array.from({ length: 3 }, (_, i) =>
+            new Exercise({ id: `ta-${i + 1}`, moduleId: "mod-1", type: "translation_active", prompt: `p-ta-${i}`, answer: `a-ta-${i}`, vocabularyItemId: `ta-v-${i + 1}`, grammarConceptId: null })
+        );
+        const multipleChoiceExercises = Array.from({ length: 50 }, (_, i) =>
+            new Exercise({ id: `mc-${i + 1}`, moduleId: "mod-1", type: "multiple_choice", prompt: `p-mc-${i}`, answer: `a-mc-${i}`, vocabularyItemId: `mc-v-${i + 1}`, grammarConceptId: null, distractors: ["d1", "d2"] })
+        );
+        const pool = [...translationExercises, ...multipleChoiceExercises];
+
+        const config = makeMockConfig(mod.toBSON(), pool.map(e => e.toBSON()), progress.toBSON());
+        const delegate = new StartModuleTest({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1", now: new Date("2026-06-11T14:00:00.000Z") }, {} as any);
+
+        const translationCount = result.exercises.filter((e: any) => e.type === "translation_active").length;
+        const uniqueIds = new Set(result.exercises.map((e: any) => e.id));
+
+        assert.equal(result.exercises.length, 20, "must return exactly 20 exercises");
+        assert.equal(translationCount, 3, "must use all 3 available translation_active exercises");
+        assert.equal(uniqueIds.size, 20, "must not repeat exercises");
+    });
 });
