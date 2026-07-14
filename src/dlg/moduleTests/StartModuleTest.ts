@@ -1,6 +1,6 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
-import { TEST_RETRY_DELAY_MINUTES, TEST_UNLOCK_DELAY_HOURS } from "../../Config";
+import { TEST_RETRY_DELAY_MINUTES, TEST_UNLOCK_DELAY_HOURS, MODULE_TEST_MIN_TRANSLATION_ACTIVE_PERCENT } from "../../Config";
 import { ControllerConfig } from "../../Config";
 import { Exercise } from "../../model/Exercise";
 import { ModuleTestAttempt } from "../../model/ModuleTestAttempt";
@@ -118,13 +118,38 @@ export class StartModuleTest extends TotoDelegate<StartModuleTestRequest, StartM
             ...grammarProgressList.map((p): [string, number] => [p.grammarConceptId, p.masteryScore]),
         ]);
 
-        // F08 unconstrained selection — no fresh/repeat split, no coverage override
-        const selected = selectExercises({
-            pool: allExercises,
+        // F11 split-selection: guarantee a 60% hard floor for translation_active exercises.
+        // Step 1 fills the floor from the translation_active-only pool (graceful cap: uses
+        // however many are available if the pool is smaller than the floor target).
+        // Step 2 fills remaining slots from all other exercises plus any leftover translation_active
+        // exercises not yet selected.
+        const targetCount = module.testQuestionCount;
+        const minTranslationActive = Math.ceil(targetCount * (MODULE_TEST_MIN_TRANSLATION_ACTIVE_PERCENT / 100));
+
+        const translationPool = allExercises.filter(e => e.type === "translation_active");
+        const otherPool = allExercises.filter(e => e.type !== "translation_active");
+
+        const translationSelected = selectExercises({
+            pool: translationPool,
             masteryByItemId,
             recentMisses: new Set(),
-            targetCount: module.testQuestionCount,
+            targetCount: Math.min(minTranslationActive, translationPool.length),
         });
+
+        const selectedIds = new Set(translationSelected.map(e => e.id));
+
+        const fillerPool = [
+            ...translationPool.filter(e => !selectedIds.has(e.id)),
+            ...otherPool,
+        ];
+
+        const stillNeeded = targetCount - translationSelected.length;
+
+        const fillerSelected = stillNeeded > 0
+            ? selectExercises({ pool: fillerPool, masteryByItemId, recentMisses: new Set(), targetCount: stillNeeded })
+            : [];
+
+        const selected = [...translationSelected, ...fillerSelected];
 
         const startedAt = now.toISOString();
 

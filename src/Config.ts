@@ -10,6 +10,15 @@ import { APIOptions, TotoControllerConfig } from 'totoms';
 export const PRACTICE_MIN_UNSEEN_VOCAB_PERCENT = 50;
 
 /**
+ * Minimum % of exercises in a Module Test (F11) that must be of type `translation_active`.
+ * Applied as a hard floor using the split-selection pattern: F08 is called first on the
+ * translation_active-only pool to fill this share, then on the remaining pool for the rest.
+ * If the translation_active pool is smaller than the floor, all available ones are used
+ * (graceful cap — no hard failure).
+ */
+export const MODULE_TEST_MIN_TRANSLATION_ACTIVE_PERCENT = 60;
+
+/**
  * Mastery score above which an exercise's linked item is considered mastered
  * and the exercise is deprioritized during selection (F08), unless the pool
  * of non-deprioritized exercises is too small to fill the session.
