@@ -4,6 +4,7 @@ import { ControllerConfig } from "../../Config";
 import { ExerciseStore } from "../../store/ExerciseStore";
 import { PracticeSessionStore } from "../../store/PracticeSessionStore";
 import { ModuleTestAttemptStore } from "../../store/ModuleTestAttemptStore";
+import { LevelTestAttemptStore } from "../../store/LevelTestAttemptStore";
 import { VocabularyItemStore } from "../../store/VocabularyItemStore";
 import { VertexAIClient, buildVertexAIClient } from "../../ai/VertexAIClient";
 
@@ -39,13 +40,14 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
      *
      * Business rules:
      * - Only translation_active exercises are eligible.
-     * - The container is resolved from either a practice session (F10) or a module test attempt (F11) —
-     *   sessionId is tried against PracticeSessionStore first, then ModuleTestAttemptStore.
+     * - The container is resolved from a practice session (F10), a module test attempt (F11), or a
+     *   level test attempt (F21) — sessionId is tried against PracticeSessionStore first, then
+     *   ModuleTestAttemptStore, then LevelTestAttemptStore.
      * - Only one verification is allowed per (sessionId, exerciseId) pair.
      * - If the AI validates the answer: for a practice session, removes the exercise from the retry
-     *   queue; for a module test attempt, flips the stored answer's isCorrect flag (there is no retry
-     *   queue). In both cases, appends the answer to the exercise's userContributedAnswers and records
-     *   the verification.
+     *   queue; for a module test or level test attempt, flips the stored answer's isCorrect flag
+     *   (neither has a retry queue). In all cases, appends the answer to the exercise's
+     *   userContributedAnswers and records the verification.
      * - If the AI rejects the answer: returns an explanation; no state is mutated.
      *
      * @param {PostExerciseAnswerVerificationRequest} req - The validated request.
@@ -62,6 +64,7 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
         const exerciseStore = new ExerciseStore(db);
         const sessionStore = new PracticeSessionStore({ db, config });
         const attemptStore = new ModuleTestAttemptStore({ db, config });
+        const levelTestAttemptStore = new LevelTestAttemptStore({ db, config });
 
         const exercise = await exerciseStore.findById(req.exerciseId);
 
@@ -73,11 +76,12 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
 
         const session = await sessionStore.findById(req.sessionId);
         const attempt = session ? null : await attemptStore.findById(req.sessionId);
+        const levelTestAttempt = (session || attempt) ? null : await levelTestAttemptStore.findById(req.sessionId);
 
-        if (!session && !attempt) throw new ValidationError(404, `Session/attempt not found for id '${req.sessionId}'`);
+        if (!session && !attempt && !levelTestAttempt) throw new ValidationError(404, `Session/attempt not found for id '${req.sessionId}'`);
 
-        const containerExerciseIds = session ? [...session.exerciseIds, ...session.retryQueue] : attempt!.exerciseIds;
-        const verifiedExerciseIds = session ? session.verifiedExerciseIds : attempt!.verifiedExerciseIds;
+        const containerExerciseIds = session ? [...session.exerciseIds, ...session.retryQueue] : (attempt ?? levelTestAttempt)!.exerciseIds;
+        const verifiedExerciseIds = session ? session.verifiedExerciseIds : (attempt ?? levelTestAttempt)!.verifiedExerciseIds;
 
         if (!containerExerciseIds.includes(req.exerciseId)) {
             throw new ValidationError(400, `Exercise '${req.exerciseId}' is not part of session/attempt '${req.sessionId}'`);
@@ -105,9 +109,12 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
             if (session) {
                 await sessionStore.removeFromRetryQueue(req.sessionId, req.exerciseId);
                 await sessionStore.addVerifiedExerciseId(req.sessionId, req.exerciseId);
-            } else {
+            } else if (attempt) {
                 await attemptStore.flipAnswerToCorrect(req.sessionId, req.exerciseId);
                 await attemptStore.addVerifiedExerciseId(req.sessionId, req.exerciseId);
+            } else {
+                await levelTestAttemptStore.flipAnswerToCorrect(req.sessionId, req.exerciseId);
+                await levelTestAttemptStore.addVerifiedExerciseId(req.sessionId, req.exerciseId);
             }
 
             await exerciseStore.appendUserContributedAnswer(req.exerciseId, req.userAnswer);
@@ -169,7 +176,7 @@ interface AIVerificationResponse {
 interface PostExerciseAnswerVerificationRequest {
     exerciseId: string;     // The id of the translation_active exercise being verified
     userAnswer: string;     // The translation the student submitted
-    sessionId: string;      // The practice session id (used for the one-per-attempt guard)
+    sessionId: string;      // The practice session, module test attempt, or level test attempt id (used for the one-per-attempt guard)
     cefrLevel: string;      // The student's CEFR level (e.g. "A1", "B2")
 }
 
