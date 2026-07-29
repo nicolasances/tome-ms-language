@@ -1,13 +1,43 @@
 import { APIOptions, TotoControllerConfig } from 'totoms';
 
 /**
- * Minimum % of each practice session (Step 2) reserved for vocabulary items the user
- * has not yet encountered in the module. Guarantees full vocabulary coverage is reached
- * within a bounded number of sessions (see F03/F10).
+ * Minimum % of each practice session (Step 2) reserved for practice items the user has not yet
+ * covered **at the module's current rung**. Guarantees a rung phase completes within a bounded
+ * number of sessions (see F10).
  *
  * This is a microservice-level tuning constant, not a per-module persisted field.
  */
 export const PRACTICE_MIN_UNSEEN_VOCAB_PERCENT = 50;
+
+/**
+ * The practice ladder (F10): the difficulty tier each exercise type belongs to.
+ *
+ * 1 · Recognition      — select or assemble from provided material
+ * 2 · Cued production  — produce a form, heavily constrained by context
+ * 3 · Free production  — produce from meaning alone
+ *
+ * `sentence_reorder` sits at rung 1 on purpose: the word tiles are supplied, so it is assembly,
+ * not production. `fill_blank` and `translation_active` carry both the vocabulary and the grammar
+ * side of their rung — see FLEXIBLE_LINKED_TYPES in the Exercise model.
+ *
+ * The rung is derived from the type; it is never stored on the exercise.
+ */
+export const PRACTICE_RUNG_TYPES: Record<number, readonly string[]> = {
+    1: ["multiple_choice", "sentence_reorder"],
+    2: ["fill_blank", "conjugation_drill"],
+    3: ["translation_active", "error_correction"],
+};
+
+/**
+ * The rung a module's practice starts at (F10).
+ */
+export const FIRST_PRACTICE_RUNG = 1;
+
+/**
+ * The last rung of the ladder. Completing it sets `practiceCompletedAt` and starts the
+ * module test unlock countdown (F11).
+ */
+export const LAST_PRACTICE_RUNG = 3;
 
 /**
  * Minimum % of exercises in a Module Test (F11) that must be of type `translation_active`.

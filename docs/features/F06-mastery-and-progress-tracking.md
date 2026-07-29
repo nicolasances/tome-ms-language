@@ -7,7 +7,7 @@
 This feature tracks, per user, how well each **vocabulary item** and each **grammar concept** is known, as a Mastery Score in [0.0–1.0] computed by a spaced-repetition (SRS) algorithm from exercise history. Mastery is the signal that drives exercise selection (F08) and the weak-areas report (F21). The two progress entities are intentionally identical mirrors (one for vocabulary, one for grammar) sharing the same SRS algorithm, so they are delivered together.
 
 **Out of scope**:
-- *When* mastery is updated — that is decided by the consuming features. Mastery is updated **continuously**: every completed exercise — in Practice (F10), the Module Test (F11), and the Level Test (F21) — updates the mastery of its linked item. This feature provides the update operation; the callers decide when to call it.
+- *When* mastery is updated — that is decided by the consuming features. Mastery is updated **continuously**: every completed exercise — in Practice (F10), the Module Test (F11), and the Level Test (F21) — updates the mastery of its linked item. This feature provides the update operation; the callers decide when to call it. The practice ladder (F10) changes nothing here: mastery stays **global and per-item**, while rung coverage is **module-scoped** and lives on F07's `UserModuleProgress`. An item's mastery is not reset or re-scoped when a module advances a rung.
 - The selection algorithm that reads mastery (→ [F08](./F08-mastery-aware-exercise-selection.md))
 
 ---

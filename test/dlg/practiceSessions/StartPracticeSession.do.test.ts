@@ -3,8 +3,7 @@ import { ObjectId } from "mongodb";
 import { StartPracticeSession } from "../../../src/dlg/practiceSessions/StartPracticeSession";
 import { Exercise } from "../../../src/model/Exercise";
 import { Module } from "../../../src/model/Module";
-import { PracticeSession } from "../../../src/model/PracticeSession";
-import { UserModuleProgress } from "../../../src/model/UserModuleProgress";
+import { RungCoverage, UserModuleProgress } from "../../../src/model/UserModuleProgress";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,26 +24,22 @@ function makeModule(overrides: Partial<ConstructorParameters<typeof Module>[0]> 
 }
 
 function makeExercise(id: string, type: string, vocabId: string): Exercise {
-    return new Exercise({
-        id,
-        moduleId: "mod-1",
-        type,
-        prompt: `prompt-${id}`,
-        answer: `answer-${id}`,
-        vocabularyItemId: vocabId,
-        grammarConceptId: null,
-    });
+    return new Exercise({ id, moduleId: "mod-1", type, prompt: `prompt-${id}`, answer: `answer-${id}`, vocabularyItemId: vocabId, grammarConceptId: null });
 }
 
-function makeProgress(vocabPracticed: string[] = []): UserModuleProgress {
+function makeGrammarExercise(id: string, type: string, grammarId: string): Exercise {
+    return new Exercise({ id, moduleId: "mod-1", type, prompt: `prompt-${id}`, answer: `answer-${id}`, vocabularyItemId: null, grammarConceptId: grammarId });
+}
+
+function makeProgress(overrides: Partial<ConstructorParameters<typeof UserModuleProgress>[0]> = {}): UserModuleProgress {
     return new UserModuleProgress({
         userId: "user-1",
         moduleId: "mod-1",
         status: "available",
         startedAt: null,
         completedAt: null,
-        vocabularyItemsPracticed: vocabPracticed,
         testAttempts: [],
+        ...overrides,
     });
 }
 
@@ -53,8 +48,7 @@ function makeProgress(vocabPracticed: string[] = []): UserModuleProgress {
  *  - modules: returns moduleDoc on findOne
  *  - exercises: returns exerciseDocs on find
  *  - userModuleProgress: returns progressDoc on findOne, replaceOne is a no-op
- *  - userVocabularyProgress: returns [] on find (no mastery yet)
- *  - userGrammarProgress: returns [] on find
+ *  - userVocabularyProgress / userGrammarProgress: return [] on find (no mastery yet)
  *  - practiceSessions: returns null on findOne (no active session), returns insertedId on insertOne
  */
 function makeMockConfig(moduleBSON: any, exerciseBSONs: any[], progressBSON: any | null) {
@@ -102,12 +96,11 @@ describe("StartPracticeSession.do", () => {
         const exercises = [
             makeExercise("ex-mc-1", "multiple_choice", "v-1"),
             makeExercise("ex-mc-2", "multiple_choice", "v-2"),
-            makeExercise("ex-t-1", "translation_active", "v-3"),
-            makeExercise("ex-t-2", "translation_active", "v-4"),
+            makeExercise("ex-mc-3", "multiple_choice", "v-3"),
+            makeExercise("ex-mc-4", "multiple_choice", "v-4"),
         ];
 
-        const progress = makeProgress([]);
-        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), makeProgress().toBSON());
         const delegate = new StartPracticeSession({} as any, config);
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
@@ -118,36 +111,187 @@ describe("StartPracticeSession.do", () => {
         assert.isString(result.startedAt);
     });
 
-    it("orders selected exercises by the type progression (multiple_choice before translation_active)", async () => {
+    it("reports the rung the session is being drawn at", async () => {
+
+        const mod = makeModule();
+        const exercises = [makeExercise("ex-fb-1", "fill_blank", "v-1"), makeExercise("ex-fb-2", "fill_blank", "v-2")];
+
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), makeProgress({ currentRung: 2 }).toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.equal(result.currentRung, 2);
+    });
+
+    it("draws only rung-1 exercises while the module is at rung 1", async () => {
 
         const mod = makeModule({ practiceSessionSize: 4 });
-        // Build 2 translation exercises and 2 multiple_choice exercises for 4 distinct vocab items
         const exercises = [
-            makeExercise("ex-t-1", "translation_active", "v-1"),
-            makeExercise("ex-t-2", "translation_active", "v-2"),
-            makeExercise("ex-mc-1", "multiple_choice", "v-3"),
-            makeExercise("ex-mc-2", "multiple_choice", "v-4"),
+            makeExercise("ex-mc-1", "multiple_choice", "v-1"),
+            makeExercise("ex-mc-2", "multiple_choice", "v-2"),
+            makeExercise("ex-fb-1", "fill_blank", "v-3"),
+            makeExercise("ex-ta-1", "translation_active", "v-4"),
         ];
 
-        const progress = makeProgress([]);
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), makeProgress({ currentRung: 1 }).toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.isNotEmpty(result.exercises);
+        for (const ex of result.exercises) assert.equal(ex.type, "multiple_choice");
+    });
+
+    it("draws only rung-2 exercises once the module has advanced to rung 2", async () => {
+
+        const mod = makeModule({ practiceSessionSize: 4 });
+        const exercises = [
+            makeExercise("ex-mc-1", "multiple_choice", "v-1"),
+            makeExercise("ex-fb-1", "fill_blank", "v-2"),
+            makeExercise("ex-cd-1", "conjugation_drill", "v-3"),
+            makeExercise("ex-ta-1", "translation_active", "v-4"),
+        ];
+
+        const progress = makeProgress({ currentRung: 2, rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1", "v-2", "v-3", "v-4"], completedAt: "2026-06-02T09:00:00.000Z" })] });
         const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
         const delegate = new StartPracticeSession({} as any, config);
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
 
-        // Multiple_choice exercises must appear before translation_active
-        const positions = result.exercises.map((ex: any) => ex.type);
-        const mcIndex = positions.indexOf("multiple_choice");
-        const tIndex = positions.indexOf("translation_active");
+        assert.isNotEmpty(result.exercises);
+        for (const ex of result.exercises) assert.include(["fill_blank", "conjugation_drill"], ex.type);
+    });
 
-        if (mcIndex !== -1 && tIndex !== -1) assert.isBelow(mcIndex, tIndex);
+    it("draws only rung-3 exercises once the module has advanced to rung 3", async () => {
+
+        const mod = makeModule({ practiceSessionSize: 4 });
+        const exercises = [
+            makeExercise("ex-mc-1", "multiple_choice", "v-1"),
+            makeExercise("ex-fb-1", "fill_blank", "v-2"),
+            makeExercise("ex-ta-1", "translation_active", "v-3"),
+            makeGrammarExercise("ex-ec-1", "error_correction", "g-1"),
+        ];
+
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), makeProgress({ currentRung: 3 }).toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.isNotEmpty(result.exercises);
+        for (const ex of result.exercises) assert.include(["translation_active", "error_correction"], ex.type);
+    });
+
+    it("treats an item covered at rung 1 as still uncovered at rung 2", async () => {
+
+        // v-1 is covered at rung 1 but not at rung 2, so its rung-2 exercise must be reserved.
+        const mod = makeModule({ vocabularyItemIds: ["v-1", "v-2"], practiceSessionSize: 2 });
+        const exercises = [makeExercise("ex-fb-1", "fill_blank", "v-1"), makeExercise("ex-fb-2", "fill_blank", "v-2")];
+
+        const progress = makeProgress({ currentRung: 2, rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1", "v-2"], completedAt: "2026-06-02T09:00:00.000Z" })] });
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.deepEqual(result.exercises.map(e => e.id).sort(), ["ex-fb-1", "ex-fb-2"]);
+    });
+
+    it("reserves the unseen slots for grammar concepts as well as vocabulary items", async () => {
+
+        const mod = makeModule({ vocabularyItemIds: ["v-1"], grammarConceptIds: ["g-1"], practiceSessionSize: 2 });
+        const exercises = [makeExercise("ex-mc-1", "multiple_choice", "v-1"), makeGrammarExercise("ex-sr-1", "sentence_reorder", "g-1")];
+
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), makeProgress().toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.deepEqual(result.exercises.map(e => e.id).sort(), ["ex-mc-1", "ex-sr-1"]);
+    });
+
+    it("prioritises items not yet covered at the current rung over already-covered ones", async () => {
+
+        // v-1 and v-2 are already covered at rung 1; v-3 and v-4 are not. Session size 2, so the
+        // 50% floor reserves at least 1 slot for the uncovered items.
+        const mod = makeModule({ vocabularyItemIds: ["v-1", "v-2", "v-3", "v-4"], practiceSessionSize: 2 });
+        const exercises = [
+            makeExercise("ex-mc-1", "multiple_choice", "v-1"),
+            makeExercise("ex-mc-2", "multiple_choice", "v-2"),
+            makeExercise("ex-mc-3", "multiple_choice", "v-3"),
+            makeExercise("ex-mc-4", "multiple_choice", "v-4"),
+        ];
+
+        const progress = makeProgress({ currentRung: 1, rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1", "v-2"] })] });
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        const uncoveredSelected = result.exercises.filter(e => ["v-3", "v-4"].includes(e.vocabularyItemId!));
+
+        assert.isAtLeast(uncoveredSelected.length, 1, "at least half the session must go to items not yet covered at this rung");
+    });
+
+    it("fills the whole session even when fewer uncovered items remain than the session size (no tail top-up)", async () => {
+
+        // Only v-4 is left uncovered at rung 1, but the session is still a full 4 exercises.
+        const mod = makeModule({ vocabularyItemIds: ["v-1", "v-2", "v-3", "v-4"], practiceSessionSize: 4 });
+        const exercises = [
+            makeExercise("ex-mc-1", "multiple_choice", "v-1"),
+            makeExercise("ex-mc-2", "multiple_choice", "v-2"),
+            makeExercise("ex-mc-3", "multiple_choice", "v-3"),
+            makeExercise("ex-mc-4", "multiple_choice", "v-4"),
+        ];
+
+        const progress = makeProgress({ currentRung: 1, rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1", "v-2", "v-3"] })] });
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.lengthOf(result.exercises, 4);
+        assert.include(result.exercises.map(e => e.id), "ex-mc-4", "the last uncovered item must be in the session so the rung can complete");
+    });
+
+    it("throws 400 when the bank holds no exercise at the module's current rung", async () => {
+
+        const mod = makeModule({ practiceSessionSize: 4 });
+        const exercises = [makeExercise("ex-mc-1", "multiple_choice", "v-1")];
+
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), makeProgress({ currentRung: 2 }).toBSON());
+        const delegate = new StartPracticeSession({} as any, config);
+
+        try {
+
+            await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+            assert.fail("Expected a 400 error");
+
+        } catch (err: any) {
+
+            assert.equal(err.code, 400);
+            assert.match(err.message, /rung 2/i);
+        }
+    });
+
+    it("starts a module with no progress record at the first rung", async () => {
+
+        const mod = makeModule({ practiceSessionSize: 2 });
+        const exercises = [makeExercise("ex-mc-1", "multiple_choice", "v-1"), makeExercise("ex-ta-1", "translation_active", "v-2")];
+
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), null);
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.equal(result.currentRung, 1);
+        assert.deepEqual(result.exercises.map(e => e.id), ["ex-mc-1"]);
     });
 
     it("throws 409 when an active session already exists for this user+module", async () => {
 
         const mod = makeModule();
-        const exercises = [makeExercise("ex-1", "translation_active", "v-1")];
-        const progress = makeProgress([]);
+        const exercises = [makeExercise("ex-1", "multiple_choice", "v-1")];
 
         const activeSessionBSON = {
             _id: new ObjectId(),
@@ -166,7 +310,7 @@ describe("StartPracticeSession.do", () => {
             modules: { findOne: async () => mod.toBSON() },
             exercises: { find: () => ({ toArray: async () => exercises.map(e => e.toBSON()) }) },
             userModuleProgress: {
-                findOne: async () => progress.toBSON(),
+                findOne: async () => makeProgress().toBSON(),
                 replaceOne: async () => ({ upsertedCount: 1 }),
             },
             userVocabularyProgress: { find: () => ({ toArray: async () => [] }) },
@@ -225,41 +369,12 @@ describe("StartPracticeSession.do", () => {
         }
     });
 
-    it("reserves unseen-vocab exercises when coverage is not yet complete", async () => {
-
-        // 4 vocab items, none practiced yet. Session size 4.
-        // All 4 exercises link to unseen vocab — all must be selected.
-        const mod = makeModule({ vocabularyItemIds: ["v-1", "v-2", "v-3", "v-4"], practiceSessionSize: 4 });
-        const exercises = [
-            makeExercise("ex-1", "translation_active", "v-1"),
-            makeExercise("ex-2", "translation_active", "v-2"),
-            makeExercise("ex-3", "translation_active", "v-3"),
-            makeExercise("ex-4", "translation_active", "v-4"),
-        ];
-
-        const progress = makeProgress([]); // nothing practiced yet
-        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
-        const delegate = new StartPracticeSession({} as any, config);
-
-        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
-
-        // All selected exercises must target unseen vocab (v-1..v-4, none practiced)
-        assert.lengthOf(result.exercises, 4);
-        for (const ex of result.exercises) {
-            assert.include(["v-1", "v-2", "v-3", "v-4"], ex.vocabularyItemId);
-        }
-    });
-
     it("embeds full exercise objects (id, type, prompt, answer) in the exercises field", async () => {
 
         const mod = makeModule({ practiceSessionSize: 2 });
-        const exercises = [
-            makeExercise("ex-mc-1", "multiple_choice", "v-1"),
-            makeExercise("ex-mc-2", "multiple_choice", "v-2"),
-        ];
+        const exercises = [makeExercise("ex-mc-1", "multiple_choice", "v-1"), makeExercise("ex-mc-2", "multiple_choice", "v-2")];
 
-        const progress = makeProgress([]);
-        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), progress.toBSON());
+        const config = makeMockConfig(mod.toBSON(), exercises.map(e => e.toBSON()), makeProgress().toBSON());
         const delegate = new StartPracticeSession({} as any, config);
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);

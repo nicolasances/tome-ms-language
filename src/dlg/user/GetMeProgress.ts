@@ -96,7 +96,13 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
             }
 
             const step = deriveStep(status, progress?.practiceCompletedAt);
-            const completionPct = m.vocabularyItemIds.length > 0 ? Math.round(((progress?.vocabularyItemsPracticed.length ?? 0) / m.vocabularyItemIds.length) * 100) : 0;
+
+            // Vocabulary coverage across all rungs of the practice ladder (F10). A module completed
+            // before the ladder shipped carries no rung coverage at all, so it is reported as fully
+            // covered rather than reading as 0% on the module map.
+            const coveredItemIds = progress?.coveredItemIds() ?? new Set<string>();
+            const vocabularyItemsPracticedCount = status === "completed" ? m.vocabularyItemIds.length : m.vocabularyItemIds.filter(id => coveredItemIds.has(id)).length;
+            const completionPct = m.vocabularyItemIds.length > 0 ? Math.round((vocabularyItemsPracticedCount / m.vocabularyItemIds.length) * 100) : 0;
 
             // testUnlocksAt: practiceCompletedAt (Step 2 complete) + module unlock delay; null until Step 2 completes
             let testUnlocksAt: string | null = null;
@@ -128,7 +134,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 completedAt: progress?.completedAt ?? null,
                 testUnlocksAt,
                 testRetryAvailableAt,
-                vocabularyItemsPracticedCount: progress?.vocabularyItemsPracticed.length ?? 0,
+                vocabularyItemsPracticedCount,
             });
 
             previousModule = m;
@@ -159,7 +165,7 @@ interface ModuleProgressEntry {
     completedAt: string | null;                 // ISO-8601 timestamp of when the module was completed
     testUnlocksAt: string | null;               // ISO-8601 timestamp of when the Module Test unlocks; null until Step 2 coverage is complete
     testRetryAvailableAt: string | null;        // ISO-8601 timestamp of when a failed test retry becomes available; null when no failed attempts exist
-    vocabularyItemsPracticedCount: number;      // Number of unique vocabulary items the user has encountered across all practice sessions for this module
+    vocabularyItemsPracticedCount: number;      // Number of the module's vocabulary items covered at any rung of the practice ladder; the module's full vocabulary count once it is completed
 }
 
 interface GetMeProgressResponse {

@@ -1,5 +1,5 @@
 import { assert } from "chai";
-import { UserModuleProgress, TestAttemptRecord } from "../../src/model/UserModuleProgress";
+import { UserModuleProgress, RungCoverage, TestAttemptRecord } from "../../src/model/UserModuleProgress";
 import { UserModuleProgressStore } from "../../src/store/UserModuleProgressStore";
 
 function makeProgress(overrides: Partial<ConstructorParameters<typeof UserModuleProgress>[0]> = {}): UserModuleProgress {
@@ -78,13 +78,33 @@ describe("UserModuleProgressStore.transitionStatus", () => {
         assert.equal(result.testAttempts[0].id, "att-1");
     });
 
-    it("preserves vocabularyItemsPracticed from the existing record during a status transition", async () => {
-        const docs = [makeProgress({ status: "in_progress", vocabularyItemsPracticed: ["v-1", "v-2"] }).toBSON()];
+    it("preserves rungCoverage from the existing record during a status transition", async () => {
+        const docs = [makeProgress({ status: "in_progress", rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1", "v-2"], completedAt: "2026-06-02T08:00:00.000Z" })] }).toBSON()];
         const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });
 
         const result = await store.transitionStatus("user-1", "mod-1", "completed");
 
-        assert.deepEqual(result.vocabularyItemsPracticed, ["v-1", "v-2"]);
+        assert.equal(result.rungCoverage.length, 1);
+        assert.deepEqual(result.rungCoverage[0].itemIds, ["v-1", "v-2"]);
+        assert.equal(result.rungCoverage[0].completedAt, "2026-06-02T08:00:00.000Z");
+    });
+
+    it("preserves currentRung from the existing record during a status transition", async () => {
+        const docs = [makeProgress({ status: "in_progress", currentRung: 3 }).toBSON()];
+        const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });
+
+        const result = await store.transitionStatus("user-1", "mod-1", "completed");
+
+        assert.equal(result.currentRung, 3);
+    });
+
+    it("starts a brand-new record at the first rung with no coverage", async () => {
+        const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection([])), config: {} as any });
+
+        const result = await store.transitionStatus("user-1", "mod-1", "in_progress");
+
+        assert.equal(result.currentRung, 1);
+        assert.deepEqual(result.rungCoverage, []);
     });
 
     it("sets practiceCompletedAt when provided and none exists yet", async () => {

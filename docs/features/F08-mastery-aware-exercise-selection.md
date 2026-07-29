@@ -8,7 +8,7 @@ This feature is the personalization engine: given a pool of exercises (a module 
 
 **Out of scope**:
 - The session/test lifecycle around the selection (→ [F10](./F10-practice-session.md), [F11](./F11-module-test.md), [F21](./F21-level-test.md))
-- The practice-time **coverage override** (reserving a share of each practice session for unseen vocabulary) — that constraint is applied by F10 on top of this engine; the Module Test (F11) and Level Test (F21) draw purely from the unconstrained algorithm below
+- The practice-time **rung pre-filter and coverage override** (restricting the pool to the module's current rung, and reserving a share of each practice session for items not yet covered at that rung) — both are applied by F10 on top of this engine, which simply receives an already-filtered pool and needs no change for the practice ladder. The Module Test (F11) and Level Test (F21) draw purely from the unconstrained algorithm below, over the full pool
 
 ---
 
