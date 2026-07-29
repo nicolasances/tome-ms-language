@@ -133,10 +133,17 @@ describe("PostExercises.parseRequest", () => {
         assert.throws(() => delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises: [noLink] })), /vocabularyItemId|grammarConceptId/i);
     });
 
-    it("throws 400 when a vocabulary type uses grammarConceptId instead of vocabularyItemId", () => {
+    it("throws 400 when multiple_choice uses grammarConceptId instead of vocabularyItemId", () => {
 
         const delegate = new PostExercises({} as any, {} as any);
-        const exercises = [{ type: "translation_active", prompt: "...", answer: "...", grammarConceptId: "grammar-1" }];
+        const exercises = [{ ...validMultipleChoice, vocabularyItemId: undefined, grammarConceptId: "grammar-1" }];
+        assert.throws(() => delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises })), /vocabularyItemId/i);
+    });
+
+    it("throws 400 when conjugation_drill uses grammarConceptId instead of vocabularyItemId", () => {
+
+        const delegate = new PostExercises({} as any, {} as any);
+        const exercises = [{ ...validConjugationDrill, vocabularyItemId: undefined, grammarConceptId: "grammar-1" }];
         assert.throws(() => delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises })), /vocabularyItemId/i);
     });
 
@@ -145,6 +152,51 @@ describe("PostExercises.parseRequest", () => {
         const delegate = new PostExercises({} as any, {} as any);
         const exercises = [{ ...validSentenceReorder, grammarConceptId: undefined, vocabularyItemId: "vocab-1" }];
         assert.throws(() => delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises })), /grammarConceptId/i);
+    });
+
+    it("throws 400 when error_correction uses vocabularyItemId instead of grammarConceptId", () => {
+
+        const delegate = new PostExercises({} as any, {} as any);
+        const exercises = [{ ...validErrorCorrection, grammarConceptId: undefined, vocabularyItemId: "vocab-1" }];
+        assert.throws(() => delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises })), /grammarConceptId/i);
+    });
+
+    it("accepts a grammar-linked fill_blank (rung-2 grammar exercise)", () => {
+
+        const delegate = new PostExercises({} as any, {} as any);
+        const exercises = [{ ...validFillBlank, vocabularyItemId: undefined, grammarConceptId: "grammar-1" }];
+
+        const parsed = delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises }));
+
+        assert.equal(parsed.exercises[0].grammarConceptId, "grammar-1");
+        assert.isNull(parsed.exercises[0].vocabularyItemId);
+    });
+
+    it("accepts a grammar-linked translation_active (rung-3 grammar exercise)", () => {
+
+        const delegate = new PostExercises({} as any, {} as any);
+        const exercises = [{ ...validTranslationActive, vocabularyItemId: undefined, grammarConceptId: "grammar-2" }];
+
+        const parsed = delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises }));
+
+        assert.equal(parsed.exercises[0].grammarConceptId, "grammar-2");
+        assert.isNull(parsed.exercises[0].vocabularyItemId);
+    });
+
+    it("still accepts a vocabulary-linked fill_blank", () => {
+
+        const delegate = new PostExercises({} as any, {} as any);
+        const parsed = delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises: [validFillBlank] }));
+
+        assert.equal(parsed.exercises[0].vocabularyItemId, "vocab-3");
+        assert.isNull(parsed.exercises[0].grammarConceptId);
+    });
+
+    it("still rejects a flexible type that sets both ids", () => {
+
+        const delegate = new PostExercises({} as any, {} as any);
+        const exercises = [{ ...validFillBlank, grammarConceptId: "grammar-1" }];
+        assert.throws(() => delegate.parseRequest(makeReq({ moduleId: "mod-1", exercises })), /not both/i);
     });
 
     it("throws 400 when sentence_reorder is missing words", () => {

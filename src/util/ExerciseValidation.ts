@@ -16,6 +16,12 @@ export interface ParsedExerciseInput {
 /**
  * Validates and parses a single exercise input object from a request body.
  * Enforces type validity, required fields, and the vocabularyItemId/grammarConceptId linkage rule.
+ *
+ * Linkage rule (F04): exactly one of vocabularyItemId / grammarConceptId must be set. Which one is
+ * allowed depends on the type — multiple_choice and conjugation_drill are vocabulary-linked,
+ * sentence_reorder and error_correction are grammar-linked, and fill_blank / translation_active may
+ * link to either (they carry both the vocabulary and the grammar rungs of the practice ladder, F10).
+ *
  * promptTranslation is required for multiple_choice, fill_blank, error_correction (Danish prompt → needs English context).
  * sentence_reorder and translation_active carry the English meaning in the prompt itself — promptTranslation is null.
  * Throws ValidationError on any violation.

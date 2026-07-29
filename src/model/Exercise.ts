@@ -2,8 +2,24 @@ import { WithId } from "mongodb";
 
 export const EXERCISE_TYPES = ["translation_active", "multiple_choice", "fill_blank", "sentence_reorder", "error_correction", "conjugation_drill"] as const;
 
-export const VOCAB_LINKED_TYPES = ["translation_active", "multiple_choice", "fill_blank", "conjugation_drill"] as const;
+/**
+ * Types that must link to a vocabulary item. Their `grammarConceptId` is always null.
+ */
+export const VOCAB_LINKED_TYPES = ["multiple_choice", "conjugation_drill"] as const;
+
+/**
+ * Types that must link to a grammar concept. Their `vocabularyItemId` is always null.
+ */
 export const GRAMMAR_LINKED_TYPES = ["sentence_reorder", "error_correction"] as const;
+
+/**
+ * Types that may link to *either* a vocabulary item or a grammar concept, chosen by what the
+ * exercise actually tests (F04). The "exactly one of the two is set" invariant still applies.
+ *
+ * These two types are what make the practice ladder (F10) expressible: without a grammar-linked
+ * `fill_blank` grammar has no rung-2 exercise type at all.
+ */
+export const FLEXIBLE_LINKED_TYPES = ["fill_blank", "translation_active"] as const;
 
 export const PROMPT_TRANSLATION_REQUIRED_TYPES = ["multiple_choice", "fill_blank", "error_correction"] as const;
 
