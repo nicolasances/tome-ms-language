@@ -231,6 +231,92 @@ describe("CompletePracticeSession.do", () => {
         assert.deepEqual(getProgress()!.coverageAt(1)!.itemIds, ["v-1", "v-2"]);
     });
 
+    it("does not credit an item whose exercise was answered wrong and never retried", async () => {
+
+        const oid = new ObjectId();
+        const exercises = [makeExerciseBSON("ex-1", "multiple_choice", "v-1"), makeExerciseBSON("ex-2", "multiple_choice", "v-2")];
+        const session = makeSessionBSON(oid, ["ex-1", "ex-2"], [makeAnswer("ex-1", true), makeAnswer("ex-2", false)]);
+
+        const { config, getProgress } = makeMockConfig({ sessionBSON: session, exerciseBSONs: exercises, moduleBSON: makeModule(["v-1", "v-2"]).toBSON(), progressBSON: makeProgressBSON({ currentRung: 1 }) });
+        const delegate = new CompletePracticeSession({} as any, config);
+
+        await delegate.do({ userId: "user-1", sessionId: oid.toString() }, { userId: "user-1" } as any);
+
+        assert.deepEqual(getProgress()!.coverageAt(1)!.itemIds, ["v-1"]);
+    });
+
+    it("credits an item once the retry queue produces a correct answer", async () => {
+
+        const oid = new ObjectId();
+        const exercises = [makeExerciseBSON("ex-1", "multiple_choice", "v-1")];
+        const session = makeSessionBSON(oid, ["ex-1"], [makeAnswer("ex-1", false), makeAnswer("ex-1", true)]);
+
+        const { config, getProgress } = makeMockConfig({ sessionBSON: session, exerciseBSONs: exercises, moduleBSON: makeModule(["v-1"]).toBSON(), progressBSON: makeProgressBSON({ currentRung: 1 }) });
+        const delegate = new CompletePracticeSession({} as any, config);
+
+        await delegate.do({ userId: "user-1", sessionId: oid.toString() }, { userId: "user-1" } as any);
+
+        assert.deepEqual(getProgress()!.coverageAt(1)!.itemIds, ["v-1"]);
+    });
+
+    it("credits an item whose answer was accepted by AI verification, which never flips isCorrect", async () => {
+
+        const oid = new ObjectId();
+        const exercises = [makeExerciseBSON("ex-1", "translation_active", "v-1")];
+        const session = makeSessionBSON(oid, ["ex-1"], [makeAnswer("ex-1", false)], { verifiedExerciseIds: ["ex-1"] });
+
+        const { config, getProgress } = makeMockConfig({ sessionBSON: session, exerciseBSONs: exercises, moduleBSON: makeModule(["v-1"]).toBSON(), progressBSON: makeProgressBSON({ currentRung: 3 }) });
+        const delegate = new CompletePracticeSession({} as any, config);
+
+        await delegate.do({ userId: "user-1", sessionId: oid.toString() }, { userId: "user-1" } as any);
+
+        assert.deepEqual(getProgress()!.coverageAt(3)!.itemIds, ["v-1"]);
+    });
+
+    it("credits an item when any one of its exercises was answered correctly", async () => {
+
+        const oid = new ObjectId();
+        const exercises = [makeExerciseBSON("ex-1", "multiple_choice", "v-1"), makeExerciseBSON("ex-2", "multiple_choice", "v-1")];
+        const session = makeSessionBSON(oid, ["ex-1", "ex-2"], [makeAnswer("ex-1", false), makeAnswer("ex-2", true)]);
+
+        const { config, getProgress } = makeMockConfig({ sessionBSON: session, exerciseBSONs: exercises, moduleBSON: makeModule(["v-1"]).toBSON(), progressBSON: makeProgressBSON({ currentRung: 1 }) });
+        const delegate = new CompletePracticeSession({} as any, config);
+
+        await delegate.do({ userId: "user-1", sessionId: oid.toString() }, { userId: "user-1" } as any);
+
+        assert.deepEqual(getProgress()!.coverageAt(1)!.itemIds, ["v-1"]);
+    });
+
+    it("does not complete the rung when the last uncovered item was only answered wrong", async () => {
+
+        const oid = new ObjectId();
+        const exercises = [makeExerciseBSON("ex-2", "multiple_choice", "v-2")];
+        const session = makeSessionBSON(oid, ["ex-2"], [makeAnswer("ex-2", false)]);
+        const progress = makeProgressBSON({ currentRung: 1, rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1"] })] });
+
+        const { config, getProgress } = makeMockConfig({ sessionBSON: session, exerciseBSONs: exercises, moduleBSON: makeModule(["v-1", "v-2"]).toBSON(), progressBSON: progress });
+        const delegate = new CompletePracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", sessionId: oid.toString() }, { userId: "user-1" } as any);
+
+        assert.isFalse(result.rungCompleted);
+        assert.equal(getProgress()!.currentRung, 1);
+    });
+
+    it("still updates mastery for an exercise that was never answered correctly", async () => {
+
+        const oid = new ObjectId();
+        const exercises = [makeExerciseBSON("ex-1", "multiple_choice", "v-1")];
+        const session = makeSessionBSON(oid, ["ex-1"], [makeAnswer("ex-1", false)]);
+
+        const { config, calls } = makeMockConfig({ sessionBSON: session, exerciseBSONs: exercises, moduleBSON: makeModule(["v-1"]).toBSON(), progressBSON: makeProgressBSON() });
+        const delegate = new CompletePracticeSession({} as any, config);
+
+        await delegate.do({ userId: "user-1", sessionId: oid.toString() }, { userId: "user-1" } as any);
+
+        assert.equal(calls.filter(c => c === "upsertVocabProgress").length, 1, "a wrong attempt must still move mastery");
+    });
+
     it("records grammar concepts as covered alongside vocabulary items", async () => {
 
         const oid = new ObjectId();

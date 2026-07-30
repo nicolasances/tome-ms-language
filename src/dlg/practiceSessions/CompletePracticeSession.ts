@@ -94,8 +94,21 @@ export class CompletePracticeSession extends TotoDelegate<CompletePracticeSessio
         const practiceItemIds = module ? [...module.vocabularyItemIds, ...module.grammarConceptIds] : [];
         const coveredBefore = new Set(progressBefore?.coverageAt(currentRung)?.itemIds ?? []);
 
-        // An item is covered at rung r when it was served a tier-r exercise in a completed session
-        const coveredThisSession = [...new Set(exercises.filter(e => rungOfType(e.type) === currentRung).map(e => linkedItemIdOf(e)))];
+        // An item is covered at rung r when it was served a tier-r exercise AND answered correctly.
+        // The retry queue is supposed to guarantee the second half — it re-presents a missed exercise
+        // until it is right — but that loop is driven entirely by the client and nothing here can
+        // verify it ran: retryQueue only ever grows, so it cannot distinguish "loop ran" from "loop
+        // skipped". Deriving correctness from the answer log instead makes the guarantee the
+        // ladder rests on hold server-side.
+        //
+        // An uncredited item is not an error and does not block the session: it simply stays
+        // uncovered and resurfaces in the next session's unseen reservation.
+        const correctlyAnsweredExerciseIds = new Set([
+            ...session.answers.filter(a => a.isCorrect).map(a => a.exerciseId),
+            ...session.verifiedExerciseIds,  // F13 accepted the answer without flipping isCorrect on the session
+        ]);
+
+        const coveredThisSession = [...new Set(exercises.filter(e => rungOfType(e.type) === currentRung && correctlyAnsweredExerciseIds.has(e.id)).map(e => linkedItemIdOf(e)))];
 
         const progressAfter = await userModuleProgressStore.appendRungCoverage(req.userId, session.moduleId, currentRung, coveredThisSession);
 

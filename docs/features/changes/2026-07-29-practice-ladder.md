@@ -54,6 +54,7 @@ Loosening the F04 binding is a prerequisite, not an independent improvement: und
 - **Modify**: `StartPracticeSession` filters the pool to `currentRung`, scopes the unseen reservation to items uncovered at that rung (grammar included), and returns `currentRung`.
 - **Add**: `StartPracticeSession` returns **400** when the bank holds no exercise at the current rung, instead of creating a zero-exercise session.
 - **Modify**: `CompletePracticeSession` records per-rung coverage, completes and advances the rung, and only sets `practiceCompletedAt` when the last rung completes.
+- **Add**: coverage is credited only for exercises with at least one correct answer in the session's answer log, or listed in `verifiedExerciseIds` (F13 accepts an answer without flipping `isCorrect` on a practice session). The retry loop that would otherwise guarantee this is client-driven and cannot be evidenced from `retryQueue`, which only ever grows. An uncredited item is not an error — it stays uncovered and returns in the next session.
 - **Modify**: `CompletePracticeSession` fetches the session's exercises in one bulk `findByIds` instead of one query per answer.
 - **Add**: `/complete` response fields `currentRung`, `previousRung`, `rungCompleted`, `ladderCompleted`, `rungsCompletedBefore`, `rungsCompletedAfter`, `rungCoverageBefore`, `rungCoverageAfter`, `vocabularyCoverage`.
 - **Keep**: `/complete` still returns `step2Complete` and `unseenVocabCount` so the app build predating the ladder keeps working.
