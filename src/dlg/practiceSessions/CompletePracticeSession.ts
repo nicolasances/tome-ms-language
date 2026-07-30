@@ -10,6 +10,23 @@ import { UserModuleProgressStore } from "../../store/UserModuleProgressStore";
 import { UserVocabularyProgressStore } from "../../store/UserVocabularyProgressStore";
 import { linkedItemIdOf, rungOfType } from "../../util/PracticeRungs";
 
+/**
+ * Raised when `/complete` is called while the session still holds exercises the user has not
+ * answered correctly — the missed-retry loop (F10) has not been driven to the end.
+ *
+ * Carries the outstanding exercise ids so the client can resume the retry loop on exactly those,
+ * rather than having to diff the session state itself.
+ */
+class IncompleteSessionError extends ValidationError {
+
+    outstandingExerciseIds: string[];
+
+    constructor(outstandingExerciseIds: string[]) {
+        super(400, `Session cannot be completed: ${outstandingExerciseIds.length} exercise(s) have not been answered correctly yet`);
+        this.outstandingExerciseIds = outstandingExerciseIds;
+    }
+}
+
 export class CompletePracticeSession extends TotoDelegate<CompletePracticeSessionRequest, CompletePracticeSessionResponse> {
 
     parseRequest(req: Request): CompletePracticeSessionRequest {
@@ -59,10 +76,29 @@ export class CompletePracticeSession extends TotoDelegate<CompletePracticeSessio
 
         const now = new Date().toISOString();
 
-        const attemptedExerciseIds = [...new Set(session.answers.map(a => a.exerciseId))];
-
-        const exercises = await exerciseStore.findByIds(attemptedExerciseIds);
+        const exercises = await exerciseStore.findByIds(session.exerciseIds);
         const exerciseById = new Map(exercises.map(e => [e.id, e]));
+
+        // An exercise counts as correct when it has at least one correct answer, or when F13
+        // accepted the answer — verification records the id in verifiedExerciseIds rather than
+        // flipping isCorrect on a practice session.
+        const correctlyAnsweredExerciseIds = new Set([
+            ...session.answers.filter(a => a.isCorrect).map(a => a.exerciseId),
+            ...session.verifiedExerciseIds,
+        ]);
+
+        // The missed-retry loop (F10) must have been driven to the end before a session may close:
+        // it is what makes "covered at a rung" mean "produced correctly at that rung", which is the
+        // guarantee the whole ladder rests on. It cannot be evidenced from retryQueue — that array
+        // only ever grows, since SubmitPracticeAnswer pushes on every wrong answer and nothing pulls
+        // on a correct retry — so it is checked against the session's own answer log instead.
+        //
+        // Rejecting rather than partially crediting keeps the request atomic: nothing below has run
+        // yet, so a refused completion writes neither mastery nor coverage. The client recovers
+        // through the ordinary flow — answer the outstanding exercises, call complete again.
+        const outstandingExerciseIds = session.exerciseIds.filter(id => !correctlyAnsweredExerciseIds.has(id));
+
+        if (outstandingExerciseIds.length > 0) throw new IncompleteSessionError(outstandingExerciseIds);
 
         // Update mastery for every attempt in the session (retry-queue repeats included)
         for (const answer of session.answers) {
@@ -94,20 +130,10 @@ export class CompletePracticeSession extends TotoDelegate<CompletePracticeSessio
         const practiceItemIds = module ? [...module.vocabularyItemIds, ...module.grammarConceptIds] : [];
         const coveredBefore = new Set(progressBefore?.coverageAt(currentRung)?.itemIds ?? []);
 
-        // An item is covered at rung r when it was served a tier-r exercise AND answered correctly.
-        // The retry queue is supposed to guarantee the second half — it re-presents a missed exercise
-        // until it is right — but that loop is driven entirely by the client and nothing here can
-        // verify it ran: retryQueue only ever grows, so it cannot distinguish "loop ran" from "loop
-        // skipped". Deriving correctness from the answer log instead makes the guarantee the
-        // ladder rests on hold server-side.
-        //
-        // An uncredited item is not an error and does not block the session: it simply stays
-        // uncovered and resurfaces in the next session's unseen reservation.
-        const correctlyAnsweredExerciseIds = new Set([
-            ...session.answers.filter(a => a.isCorrect).map(a => a.exerciseId),
-            ...session.verifiedExerciseIds,  // F13 accepted the answer without flipping isCorrect on the session
-        ]);
-
+        // An item is covered at rung r when it was served a tier-r exercise and answered correctly.
+        // The correctness filter is redundant given the precondition checked above — by here every
+        // exercise in the session is correct — but it keeps the coverage write self-evidently right
+        // rather than depending on a guard forty lines away.
         const coveredThisSession = [...new Set(exercises.filter(e => rungOfType(e.type) === currentRung && correctlyAnsweredExerciseIds.has(e.id)).map(e => linkedItemIdOf(e)))];
 
         const progressAfter = await userModuleProgressStore.appendRungCoverage(req.userId, session.moduleId, currentRung, coveredThisSession);
