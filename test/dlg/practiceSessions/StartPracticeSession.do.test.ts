@@ -124,8 +124,13 @@ describe("StartPracticeSession.do", () => {
         assert.equal(result.currentRung, 2);
     });
 
-    it("draws only rung-1 exercises while the module is at rung 1", async () => {
+    it("draws only rung-1 exercises, ignoring the rest of the bank", async () => {
 
+        // Deliberately undersized fixture: only 2 of the 4 exercises are rung 1, against a session
+        // size of 4. A real bank cannot look like this — the generation floor puts >=1 exercise per
+        // item at every rung, so the rung pool always exceeds practiceSessionSize. Here the session
+        // is 2 exercises, which pins down that the filter drops the off-rung ones outright rather
+        // than falling back to them to fill the session.
         const mod = makeModule({ practiceSessionSize: 4 });
         const exercises = [
             makeExercise("ex-mc-1", "multiple_choice", "v-1"),
@@ -139,8 +144,7 @@ describe("StartPracticeSession.do", () => {
 
         const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
 
-        assert.isNotEmpty(result.exercises);
-        for (const ex of result.exercises) assert.equal(ex.type, "multiple_choice");
+        assert.deepEqual(result.exercises.map(e => e.id).sort(), ["ex-mc-1", "ex-mc-2"]);
     });
 
     it("draws only rung-2 exercises once the module has advanced to rung 2", async () => {
