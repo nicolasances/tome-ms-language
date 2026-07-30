@@ -379,6 +379,50 @@ describe("CompletePracticeSession.do", () => {
         assert.isString(getProgress()!.coverageAt(1)!.completedAt);
     });
 
+    it("completes the rung when a mixed vocabulary + grammar session covers the last of both", async () => {
+
+        // Module holds 2 vocabulary items and 1 grammar concept; only v-1 is covered so far.
+        // This session covers v-2 and g-1 together, which is what completes rung 1.
+        const oid = new ObjectId();
+        const exercises = [makeExerciseBSON("ex-mc", "multiple_choice", "v-2"), makeExerciseBSON("ex-sr", "sentence_reorder", null, "g-1")];
+        const session = makeSessionBSON(oid, ["ex-mc", "ex-sr"], [makeAnswer("ex-mc", true), makeAnswer("ex-sr", true)]);
+        const progress = makeProgressBSON({ currentRung: 1, rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1"] })] });
+
+        const { config, getProgress } = makeMockConfig({ sessionBSON: session, exerciseBSONs: exercises, moduleBSON: makeModule(["v-1", "v-2"], ["g-1"]).toBSON(), progressBSON: progress });
+        const delegate = new CompletePracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", sessionId: oid.toString() }, { userId: "user-1" } as any);
+
+        assert.deepEqual(getProgress()!.coverageAt(1)!.itemIds, ["v-1", "v-2", "g-1"]);
+        assert.isTrue(result.rungCompleted);
+        assert.equal(result.currentRung, 2);
+        assert.equal(result.rungCoverageAfter.coveredCount, 3, "vocabulary items and grammar concepts count toward the same total");
+        assert.equal(result.rungCoverageAfter.totalCount, 3);
+        assert.equal(getProgress()!.currentRung, 2);
+        assert.isString(getProgress()!.coverageAt(1)!.completedAt);
+    });
+
+    it("completes rung 2 with a grammar concept covered by a grammar-linked fill_blank", async () => {
+
+        // The rung-2 grammar type only exists because F04 lets fill_blank link to a grammar
+        // concept. Without it a rung-2 phase covering grammar could never complete.
+        const oid = new ObjectId();
+        const exercises = [makeExerciseBSON("ex-fb-v", "fill_blank", "v-1"), makeExerciseBSON("ex-fb-g", "fill_blank", null, "g-1")];
+        const session = makeSessionBSON(oid, ["ex-fb-v", "ex-fb-g"], [makeAnswer("ex-fb-v", true), makeAnswer("ex-fb-g", true)]);
+        const progress = makeProgressBSON({ currentRung: 2, rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1", "g-1"], completedAt: "2026-06-08T09:00:00.000Z" })] });
+
+        const { config, getProgress } = makeMockConfig({ sessionBSON: session, exerciseBSONs: exercises, moduleBSON: makeModule(["v-1"], ["g-1"]).toBSON(), progressBSON: progress });
+        const delegate = new CompletePracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", sessionId: oid.toString() }, { userId: "user-1" } as any);
+
+        assert.deepEqual(getProgress()!.coverageAt(2)!.itemIds, ["v-1", "g-1"]);
+        assert.isTrue(result.rungCompleted);
+        assert.isFalse(result.ladderCompleted);
+        assert.equal(result.currentRung, 3);
+        assert.equal(result.rungsCompletedAfter, 2);
+    });
+
     it("does not complete the rung while a grammar concept is still uncovered", async () => {
 
         const oid = new ObjectId();
