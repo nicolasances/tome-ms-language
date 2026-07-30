@@ -127,7 +127,7 @@ export class CompletePracticeSession extends TotoDelegate<CompletePracticeSessio
         const currentRung = progressBefore?.currentRung ?? FIRST_PRACTICE_RUNG;
         const rungWasAlreadyComplete = progressBefore?.coverageAt(currentRung)?.completedAt != null;
 
-        const practiceItemIds = module ? [...module.vocabularyItemIds, ...module.grammarConceptIds] : [];
+        const modulePracticeItemIds = module ? [...module.vocabularyItemIds, ...module.grammarConceptIds] : [];
         const coveredBefore = new Set(progressBefore?.coverageAt(currentRung)?.itemIds ?? []);
 
         // An item is covered at rung r when it was served a tier-r exercise and answered correctly.
@@ -140,7 +140,7 @@ export class CompletePracticeSession extends TotoDelegate<CompletePracticeSessio
 
         const coveredAfter = new Set(progressAfter?.coverageAt(currentRung)?.itemIds ?? []);
 
-        const rungCompleted = !rungWasAlreadyComplete && practiceItemIds.length > 0 && practiceItemIds.every(id => coveredAfter.has(id));
+        const rungCompleted = !rungWasAlreadyComplete && modulePracticeItemIds.length > 0 && modulePracticeItemIds.every(id => coveredAfter.has(id));
         const ladderCompleted = rungCompleted && currentRung === LAST_PRACTICE_RUNG;
 
         if (rungCompleted) {
@@ -166,8 +166,8 @@ export class CompletePracticeSession extends TotoDelegate<CompletePracticeSessio
             ladderCompleted,
             rungsCompletedBefore,
             rungsCompletedAfter: rungCompleted ? rungsCompletedBefore + 1 : rungsCompletedBefore,
-            rungCoverageBefore: { rung: currentRung, coveredCount: coveredBefore.size, totalCount: practiceItemIds.length },
-            rungCoverageAfter: { rung: currentRung, coveredCount: coveredAfter.size, totalCount: practiceItemIds.length },
+            rungCoverageBefore: { rung: currentRung, coveredCount: coveredBefore.size, totalCount: modulePracticeItemIds.length },
+            rungCoverageAfter: { rung: currentRung, coveredCount: coveredAfter.size, totalCount: modulePracticeItemIds.length },
             vocabularyCoverage: { coveredCount: vocabCoveredCount, totalCount: moduleVocabIds.length },
             step2Complete: ladderCompleted,
             unseenVocabCount: moduleVocabIds.length - vocabCoveredCount,
