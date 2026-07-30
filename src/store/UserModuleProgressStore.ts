@@ -39,23 +39,30 @@ export class UserModuleProgressStore {
     /**
      * Transitions a module's status (in_progress | completed) for a user, upserting the record.
      *
+     * **`completed` is terminal.** A module that has been passed is never moved back to
+     * `in_progress`: re-entering it via "Keep practising" starts a session, which would otherwise
+     * un-complete it, hiding it from F21's level-test gate (which requires every module at the
+     * level to be `completed`) and re-showing the module test on the dashboard.
+     *
      * Idempotent timestamps: startedAt is set once on the first in_progress transition and
      * never overwritten; practiceCompletedAt is set once (whenever first provided) and never
-     * overwritten. completedAt, currentRung, rungCoverage and testAttempts carry over from any
-     * existing record across transitions.
+     * overwritten. currentRung, rungCoverage and testAttempts carry over from any existing
+     * record across transitions.
      *
      * @param userId the user id
      * @param moduleId the module id
-     * @param status the new status: "in_progress" or "completed"
+     * @param requestedStatus the status to move to: "in_progress" or "completed"
      * @param practiceCompletedAt optional ISO timestamp marking completion of the whole practice ladder (rung 3 covered)
      *
      * @return the upserted progress record
      */
-    async transitionStatus(userId: string, moduleId: string, status: "in_progress" | "completed", practiceCompletedAt?: string): Promise<UserModuleProgress> {
+    async transitionStatus(userId: string, moduleId: string, requestedStatus: "in_progress" | "completed", practiceCompletedAt?: string): Promise<UserModuleProgress> {
 
         const existing = await this.findByUserAndModule(userId, moduleId);
 
         const now = new Date().toISOString();
+
+        const status = existing?.status === "completed" ? "completed" : requestedStatus;
 
         const updated = new UserModuleProgress({
             userId,
@@ -64,7 +71,9 @@ export class UserModuleProgressStore {
             startedAt: status === "in_progress"
                 ? (existing?.startedAt ?? now)
                 : (existing?.startedAt ?? null),
-            completedAt: status === "completed" ? now : (existing?.completedAt ?? null),
+            // Keyed off the requested status, not the effective one: a practice start on an already
+            // completed module must leave completedAt where it was, not restamp it to now.
+            completedAt: requestedStatus === "completed" ? now : (existing?.completedAt ?? null),
             currentRung: existing?.currentRung,
             rungCoverage: existing?.rungCoverage ?? [],
             practiceCompletedAt: existing?.practiceCompletedAt ?? practiceCompletedAt ?? null,

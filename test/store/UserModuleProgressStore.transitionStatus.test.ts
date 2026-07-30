@@ -107,6 +107,32 @@ describe("UserModuleProgressStore.transitionStatus", () => {
         assert.deepEqual(result.rungCoverage, []);
     });
 
+    it("does not downgrade a completed module back to in_progress", async () => {
+
+        // Re-entering a passed module via "Keep practising" starts a session, which transitions to
+        // in_progress. That must not un-complete the module: F21 gates the level test on every
+        // module at the level being completed.
+        const docs = [makeProgress({ status: "completed", completedAt: "2026-06-05T10:00:00.000Z" }).toBSON()];
+        const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });
+
+        const result = await store.transitionStatus("user-1", "mod-1", "in_progress");
+
+        assert.equal(result.status, "completed");
+        assert.equal(result.completedAt, "2026-06-05T10:00:00.000Z");
+    });
+
+    it("still records rung progress written while re-practising a completed module", async () => {
+
+        const docs = [makeProgress({ status: "completed", completedAt: "2026-06-05T10:00:00.000Z", currentRung: 3, rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v-1"], completedAt: "2026-06-01T09:00:00.000Z" })] }).toBSON()];
+        const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });
+
+        const result = await store.transitionStatus("user-1", "mod-1", "in_progress");
+
+        assert.equal(result.status, "completed");
+        assert.equal(result.currentRung, 3);
+        assert.equal(result.rungCoverage.length, 1);
+    });
+
     it("sets practiceCompletedAt when provided and none exists yet", async () => {
         const docs = [makeProgress({ status: "in_progress" }).toBSON()];
         const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });

@@ -292,6 +292,38 @@ describe("StartPracticeSession.do", () => {
         assert.deepEqual(result.exercises.map(e => e.id), ["ex-mc-1"]);
     });
 
+    it("leaves a completed module completed when the user re-practises it", async () => {
+
+        // "Keep practising" on a module whose test was already passed. Starting the session
+        // transitions to in_progress, which must not un-complete the module — F21 gates the level
+        // test on every module at the level being completed.
+        const mod = makeModule({ practiceSessionSize: 2 });
+        const exercises = [makeExercise("ex-ta-1", "translation_active", "v-1"), makeExercise("ex-ta-2", "translation_active", "v-2")];
+        const progress = makeProgress({ status: "completed", completedAt: "2026-06-05T10:00:00.000Z", currentRung: 3 });
+
+        let storedStatus: string | null = null;
+
+        const collections: Record<string, any> = {
+            modules: { findOne: async () => mod.toBSON() },
+            exercises: { find: () => ({ toArray: async () => exercises.map(e => e.toBSON()) }) },
+            userModuleProgress: {
+                findOne: async () => progress.toBSON(),
+                replaceOne: async (_f: any, doc: any) => { storedStatus = doc.status; return { upsertedCount: 1 }; },
+            },
+            userVocabularyProgress: { find: () => ({ toArray: async () => [] }) },
+            userGrammarProgress: { find: () => ({ toArray: async () => [] }) },
+            practiceSessions: { findOne: async () => null, insertOne: async () => ({ insertedId: new ObjectId() }) },
+        };
+
+        const config = { getDBName: () => "test", getMongoDb: async () => ({ collection: (name: string) => collections[name] }) } as any;
+        const delegate = new StartPracticeSession({} as any, config);
+
+        const result = await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.isNotEmpty(result.exercises, "the session still starts — re-practising a completed module is allowed");
+        assert.equal(storedStatus, "completed", "the module must not be knocked back to in_progress");
+    });
+
     it("throws 409 when an active session already exists for this user+module", async () => {
 
         const mod = makeModule();

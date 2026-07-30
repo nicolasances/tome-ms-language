@@ -59,7 +59,7 @@ Both id spaces land in `itemIds` because vocabulary item ids and grammar concept
 |-------|------|-------------|-------|
 | userId | string | User id (`User.id`) | Required |
 | moduleId | string | Module id | Required; one record per (userId, moduleId) |
-| status | string | Current module status | Must be one of: locked, available, in_progress, completed |
+| status | string | Current module status | Must be one of: locked, available, in_progress, completed. `completed` is terminal — never downgraded |
 | startedAt | string \| null | When practice was first started (ISO 8601) | Nullable; set once on first `in_progress` transition, never overwritten |
 | completedAt | string \| null | When the module was passed (ISO 8601) | Nullable |
 | currentRung | number | The rung the module is practising at | `1`–`3`; defaults to `1`; only ever increases, driven by F10 |
@@ -94,6 +94,7 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 - A dedicated store (`UserModuleProgressStore`, collection `userModuleProgress`) is the sole accessor of the progress collection.
 - `GET /me/progress` is an aggregating read: it resolves the user's CEFR level (F05), lists the modules for the selected level (F03), maps each to its progress record (defaulting to `locked` if no record exists), and computes the per-level rollup. For the `in_progress` module it pulls the test-timing fields from F11.
 - `UserModuleProgressStore.transitionStatus` acts as an upsert — the first call with `in_progress` creates the record. There is no separate initialization operation; callers (F10 on practice start, F11 on test pass) drive the transition directly.
+- **`completed` is terminal.** `transitionStatus` never moves a module back from `completed` to `in_progress`. This matters because re-entering a passed module via "Keep practising" starts a practice session, and F10 transitions to `in_progress` on session start — which would otherwise un-complete the module, blocking F21's level-test gate (it requires every module at the level to be `completed`) and re-showing the Module Test on the dashboard. Practice on a completed module still runs and still records rung coverage and mastery; only the status is pinned. `completedAt` is keyed off the *requested* status, so a practice start on a completed module leaves it where it was rather than restamping it.
 - `startedAt` is idempotent: set on the first `in_progress` transition and never overwritten by subsequent transitions.
 - `practiceCompletedAt` is idempotent: set once when the last rung of the practice ladder is first completed and never overwritten; it is the timestamp F11's `testUnlocksAt` (= `practiceCompletedAt + testUnlockDelayHours`) is derived from. Re-running practice afterwards does not move it.
 - `rungCoverage` accumulates with set-union semantics (no duplicates) per rung and is preserved across status transitions. `currentRung` only ever increases.
