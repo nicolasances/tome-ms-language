@@ -4,9 +4,17 @@
 
 ## 1. Purpose & Scope
 
-Step 2 is the interactive practice phase of a module. The user works through `practiceSessionSize` (default 20) exercises per session, drawn from the module's exercise pool via mastery-aware selection (F08), ordered by exercise type to follow the recognition → production progression. Wrong answers reveal the correct answer and the user moves on; at the end, all missed exercises are retried until correct.
+Step 2 is the interactive practice phase of a module. The user works through `practiceSessionSize` (default 20) exercises per session, drawn from the module's exercise pool via mastery-aware selection (F08). Wrong answers reveal the correct answer and the user moves on; at the end, all missed exercises are retried until correct.
 
-Practice is **not a single session**. The user repeats practice sessions until **every vocabulary item in the module has appeared in at least one exercise** (shown, not necessarily answered correctly). To make that converge in a bounded number of sessions, each session reserves at least `practiceMinUnseenVocabPercent` (the microservice-level constant `PRACTICE_MIN_UNSEEN_VOCAB_PERCENT` from `Config.ts`, default 50% — not a per-module field) of its exercises for vocabulary items the user has not yet encountered in this module. Grammar concepts are **not** part of this coverage gate — they are introduced explicitly in Step 1 (F09). When full coverage is reached, Step 2 is complete and the Module Test unlock countdown (F11) begins.
+Practice is **not a single session**, and it is not one flat pass either. Step 2 runs as **three sequential rung phases** of increasing difficulty:
+
+1. **Rung 1 · Recognition** — select or assemble from provided material
+2. **Rung 2 · Cued production** — produce a form, heavily constrained by context
+3. **Rung 3 · Free production** — produce from meaning alone
+
+Each rung phase runs as many sessions as it takes to cover **every vocabulary item and every grammar concept** in the module at that rung. When a rung is fully covered the module advances to the next one, with no delay and no gate between them. When rung 3 completes, Step 2 is done and the Module Test unlock countdown (F11) begins.
+
+To make each phase converge in a bounded number of sessions, a session reserves at least `practiceMinUnseenVocabPercent` (the microservice-level constant `PRACTICE_MIN_UNSEEN_VOCAB_PERCENT` from `Config.ts`, default 50% — not a per-module field) of its exercises for practice items not yet covered **at the current rung**. Unlike the old single-exposure gate, grammar concepts are covered at every rung exactly like vocabulary items.
 
 **Mastery scores ARE updated during practice** — every completed exercise updates the mastery of its linked vocabulary item or grammar concept via F06, identically to how the Module Test does. This feature owns the practice session lifecycle, answer checking, coverage tracking, and continuous mastery updates.
 
@@ -14,7 +22,7 @@ Practice is **not a single session**. The user repeats practice sessions until *
 - The SRS math itself (→ [F06](./F06-mastery-and-progress-tracking.md)); this feature calls F06's apply-results operation after each session
 - The Module Test (→ [F11](./F11-module-test.md))
 - Selection algorithm internals (→ [F08](./F08-mastery-aware-exercise-selection.md)); the coverage override is applied by this feature on top of F08
-- Storage of the coverage gate (`vocabularyItemsPracticed`, `practiceCompletedAt`) (→ [F07](./F07-user-module-progress.md)); this feature writes them but F07 owns them
+- Storage of the rung state (`currentRung`, `rungCoverage`, `practiceCompletedAt`) (→ [F07](./F07-user-module-progress.md)); this feature writes them but F07 owns them
 - On-demand "explain my mistake" / verification (→ [F12](./F12-explain-my-mistake.md), [F13](./F13-translation-answer-verification.md)) — surfaced here but owned there
 
 ---
@@ -25,12 +33,16 @@ Practice is **not a single session**. The user repeats practice sessions until *
 
 | Term | Definition |
 |------|-----------|
-| Practice session | One `practiceSessionSize`-sized run of exercises for a module; Step 2 may span several such sessions |
-| Coverage gate | Step 2 is complete only when every `Module.vocabularyItemId` has appeared in at least one exercise shown to the user; tracked via F07's `vocabularyItemsPracticed` |
-| Coverage override | At least `practiceMinUnseenVocabPercent` of each session is reserved for exercises whose vocabulary item the user has not yet encountered in this module — applied on top of F08, overriding its mastery-based deprioritization for unseen items |
-| Type ordering | Exercises ordered: multiple_choice → sentence_reorder → fill_blank → conjugation_drill → error_correction → translation_active |
+| Practice session | One `practiceSessionSize`-sized run of exercises for a module; a rung phase spans several such sessions |
+| Practice item | One vocabulary item **or** one grammar concept referenced by the module. Both are covered at every rung |
+| Rung | A difficulty tier of exercise: 1 · recognition, 2 · cued production, 3 · free production. Derived from `Exercise.type` via `PRACTICE_RUNG_TYPES`; never stored on the exercise |
+| Rung phase | The stretch of sessions during which the module practises at one rung. Three phases, strictly sequential, module-wide |
+| Covered at rung *r* | A practice item has been served a tier-*r* exercise in a completed session. A session can only complete once every one of its exercises has been answered correctly (see Missed-retry), so a covered item has necessarily been produced correctly at that rung |
+| Rung phase complete | Every practice item in the module is covered at the current rung. Advances `currentRung` |
+| Ladder complete | Rung 3 is complete. Sets `practiceCompletedAt` and starts the test-unlock countdown |
+| Coverage override | At least `practiceMinUnseenVocabPercent` of each session is reserved for exercises whose practice item is not yet covered *at the current rung* — applied on top of F08, overriding its mastery-based deprioritization for those items |
 | Answer checking | Normalize (lowercase, strip punctuation) then compare against canonical + alternative + user-contributed answers; optional fuzzy compare |
-| Missed-retry | At session end, all incorrectly answered exercises are retried until all are correct |
+| Missed-retry | At session end, all incorrectly answered exercises are retried until all are correct. **Enforced server-side**: `/complete` rejects a session that still holds an exercise without a correct answer |
 
 ### 2.2. Requirements
 
@@ -52,25 +64,57 @@ Practice is **not a single session**. The user repeats practice sessions until *
 
 #### 2.2.2. Endpoints
 
-- `POST /users/:userId/modules/:moduleId/practiceSessions` — start a new practice session; draws `practiceSessionSize` exercises via F08 with the coverage override applied (≥ `practiceMinUnseenVocabPercent` reserved for unseen vocabulary), orders them by type progression; creates and returns the PracticeSession. Response includes `exercises: Exercise[]` — full exercise objects in type-progression order — so the client can render the session immediately without additional round-trips. If an active session already exists for the user+module, returns **409** with body `{ code: 409, message: "...", sessionId: "<existing-session-id>" }` so the client can resume via `GET .../practiceSessions/:sessionId`.
+- `POST /users/:userId/modules/:moduleId/practiceSessions` — start a new practice session. Filters the module's pool down to the current rung (filters by exercise type, since types are mapped 1:1 to a rung), then draws `practiceSessionSize` exercises via F08 with the coverage override applied (≥ `practiceMinUnseenVocabPercent` reserved for items not yet covered at that rung). Creates and returns the PracticeSession. Response includes `exercises: Exercise[]` — full exercise objects, all of the current rung — plus `currentRung`, so the client can render the session immediately without additional round-trips. If an active session already exists for the user+module, returns **409** with body `{ code: 409, message: "...", sessionId: "<existing-session-id>" }` so the client can resume via `GET .../practiceSessions/:sessionId`. Returns **400** when the module's bank holds no exercise at the current rung — see the bank-coverage constraint in §4.
 - `GET /users/:userId/practiceSessions/:sessionId` — return the current session state (for resume after app close). Response includes `exercises: Exercise[]` — full exercise objects for all exercises in the session — so the client can restore the full session UI without additional fetches.
 - `POST /users/:userId/practiceSessions/:sessionId/answers` — submit an answer for one exercise; body: `{ exerciseId, userAnswer }`.
-- `POST /users/:userId/practiceSessions/:sessionId/complete` — mark the session complete. Updates mastery for every exercise attempted (F06), appends the session's encountered vocabulary items to F07's `vocabularyItemsPracticed`, evaluates the coverage gate, and — if full coverage is now reached — sets `practiceCompletedAt` (F07), which starts the test-unlock countdown. Returns the completed session plus the coverage state (`step2Complete: boolean`, and the remaining unseen vocabulary count when not complete) so the app knows whether to offer another practice session or route the user toward the Module Test.
+- `POST /users/:userId/practiceSessions/:sessionId/complete` — mark the session complete. Rejects with **400** when any exercise in the session lacks a correct answer, i.e. the missed-retry loop has not been driven to the end; the error body carries `outstandingExerciseIds` so the client can resume the loop on exactly those. Otherwise updates mastery for every exercise attempted (F06), records the session's practice items as covered at the current rung (F07), and — if that completes the rung — advances `currentRung`; if the rung completed was the last one, sets `practiceCompletedAt` (F07), which starts the test-unlock countdown. Returns:
+
+  | Field | Type | Description |
+  |---|---|---|
+  | `currentRung` | number | The rung the module is at *after* this session |
+  | `previousRung` | number | The rung this session was practised at |
+  | `rungCompleted` | boolean | Whether this session completed the rung phase |
+  | `ladderCompleted` | boolean | Whether this session completed the last rung, and so the whole ladder |
+  | `rungsCompletedBefore` / `rungsCompletedAfter` | number | Rungs fully covered before/after — the recap's **outer** ring (`1/3 → 3/3`) |
+  | `rungCoverageBefore` / `rungCoverageAfter` | `{ rung, coveredCount, totalCount }` | Current-rung coverage before/after this session |
+  | `vocabularyCoverage` | `{ coveredCount, totalCount }` | Module-wide vocabulary coverage across all rungs — the recap's **inner** ring |
+  | `step2Complete` | boolean | Alias of `ladderCompleted`, kept for clients predating the ladder |
+  | `unseenVocabCount` | number | Vocabulary items not covered at any rung, kept for clients predating the ladder |
+
+  The before/after pairs are what let the recap animate the rings from their old value to their new one rather than snapping to the final state.
 
 #### 2.2.4. Business Logic
 
 - Starting a practice session transitions UserModuleProgress to `in_progress` (via F07).
-- **Coverage override on selection**: when drawing the session from the pool via F08, reserve at least `practiceMinUnseenVocabPercent`% of `practiceSessionSize` for exercises whose linked vocabulary item is **not** in F07's `vocabularyItemsPracticed` for this user+module. This overrides F08's mastery-based deprioritization for unseen items (an unseen item has the lowest possible mastery anyway; the override makes coverage a hard guarantee, not a statistical tendency). If fewer unseen-vocab exercises exist than the reserved share, take all available and fill the rest via the normal F08 draw. Grammar-only exercises do not count toward the coverage reservation.
+- **The rung → type map** (`PRACTICE_RUNG_TYPES` in `Config.ts`) is the single source of truth for which tier an exercise belongs to. The rung is derived from `Exercise.type` and never stored on the exercise, so re-tiering a type is a config change rather than a data migration:
+
+  | Rung | Name | Vocabulary types | Grammar types |
+  |---|---|---|---|
+  | 1 | Recognition | `multiple_choice` | `sentence_reorder` |
+  | 2 | Cued production | `fill_blank`, `conjugation_drill` | `fill_blank` |
+  | 3 | Free production | `translation_active` | `error_correction`, `translation_active` |
+
+  `sentence_reorder` is rung 1 on purpose: the word tiles are supplied, so it is assembly, not production. `fill_blank` and `translation_active` appear on both sides because F04 lets those two types link to either a vocabulary item or a grammar concept — without that, grammar would have no rung-2 type at all and a rung-2 phase covering grammar could never complete.
+- **Rung pre-filter on selection**: the session pool is first filtered to exercises whose rung equals `currentRung`. F08 itself is unchanged — it simply receives a pre-filtered pool.
+- **Coverage override on selection**: within that rung pool, reserve at least `practiceMinUnseenVocabPercent`% of `practiceSessionSize` for exercises whose linked practice item is **not** in that rung's `itemIds` for this user+module. This overrides F08's mastery-based deprioritization for those items (an uncovered item has low mastery anyway; the override makes coverage a hard guarantee, not a statistical tendency). If fewer uncovered exercises exist than the reserved share, take all available and fill the rest via the normal F08 draw. Grammar-linked exercises count toward the reservation exactly like vocabulary-linked ones.
+- **No tail top-up**: every session is a full `practiceSessionSize`, including a rung's last. When fewer uncovered items remain than the reservation targets, the reservation takes all of them — which completes the rung — and F08 fills the remaining slots from the rung pool. The ≥50% reservation is already a "reserve *up to* N" rule, so this needs no special-casing.
 - Answer checking: normalize userAnswer (lowercase, strip punctuation) then compare against the exercise's `answer`, `alternativeAnswers`, and `userContributedAnswers`. Optional fuzzy match (Levenshtein) for additional tolerance.
 - If correct: advance to the next exercise. If wrong: return the correct answer, add the exercise id to `retryQueue`, advance.
 - Increment the exercise's `timesShown` (via F04) after each exercise is shown.
 - Missed-retry loop: when the primary pass is done (all `exerciseIds` visited), present the `retryQueue` exercises repeatedly until the user answers all correctly. Then the session is complete.
 - **On session completion:**
   - **Update mastery**: build an ExerciseResult per attempted exercise and call F06 apply-results (vocab + grammar), exactly as F11 does. Practice and the Module Test update mastery identically — there is no "practice doesn't count" mode. The retry loop's repeated attempts are recorded as they occur.
-  - **Track coverage**: append every vocabulary item shown this session (regardless of correctness) to F07's `vocabularyItemsPracticed` via `POST …/practicedVocabulary` (set-union, de-duplicated).
-  - **Evaluate the coverage gate**: if `vocabularyItemsPracticed` now covers all of `Module.vocabularyItemIds`, Step 2 is complete — set `practiceCompletedAt` on UserModuleProgress (F07). This timestamp (not the per-session `completedAt`) starts the `testUnlockDelayHours` countdown consumed by F11. If coverage is not yet complete, the app starts another practice session.
+  - **Track rung coverage**: record every practice item served a current-rung exercise this session into that rung's `itemIds` via `UserModuleProgressStore.appendRungCoverage` (set-union, de-duplicated). Vocabulary items and grammar concepts go into the same array. By this point the completion precondition has already established that every exercise was answered correctly, so every recorded item has been produced correctly at that rung.
+  - **Evaluate the rung phase**: if that rung's `itemIds` now cover all of `Module.vocabularyItemIds` **and** all of `Module.grammarConceptIds`, the phase is complete — stamp the rung's `completedAt` and advance `currentRung` (F07). There is no delay and no spacing between rungs: the next session is simply the first of the new rung.
+  - **Evaluate the ladder**: if the rung just completed was the last one, set `practiceCompletedAt` on UserModuleProgress (F07). This timestamp (not the per-session `completedAt`) starts the `testUnlockDelayHours` countdown consumed by F11.
+  - Rung completion is evaluated against the state *before* this session, so a rung already carrying a `completedAt` is not re-completed. That matters at the last rung, where `currentRung` stops climbing and later "keep practising" sessions keep re-detecting full coverage.
   - Record the session's own `completedAt`.
-- Coverage convergence: with ≥ 50% of a 20-exercise session reserved for unseen items, a module of N vocabulary items reaches full coverage within a bounded number of sessions (e.g. a 30-item module within at most 3 sessions).
+- **The missed-retry loop is a precondition of completion, enforced server-side.** `/complete` refuses a session that still holds an exercise without a correct answer, and refuses before writing anything — no mastery, no coverage, no `completedAt`. This is what makes "covered at a rung" mean "produced correctly at that rung", the guarantee the whole ladder rests on.
+  - Correctness is read from the session's own answer log: an exercise qualifies when it has at least one `isCorrect` answer, **or** when it appears in `verifiedExerciseIds` (F13 accepts an answer without flipping `isCorrect` on a practice session). An exercise that was never answered at all also blocks completion, so the endpoint cannot be used to abandon a session part-way.
+  - It deliberately does **not** read `retryQueue`, which cannot evidence the loop: `SubmitPracticeAnswer` pushes on every wrong answer and nothing pulls on a correct retry, so after a single miss the queue stays non-empty for the rest of the session no matter how the user does. It is a log of misses, not a work queue.
+  - Recovery is the ordinary flow, not an exception path: the session stays open, the client answers the outstanding exercises via `POST …/answers`, and calls `/complete` again. Nothing is stranded.
+- There is **no per-item rung state and no earned advancement**, so nothing can get stuck.
+- Coverage convergence: with ≥ 50% of a 20-exercise session reserved for items uncovered at the current rung, a phase covers ≥10 new items per session, so a module of N practice items completes each rung in at most `ceil(N / 10)` sessions. The bound depends on item count alone, not on how well the user performs.
 - Only one active practice session per user per module at a time. Sessions are sequential: a new one can start only after the previous one is complete.
 
 ---
@@ -90,9 +134,12 @@ Practice is **not a single session**. The user repeats practice sessions until *
 ## 4. Constraints and Assumptions
 
 - **Constraint** — Mastery **is** updated in Step 2, on every completed exercise, identically to the Module Test (idea §3.1.1).
-- **Constraint** — Step 2 spans as many sessions as needed to reach full vocabulary coverage; it is not a single session.
-- **Constraint** — Each session is `practiceSessionSize` exercises (default 20, configurable per module), with ≥ `practiceMinUnseenVocabPercent`% (default 50) reserved for unseen vocabulary.
-- **Constraint** — The `testUnlockDelayHours` countdown starts from `practiceCompletedAt` (full coverage reached), not from the end of any single session.
+- **Constraint** — Rung phases are module-level and strictly sequential. There is no per-item rung state: every practice item is covered at rung 1 before any rung-2 exercise appears.
+- **Constraint** — Step 2 spans as many sessions as each rung phase needs; it is not a single session, and not a single pass.
+- **Constraint** — Each session is `practiceSessionSize` exercises (default 20, configurable per module), all of the current rung, with ≥ `practiceMinUnseenVocabPercent`% (default 50) reserved for items uncovered at that rung. Every session is full — there is no shortened final session of a rung.
+- **Constraint** — The `testUnlockDelayHours` countdown starts from `practiceCompletedAt` (the last rung completed), not from the end of any single session or of any earlier rung.
+- **Constraint — the exercise bank gates the ladder.** A practice item with no exercise at a given rung can never be covered there, so that phase can never complete and the Module Test never unlocks. There is deliberately **no safety valve**: rung completion requires every practice item, not just the ones the bank happens to cover. A module whose bank cannot support a rung must have its bank regenerated. `POST .../practiceSessions` fails fast with a **400** when the rung pool is empty rather than creating a zero-exercise session, but a partially-covered rung produces no error — it simply never completes.
+- **Constraint** — A session cannot be closed until every one of its exercises has been answered correctly. `/complete` enforces this and rejects otherwise, atomically — a refused completion writes nothing. There is no partial or abandoned completion.
 - **Constraint** — Answer matching is normalized; no AI call at answer time (except the on-demand F13 verification, which is separate and explicit).
 - **Assumption** — Only one active practice session per user per module at a time.
 
@@ -106,15 +153,23 @@ Practice is **not a single session**. The user repeats practice sessions until *
 
 _Resolved questions:_
 - **OQ-01** — Fuzzy matching is applied only to `translation_active` and `error_correction` (free-text production types). `fill_blank` and `conjugation_drill` require exact answers. Threshold: ≤10 chars → 1 edit; ≤20 chars → 2 edits; >20 chars → 3 edits. Implemented via Levenshtein distance in `src/util/AnswerChecker.ts`. `CheckAnswerResult.fuzzyMatched` distinguishes exact from fuzzy accepts.
-- **OQ-02** — unlock timer starts from `practiceCompletedAt`, set once (idempotent) by `UserModuleProgressStore.transitionStatus` when coverage is first reached. Re-running practice afterward does not restart it.
-- **OQ-04** — any appearance counts: the session collects vocab ids from all answered exercises (primary pass + retry queue) and passes them to `appendPracticedVocabulary`.
+- **OQ-02** — unlock timer starts from `practiceCompletedAt`, set once (idempotent) by `UserModuleProgressStore.transitionStatus` when the last rung completes. Re-running practice afterward does not restart it.
+- **OQ-04** — appearance alone is not enough; a **correct** answer is required, and it is enforced rather than assumed. `/complete` rejects with 400 while any exercise still lacks a correct answer (via `isCorrect`, or via F13's `verifiedExerciseIds`), so by the time coverage is written every current-rung exercise has been produced correctly. Crediting on mere appearance was the original reading, on the assumption that the client-driven retry loop made the two equivalent — it did not, and nothing on the server checked.
+- **OQ-05** — no tail top-up. Every session is a full `practiceSessionSize`, including a rung's last. The per-rung coverage floor on the bank makes the rung pool ≥ the module's item count, so a full session rarely repeats an item, and the phase's session count is unaffected by the final session's length.
+- **OQ-06** — no spacing and no hard stop between rungs. The backend simply advances `currentRung`; the next session is the first of the new rung. There is no dedicated "rung complete" screen — the ordinary recap carries the signal via its rings.
 
 ---
 
 ## 6. Technical Decisions
 
 ### Coverage override implementation
-The session selection uses a two-step draw: (1) guarantee `ceil(practiceSessionSize × PRACTICE_MIN_UNSEEN_VOCAB_PERCENT / 100)` exercises from the unseen-vocab pool via `selectExercises`; (2) fill the remaining slots from a filler pool of (leftover unseen + seen/grammar) exercises. This ensures the minimum is a hard guarantee while still letting additional unseen exercises fill remaining slots naturally.
+The session selection uses a two-step draw over the **rung-filtered** pool: (1) guarantee `ceil(practiceSessionSize × PRACTICE_MIN_UNSEEN_VOCAB_PERCENT / 100)` exercises from the not-yet-covered-at-this-rung pool via `selectExercises`; (2) fill the remaining slots from a filler pool of (leftover uncovered + already covered) exercises. This ensures the minimum is a hard guarantee while still letting additional uncovered exercises fill remaining slots naturally.
+
+### Rung derived from type, not stored
+`rungOfType` in `src/util/PracticeRungs.ts` resolves the rung from `Exercise.type` through `PRACTICE_RUNG_TYPES`. Nothing about the ladder is persisted on the exercise, so moving a type between rungs is a config change and existing banks need no rewrite. A type absent from the map belongs to no rung and is therefore never drawn into a practice session.
+
+### Rung completion evaluated against the pre-session state
+`CompletePracticeSession` reads the progress record before appending this session's coverage and compares that snapshot's `completedAt` for the current rung. Without it, every later session at the last rung would report `rungCompleted: true` — `currentRung` stops climbing at 3, so full coverage keeps re-registering. `UserModuleProgressStore.completeRung` carries the same guard at the database level, matching only a rung whose `completedAt` is still null.
 
 ### `userId` in URL, not from auth token
 The practice-session endpoints use `/users/:userId/…` matching the pattern established by the progress endpoints (F06/F07). The delegate validates that `req.params.userId` matches the `userContext.userId` from the auth token on all reads/writes — ownership is enforced in the delegate, not the route.

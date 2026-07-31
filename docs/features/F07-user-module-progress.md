@@ -26,6 +26,9 @@ This feature also owns the single aggregate read the app uses to render the Home
 | UserModuleProgress | Per-user, per-module progress record |
 | ModuleTestAttempt | A recorded test attempt: score, passed, takenAt |
 | Completion gate | All level modules must be `completed` before the Level Test is offered |
+| Practice item | One vocabulary item **or** one grammar concept referenced by the module. Both are tracked by rung coverage |
+| Rung | A difficulty tier of practice: 1 · recognition, 2 · cued production, 3 · free production. Owned by [F10](./F10-practice-session.md); this feature only stores the coverage |
+| Rung coverage | The set of practice items covered at one rung, plus when that rung was completed |
 
 ### 2.2. Requirements
 
@@ -40,18 +43,31 @@ This feature also owns the single aggregate read the app uses to render the Home
 | passed | boolean | Whether the attempt passed | Required |
 | takenAt | string | When the test was submitted (ISO 8601) | Set server-side |
 
+**RungCoverage** (sub-model, embedded in UserModuleProgress)
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| rung | number | The rung this entry covers | `1`–`3`; required |
+| itemIds | string[] | Practice items covered at this rung — vocabulary item ids **and** grammar concept ids in one array | Set-union semantics (`$addToSet`); defaults to `[]` |
+| completedAt | string \| null | When this rung was fully covered (ISO 8601) | Nullable; set once by F10, never overwritten |
+
+Both id spaces land in `itemIds` because vocabulary item ids and grammar concept ids are disjoint (F06 relies on this already), so one array per rung suffices.
+
 **UserModuleProgress**
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
 | userId | string | User id (`User.id`) | Required |
 | moduleId | string | Module id | Required; one record per (userId, moduleId) |
-| status | string | Current module status | Must be one of: locked, available, in_progress, completed |
+| status | string | Current module status | Must be one of: locked, available, in_progress, completed. `completed` is terminal — never downgraded |
 | startedAt | string \| null | When practice was first started (ISO 8601) | Nullable; set once on first `in_progress` transition, never overwritten |
 | completedAt | string \| null | When the module was passed (ISO 8601) | Nullable |
-| vocabularyItemsPracticed | string[] | `vocabularyItemId`s the user has encountered at least once during this module's practice, accumulated across however many sessions Step 2 takes | Defaults to `[]`; appended by F10 as practice progresses; reaching full coverage of `Module.vocabularyItemIds` completes Step 2 |
-| practiceCompletedAt | string \| null | When full vocabulary coverage was first reached (Step 2 complete) (ISO 8601) | Nullable; set once by F10 the moment coverage is reached; the timestamp `testUnlockDelayHours` counts from |
+| currentRung | number | The rung the module is practising at | `1`–`3`; defaults to `1`; only ever increases, driven by F10 |
+| rungCoverage | RungCoverage[] | Per-rung covered-item sets | Defaults to `[]`; one entry per rung reached; entries are never cleared when the module advances, so the history is preserved |
+| practiceCompletedAt | string \| null | When the whole practice ladder was completed — i.e. when rung 3 was fully covered (ISO 8601) | Nullable; set once by F10 the moment the last rung completes; the timestamp `testUnlockDelayHours` counts from |
 | testAttempts | ModuleTestAttempt[] | All module test attempts | Appended by F11 via `UserModuleProgressStore.appendTestAttempt`, in-process |
+
+> **Note — `vocabularyItemsPracticed` is gone.** It was a single flat set of vocabulary ids that recorded one exposure per item and excluded grammar concepts entirely. `currentRung` + `rungCoverage` replace it. Records written before the practice ladder may still carry the old field on disk; `UserModuleProgress.fromBSON` simply ignores it. There is no migration of old values into rung coverage — a module still in flight is reset to rung 1 instead (see [F10](./F10-practice-session.md)).
 
 #### 2.2.2. Endpoints
 
@@ -67,8 +83,9 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 
 > **Note — writes and the completion-gate query are not REST endpoints.** Everything below `GET /me/progress` is driven directly, in-process, by the features that need it — all of them (F10, F11, F21) live inside this microservice, so HTTP endpoints here would have no external consumer. Earlier in the redesign these existed as `PUT /me/moduleProgress/:moduleId`, `POST /me/moduleProgress/:moduleId/practicedVocabulary`, `POST /me/moduleProgress/:moduleId/testAttempts`, and `GET /me/levelProgress`; all four were removed per the coding standard ("only create REST endpoints when consumed by an external consumer") — see the [change](./changes/2026-06-08-remove-internal-module-progress-endpoint.md) [records](./changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
-- **Status transitions**: `UserModuleProgressStore.transitionStatus(userId, moduleId, status, practiceCompletedAt?)` upserts the status (`in_progress` | `completed`) and timestamps (including `practiceCompletedAt`) directly. F10 calls it on practice start and when Step 2 coverage completes; F11 calls it on a passing test. There is no separate initialization operation — the first `in_progress` call creates the record.
-- **Practiced-vocabulary accumulation**: `UserModuleProgressStore.appendPracticedVocabulary(userId, moduleId, vocabularyItemIds)` adds ids to `vocabularyItemsPracticed` with de-duplicated, set-union semantics (`$addToSet`). F10 calls it after each practice session, then decides when full coverage is reached and sets `practiceCompletedAt` via `transitionStatus`.
+- **Status transitions**: `UserModuleProgressStore.transitionStatus(userId, moduleId, status, practiceCompletedAt?)` upserts the status (`in_progress` | `completed`) and timestamps (including `practiceCompletedAt`) directly. F10 calls it on practice start and when the last rung completes; F11 calls it on a passing test. There is no separate initialization operation — the first `in_progress` call creates the record. `currentRung` and `rungCoverage` carry over unchanged across transitions.
+- **Rung coverage accumulation**: `UserModuleProgressStore.appendRungCoverage(userId, moduleId, rung, itemIds)` adds practice item ids to that rung's `itemIds` with de-duplicated, set-union semantics (`$addToSet`), creating the rung's entry on first use. F10 calls it after each practice session.
+- **Rung completion**: `UserModuleProgressStore.completeRung(userId, moduleId, rung, completedAt)` stamps `completedAt` on the rung and advances `currentRung` to `rung + 1`, capped at the last rung. It is idempotent — the update only matches a rung whose `completedAt` is still null, so a later session at the same rung cannot move the timestamp or re-advance the module. That matters at the last rung, where `currentRung` stops climbing and further "keep practising" sessions keep re-detecting full coverage.
 - **Test-attempt recording**: `UserModuleProgressStore.appendTestAttempt(userId, moduleId, attempt)` appends a `ModuleTestAttempt` record. F11 calls it once a module test is graded.
 - **Completion-gate query**: F21 reads the user's CEFR level (F05's `UserStore`), lists that level's modules (F03's `ModuleStore.list`), and maps each to its progress record via `UserModuleProgressStore.listByUser` (defaulting to `locked` when no record exists) to determine whether every module is `completed`. This is a small in-process aggregation F21 performs itself — not a shared store method — mirroring how `GetMeProgress` already aggregates across F03/F05/F07.
 
@@ -77,9 +94,11 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 - A dedicated store (`UserModuleProgressStore`, collection `userModuleProgress`) is the sole accessor of the progress collection.
 - `GET /me/progress` is an aggregating read: it resolves the user's CEFR level (F05), lists the modules for the selected level (F03), maps each to its progress record (defaulting to `locked` if no record exists), and computes the per-level rollup. For the `in_progress` module it pulls the test-timing fields from F11.
 - `UserModuleProgressStore.transitionStatus` acts as an upsert — the first call with `in_progress` creates the record. There is no separate initialization operation; callers (F10 on practice start, F11 on test pass) drive the transition directly.
+- **`completed` is terminal.** `transitionStatus` never moves a module back from `completed` to `in_progress`. This matters because re-entering a passed module via "Keep practising" starts a practice session, and F10 transitions to `in_progress` on session start — which would otherwise un-complete the module, blocking F21's level-test gate (it requires every module at the level to be `completed`) and re-showing the Module Test on the dashboard. Practice on a completed module still runs and still records rung coverage and mastery; only the status is pinned. `completedAt` is keyed off the *requested* status, so a practice start on a completed module leaves it where it was rather than restamping it.
 - `startedAt` is idempotent: set on the first `in_progress` transition and never overwritten by subsequent transitions.
-- `practiceCompletedAt` is idempotent: set once when full vocabulary coverage is first reached and never overwritten; it is the timestamp F11's `testUnlocksAt` (= `practiceCompletedAt + testUnlockDelayHours`) is derived from. Re-running practice after coverage is reached does not move it.
-- `vocabularyItemsPracticed` accumulates with set-union semantics (no duplicates) and is preserved across status transitions.
+- `practiceCompletedAt` is idempotent: set once when the last rung of the practice ladder is first completed and never overwritten; it is the timestamp F11's `testUnlocksAt` (= `practiceCompletedAt + testUnlockDelayHours`) is derived from. Re-running practice afterwards does not move it.
+- `rungCoverage` accumulates with set-union semantics (no duplicates) per rung and is preserved across status transitions. `currentRung` only ever increases.
+- `GET /me/progress` derives `completionPct` and `vocabularyItemsPracticedCount` from the union of covered items across every rung, intersected with `Module.vocabularyItemIds`. A module whose status is `completed` is always reported as 100% — modules completed before the practice ladder shipped hold no rung coverage at all, and would otherwise read as 0% on the module map.
 - `testAttempts` are always preserved across status transitions.
 - The completion-gate check (F21) reads all modules at the user's current CEFR level, maps each to its progress record (defaulting to `locked` if no record exists), and derives `allCompleted` plus a per-module status array.
 

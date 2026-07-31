@@ -1,8 +1,8 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
-import { PRACTICE_MIN_UNSEEN_VOCAB_PERCENT } from "../../Config";
+import { FIRST_PRACTICE_RUNG, PRACTICE_MIN_UNSEEN_VOCAB_PERCENT } from "../../Config";
 import { ControllerConfig } from "../../Config";
-import { Exercise, EXERCISE_TYPES } from "../../model/Exercise";
+import { Exercise } from "../../model/Exercise";
 import { PracticeSession } from "../../model/PracticeSession";
 import { ExerciseStore } from "../../store/ExerciseStore";
 import { ModuleStore } from "../../store/ModuleStore";
@@ -11,10 +11,14 @@ import { UserGrammarConceptProgressStore } from "../../store/UserGrammarConceptP
 import { UserModuleProgressStore } from "../../store/UserModuleProgressStore";
 import { UserVocabularyProgressStore } from "../../store/UserVocabularyProgressStore";
 import { selectExercises } from "../../util/ExerciseSelector";
+import { exercisesAtRung, linkedItemIdOf } from "../../util/PracticeRungs";
 
 /**
  * Type-progression order for exercises within a practice session (F10).
  * Lower index = shown earlier (recognition before production).
+ *
+ * A session only ever holds exercises of one rung, so this now only orders the two types
+ * that share a rung; the recognition → production progression across rungs is the ladder itself.
  */
 const TYPE_ORDER: Record<string, number> = {
     multiple_choice: 0,
@@ -70,7 +74,9 @@ export class StartPracticeSession extends TotoDelegate<StartPracticeSessionReque
 
         const userModuleProgressStore = new UserModuleProgressStore({ db, config });
         const progress = await userModuleProgressStore.findByUserAndModule(userId, req.moduleId);
-        const seenVocabIds = new Set(progress?.vocabularyItemsPracticed ?? []);
+
+        const currentRung = progress?.currentRung ?? FIRST_PRACTICE_RUNG;
+        const coveredItemIds = new Set(progress?.coverageAt(currentRung)?.itemIds ?? []);
 
         const vocabProgressStore = new UserVocabularyProgressStore({ db, config });
         const grammarProgressStore = new UserGrammarConceptProgressStore({ db, config });
@@ -86,22 +92,29 @@ export class StartPracticeSession extends TotoDelegate<StartPracticeSessionReque
         const sessionSize = module.practiceSessionSize;
         const minUnseen = Math.ceil(sessionSize * (PRACTICE_MIN_UNSEEN_VOCAB_PERCENT / 100));
 
-        const unseenExercises = allExercises.filter(e => e.vocabularyItemId !== null && !seenVocabIds.has(e.vocabularyItemId!));
-        const seenOrGrammarExercises = allExercises.filter(e => e.vocabularyItemId === null || seenVocabIds.has(e.vocabularyItemId!));
+        // The rung pre-filter: a session draws only from the tier the module is practising at.
+        const rungPool = exercisesAtRung(allExercises, currentRung);
 
-        // Step 1: guarantee the minimum unseen-vocab reservation
+        if (rungPool.length === 0) throw new ValidationError(400, `Module ${req.moduleId} has no exercise at rung ${currentRung} — its exercise bank cannot support the practice ladder`);
+
+        // "Unseen" is scoped per rung: an item covered at rung 1 is still uncovered at rung 2.
+        const uncoveredExercises = rungPool.filter(e => !coveredItemIds.has(linkedItemIdOf(e)));
+        const coveredExercises = rungPool.filter(e => coveredItemIds.has(linkedItemIdOf(e)));
+
+        // Step 1: guarantee the minimum reservation for items not yet covered at this rung
         const unseenGuaranteed = selectExercises({
-            pool: unseenExercises,
+            pool: uncoveredExercises,
             masteryByItemId,
             recentMisses: new Set(),
-            targetCount: Math.min(minUnseen, unseenExercises.length),
+            targetCount: Math.min(minUnseen, uncoveredExercises.length),
         });
 
-        // Step 2: fill remaining slots from (leftover unseen) + (seen / grammar) exercises
+        // Step 2: fill the remaining slots from (leftover uncovered) + (already covered) exercises.
+        // There is no tail top-up — the session is always a full sessionSize, including a rung's last.
         const guaranteedIds = new Set(unseenGuaranteed.map(e => e.id));
         const fillerPool = [
-            ...unseenExercises.filter(e => !guaranteedIds.has(e.id)),
-            ...seenOrGrammarExercises,
+            ...uncoveredExercises.filter(e => !guaranteedIds.has(e.id)),
+            ...coveredExercises,
         ];
         const stillNeeded = sessionSize - unseenGuaranteed.length;
 
@@ -134,6 +147,7 @@ export class StartPracticeSession extends TotoDelegate<StartPracticeSessionReque
             sessionId,
             moduleId: req.moduleId,
             exercises: combined,
+            currentRung,
             startedAt: now,
         };
     }
@@ -147,6 +161,7 @@ interface StartPracticeSessionRequest {
 interface StartPracticeSessionResponse {
     sessionId: string;         // The id of the newly created practice session.
     moduleId: string;          // The id of the module this session belongs to.
-    exercises: Exercise[];     // The full exercise objects selected for this session, ordered by type progression.
+    exercises: Exercise[];     // The full exercise objects selected for this session, ordered by type progression. All belong to currentRung.
+    currentRung: number;       // The practice-ladder rung (1–3) this session was drawn at.
     startedAt: string;         // ISO 8601 timestamp of when the session was started.
 }

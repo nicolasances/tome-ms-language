@@ -2,7 +2,7 @@
 import { Request } from "express";
 import { User } from "../../../src/model/User";
 import { Module } from "../../../src/model/Module";
-import { UserModuleProgress, TestAttemptRecord } from "../../../src/model/UserModuleProgress";
+import { UserModuleProgress, RungCoverage, TestAttemptRecord } from "../../../src/model/UserModuleProgress";
 import { GetMeProgress } from "../../../src/dlg/user/GetMeProgress";
 
 const userContext = { email: "alice@example.com", userId: "u1", authProvider: "test" };
@@ -24,7 +24,8 @@ function makeProgress(moduleId: string, status: string, overrides: Partial<{
     completedAt: string | null;
     practiceCompletedAt: string | null;
     testAttempts: TestAttemptRecord[];
-    vocabularyItemsPracticed: string[];
+    currentRung: number;
+    rungCoverage: RungCoverage[];
 }> = {}): UserModuleProgress {
     return new UserModuleProgress({
         userId: "uuid-001", moduleId, status: status as any,
@@ -277,7 +278,7 @@ describe("GetMeProgress.do - per-module status and step", () => {
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
             [makeModule("a1-1", "A1", ["v1", "v2", "v3"]).toBSON()],
-            [makeProgress("a1-1", "completed", { vocabularyItemsPracticed: ["v1", "v2", "v3"], completedAt: "2026-01-02T10:00:00.000Z" }).toBSON()]
+            [makeProgress("a1-1", "completed", { rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v1", "v2", "v3"] })], completedAt: "2026-01-02T10:00:00.000Z" }).toBSON()]
         );
         const delegate = new GetMeProgress({} as any, config);
 
@@ -292,7 +293,7 @@ describe("GetMeProgress.do - per-module status and step", () => {
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
             [makeModule("a1-1", "A1", ["v1", "v2", "v3"]).toBSON(), makeModule("a1-2", "A1").toBSON()],
-            [makeProgress("a1-1", "completed", { vocabularyItemsPracticed: ["v1", "v2", "v3"], completedAt: "2026-01-02T10:00:00.000Z" }).toBSON()]
+            [makeProgress("a1-1", "completed", { rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v1", "v2", "v3"] })], completedAt: "2026-01-02T10:00:00.000Z" }).toBSON()]
         );
         const delegate = new GetMeProgress({} as any, config);
 
@@ -440,9 +441,10 @@ describe("GetMeProgress.do - vocabularyItemsPracticedCount", () => {
         assert.equal(result.modules[0].completionPct, 0);
     });
 
-    it("returns the count of vocabulary items seen so far during practice", async () => {
+    it("counts the vocabulary items covered at rung 1", async () => {
         const progress = makeProgress("a1-1", "in_progress", {
-            vocabularyItemsPracticed: ["v1", "v2", "v3"],
+            currentRung: 1,
+            rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v1", "v2", "v3"] })],
         });
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
@@ -454,13 +456,52 @@ describe("GetMeProgress.do - vocabularyItemsPracticedCount", () => {
         const result = await delegate.do({}, userContext);
 
         assert.equal(result.modules[0].vocabularyItemsPracticedCount, 3);
-        assert.equal(result.modules[0].completionPct, 60); // 3 out of 5 items practiced
+        assert.equal(result.modules[0].completionPct, 60); // 3 out of 5 items covered
     });
 
-    it("returns the full vocabulary count when all items have been practiced", async () => {
+    it("counts an item once even when it is covered at several rungs", async () => {
         const progress = makeProgress("a1-1", "in_progress", {
-            vocabularyItemsPracticed: ["v1", "v2", "v3", "v4", "v5"],
-            practiceCompletedAt: "2026-01-10T10:00:00.000Z",
+            currentRung: 2,
+            rungCoverage: [
+                new RungCoverage({ rung: 1, itemIds: ["v1", "v2"], completedAt: "2026-01-09T10:00:00.000Z" }),
+                new RungCoverage({ rung: 2, itemIds: ["v1"] }),
+            ],
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3", "v4"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].vocabularyItemsPracticedCount, 2);
+        assert.equal(result.modules[0].completionPct, 50);
+    });
+
+    it("ignores grammar concept ids when counting vocabulary coverage", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 1,
+            rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v1", "g1", "g2"] })],
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].vocabularyItemsPracticedCount, 1);
+        assert.equal(result.modules[0].completionPct, 50);
+    });
+
+    it("returns the full vocabulary count when every item has been covered", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 2,
+            rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v1", "v2", "v3", "v4", "v5"], completedAt: "2026-01-10T10:00:00.000Z" })],
         });
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
@@ -472,13 +513,11 @@ describe("GetMeProgress.do - vocabularyItemsPracticedCount", () => {
         const result = await delegate.do({}, userContext);
 
         assert.equal(result.modules[0].vocabularyItemsPracticedCount, 5);
-        assert.equal(result.modules[0].completionPct, 100); // 5 out of 5 items practiced
+        assert.equal(result.modules[0].completionPct, 100);
     });
 
-    it("returns 0 when progress record exists but vocabularyItemsPracticed is empty", async () => {
-        const progress = makeProgress("a1-1", "in_progress", {
-            vocabularyItemsPracticed: [],
-        });
+    it("returns 0 when a progress record exists but nothing has been covered yet", async () => {
+        const progress = makeProgress("a1-1", "in_progress", { rungCoverage: [] });
         const config = makeMockConfig(
             [makeUser("A1").toBSON()],
             [makeModule("a1-1", "A1", ["v1", "v2", "v3", "v4", "v5"]).toBSON()],
@@ -491,5 +530,21 @@ describe("GetMeProgress.do - vocabularyItemsPracticedCount", () => {
         assert.equal(result.modules[0].vocabularyItemsPracticedCount, 0);
         assert.equal(result.modules[0].completionPct, 0);
     });
-});
 
+    it("reports a completed module as fully covered even though it holds no rung coverage", async () => {
+
+        // Modules completed before the practice ladder shipped have no rungCoverage at all.
+        const progress = makeProgress("a1-1", "completed", { rungCoverage: [], completedAt: "2026-01-02T10:00:00.000Z" });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3", "v4", "v5"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].completionPct, 100);
+        assert.equal(result.modules[0].vocabularyItemsPracticedCount, 5);
+    });
+});

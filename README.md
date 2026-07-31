@@ -16,3 +16,8 @@ Resources:
 | [Sentence Management](docs/specs/sentence-management.md) | API for storing and retrieving sentences (extracted from sources or AI-generated). Includes batch insert and random word sampling for LLM generation. |
 | [Practice Sessions](docs/specs/practice-sessions.md) | Generic session lifecycle API (start, resume, submit answers, complete) with probabilistic word selection based on per-user failure ratios. |
 | [Session Stats](docs/specs/session-stats.md) | Stats endpoints returning per-day completed session counts: ISO week view and rolling N-day window. |
+
+### Operations
+| Document | Description |
+|----------|-------------|
+| [Scripts](scripts/README.md) | One-off operational scripts, e.g. resetting a module's practice progress after its exercise bank is regenerated. |

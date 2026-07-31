@@ -48,8 +48,8 @@ Selection logic lives in [F08](./F08-mastery-aware-exercise-selection.md).
 | userContributedAnswers | string[] | User translations validated by AI at answer time | Appended at runtime; starts empty |
 | words | string[] | Scrambled words for the exercise | Required for sentence_reorder only; null otherwise |
 | distractors | string[] | Wrong answer options | Required for multiple_choice only; null otherwise |
-| vocabularyItemId | string | Linked vocabulary item | Exactly one of vocabularyItemId / grammarConceptId must be set |
-| grammarConceptId | string | Linked grammar concept | Exactly one of vocabularyItemId / grammarConceptId must be set |
+| vocabularyItemId | string | Linked vocabulary item | Exactly one of vocabularyItemId / grammarConceptId must be set; permitted for multiple_choice, conjugation_drill, fill_blank, translation_active |
+| grammarConceptId | string | Linked grammar concept | Exactly one of vocabularyItemId / grammarConceptId must be set; permitted for sentence_reorder, error_correction, fill_blank, translation_active |
 | timesShown | number | How many times shown to users | Default: 0 |
 
 #### 2.2.2. Endpoints
@@ -62,7 +62,8 @@ Selection logic lives in [F08](./F08-mastery-aware-exercise-selection.md).
 #### 2.2.4. Business Logic
 
 - A dedicated store is the sole DB accessor for exercises. Supports: batch-insert exercises with duplicate detection, list exercises by moduleId, find exercise by id, increment `timesShown`, append a string to `userContributedAnswers`.
-- Per-type linkage rule: `vocabularyItemId` is set for multiple_choice, fill_blank, conjugation_drill, translation_active; `grammarConceptId` is set for sentence_reorder, error_correction. Exactly one of the two must be set per exercise; the other must be null.
+- Per-type linkage rule: `vocabularyItemId` is set for multiple_choice and conjugation_drill; `grammarConceptId` is set for sentence_reorder and error_correction; **`fill_blank` and `translation_active` may link to either**, chosen by what the exercise actually tests. Exactly one of the two must be set per exercise; the other must be null.
+  - The two flexible types exist to make the practice ladder ([F10](./F10-practice-session.md)) expressible: under a fixed binding, grammar concepts would have no rung-2 (cued production) exercise type at all, so a rung-2 phase covering grammar could never complete. A grammar-linked `fill_blank` or `translation_active` must be authored so the structure under test is **unavoidable** in a correct answer — a fronted adverbial forcing inversion, a blank placed where negation must land — and not incidental to it. That authoring constraint is enforced by the generation tooling, not by this microservice.
 - **Deduplication**: `(moduleId, type, prompt)` is the uniqueness key for exercises. On `POST /exercises`, each exercise in the batch is checked against this key before insert. Duplicates are skipped (not inserted, not errored); the rest are inserted normally. The response reports how many were inserted and how many were skipped.
 - Pool size for a module is derived at query time (count of exercises with that `moduleId`). There is no stored counter.
 
