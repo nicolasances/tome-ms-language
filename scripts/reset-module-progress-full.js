@@ -19,23 +19,39 @@
  * Also deletes the full ModuleTestAttempt documents for this user+module from the separate
  * moduleTestAttempts collection, so a stale attempt can't be looked up by a leftover id.
  *
+ * Also deletes every PracticeSession document for this user+module (practiceSessions
+ * collection), completed or not. This matters more than it looks: StartPracticeSession
+ * returns 409 (and the client resumes the existing session) whenever an *active*
+ * (completedAt: null) session already exists for the user+module — a stale in-progress
+ * session from before the bank regeneration would otherwise get silently resumed, with the
+ * client replaying its old answers log against exercise ids that may no longer exist. That is
+ * why practice can appear "already half-through" right after a reset that only touched
+ * userModuleProgress.
+ *
  * What it deliberately does NOT touch:
  *   - UserVocabularyProgress / UserGrammarConceptProgress — mastery is global and per-item,
  *     not module-scoped, so resetting one module's progress does not reset mastery scores.
  *
- * Usage:
- *   mongosh "<connection-string>/tomelang" scripts/reset-module-progress-full.js
+ * Usage (defaults: MODULE_ID "danish-A2-01", DRY_RUN true — edit the vars below to change them):
+ *   mongo "<connection-string>/tomelang" scripts/reset-module-progress-full.js
+ *
+ * Or override from the command line with --eval, which runs before the file. Values passed
+ * this way must use `var` (not `const`/`let`) so this script's own `var` declarations below
+ * don't collide with them:
+ *   mongo --host <host> -u <user> --eval 'var DRY_RUN = false; var MODULE_ID = "danish-A2-02";' tomelang scripts/reset-module-progress-full.js
  *
  * DRY_RUN is true by default: it prints the records that would change and deletes nothing.
- * Set it to false to apply. Intended for dev use — think twice before pointing this at prod.
+ * Set it to false (directly below, or via --eval above) to apply. Intended for dev use —
+ * think twice before pointing this at prod.
  */
 
-const MODULE_ID = "danish-A2-01";
-const DRY_RUN = true;
+var MODULE_ID = (typeof MODULE_ID !== "undefined") ? MODULE_ID : "danish-A2-01";
+var DRY_RUN = (typeof DRY_RUN !== "undefined") ? DRY_RUN : true;
 
 const dbHandle = db.getSiblingDB("tomelang");
 const progressCollection = dbHandle.getCollection("userModuleProgress");
 const attemptsCollection = dbHandle.getCollection("moduleTestAttempts");
+const sessionsCollection = dbHandle.getCollection("practiceSessions");
 
 const filter = { moduleId: MODULE_ID };
 
@@ -55,11 +71,16 @@ if (matched.length === 0) {
 }
 
 let totalAttemptDocs = 0;
+let totalSessionDocs = 0;
 
 for (const doc of matched) {
 
     const attemptDocCount = attemptsCollection.countDocuments({ userId: doc.userId, moduleId: MODULE_ID });
     totalAttemptDocs += attemptDocCount;
+
+    const sessionDocCount = sessionsCollection.countDocuments({ userId: doc.userId, moduleId: MODULE_ID });
+    const activeSessionCount = sessionsCollection.countDocuments({ userId: doc.userId, moduleId: MODULE_ID, completedAt: null });
+    totalSessionDocs += sessionDocCount;
 
     print("-".repeat(70));
     print(`userId:              ${doc.userId}`);
@@ -71,6 +92,7 @@ for (const doc of matched) {
     print(`practiceCompletedAt: ${doc.practiceCompletedAt || null}`);
     print(`testAttempts (embedded): ${(doc.testAttempts || []).length}`);
     print(`moduleTestAttempts docs to delete: ${attemptDocCount}`);
+    print(`practiceSessions docs to delete: ${sessionDocCount} (${activeSessionCount} active — this is what causes "already half-through")`);
 }
 
 print("-".repeat(70));
@@ -95,10 +117,12 @@ const updateResult = progressCollection.updateMany(filter, {
 });
 
 const deleteResult = attemptsCollection.deleteMany({ moduleId: MODULE_ID });
+const sessionDeleteResult = sessionsCollection.deleteMany({ moduleId: MODULE_ID });
 
 print(`Progress records matched:  ${updateResult.matchedCount}`);
 print(`Progress records modified: ${updateResult.modifiedCount}`);
 print(`Test attempt docs deleted: ${deleteResult.deletedCount} (expected ${totalAttemptDocs})`);
+print(`Practice session docs deleted: ${sessionDeleteResult.deletedCount} (expected ${totalSessionDocs})`);
 print("");
 print("Done. The module is back to 'available' — Grammar, Practice and the Module Test can");
 print("all be run again from scratch against the regenerated bank.");

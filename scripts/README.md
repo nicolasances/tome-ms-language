@@ -30,14 +30,21 @@ touched: they survive the regeneration deliberately.
 
 ## `reset-module-progress-full.js`
 
-Run with `mongosh`:
+Works with either `mongosh` or the legacy `mongo` shell (no ES2020 syntax — no `??`/`?.`).
+
+Run with the defaults (`MODULE_ID` = `danish-A2-01`, `DRY_RUN` = `true`) by editing the vars at
+the top of the file, or override from the command line with `--eval`, which runs before the file:
 
 ```bash
-mongosh "<connection-string>/tomelang" scripts/reset-module-progress-full.js
+# Edit-the-file style
+mongo "<connection-string>/tomelang" scripts/reset-module-progress-full.js
+
+# --eval style — note `var`, not `const`/`let`, so it doesn't collide with the script's own vars
+mongo --host <host> -u <user> --eval 'var DRY_RUN = false; var MODULE_ID = "danish-A2-02";' tomelang scripts/reset-module-progress-full.js
 ```
 
-`DRY_RUN` is `true` at the top of the file — read the output, then set `DRY_RUN = false` and run
-again to apply. Edit `MODULE_ID` at the top for the target module (defaults to `danish-A2-01`).
+`DRY_RUN` is `true` by default — read the output, then set `DRY_RUN = false` (either way above) and
+run again to apply.
 
 **When you need it.** You want to manually re-run a module — Grammar, Practice, and the Module
 Test — from scratch against a regenerated exercise bank, including a module whose status is
@@ -48,9 +55,14 @@ deliberately re-testing one anyway.
 **What it does.** Unlike `reset-module-practice.js`, `status` is **not** filtered — every progress
 record for the module is reset to `status: "available"`, `startedAt`/`completedAt`/
 `practiceCompletedAt` cleared, `currentRung` back to 1, `rungCoverage` cleared, embedded
-`testAttempts` cleared, and the full `ModuleTestAttempt` documents for that user+module deleted
-from the `moduleTestAttempts` collection. Mastery (`UserVocabularyProgress` /
-`UserGrammarConceptProgress`) is left untouched — it is global and per-item, not module-scoped.
+`testAttempts` cleared, the full `ModuleTestAttempt` documents for that user+module deleted from
+`moduleTestAttempts`, **and every `practiceSessions` document for that user+module deleted too**.
+That last one matters more than it looks: `StartPracticeSession` resumes (409 + client replay)
+any *active* (`completedAt: null`) session it finds for the user+module, so a stale in-progress
+session left over from before a reset gets silently resumed — practice looks "already
+half-through" even though `userModuleProgress` was reset correctly. Mastery
+(`UserVocabularyProgress` / `UserGrammarConceptProgress`) is left untouched — it is global and
+per-item, not module-scoped.
 
 **Use with care.** This is meant for dev. Think twice before pointing it at prod — it discards a
 passed module test.
