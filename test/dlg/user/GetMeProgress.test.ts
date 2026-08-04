@@ -548,3 +548,179 @@ describe("GetMeProgress.do - vocabularyItemsPracticedCount", () => {
         assert.equal(result.modules[0].vocabularyItemsPracticedCount, 5);
     });
 });
+
+describe("GetMeProgress.do - currentRung", () => {
+
+    it("defaults to rung 1 when no progress record exists for the module", async () => {
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2"]).toBSON()],
+            []
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].currentRung, 1);
+    });
+
+    it("reports the rung the progress record is currently at", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 2,
+            rungCoverage: [
+                new RungCoverage({ rung: 1, itemIds: ["v1", "v2"], completedAt: "2026-01-09T10:00:00.000Z" }),
+                new RungCoverage({ rung: 2, itemIds: ["v1"] }),
+            ],
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].currentRung, 2);
+    });
+});
+
+describe("GetMeProgress.do - fullyCompletedRungs", () => {
+
+    it("is 0 when no progress record exists for the module", async () => {
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2"]).toBSON()],
+            []
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].fullyCompletedRungs, 0);
+    });
+
+    it("is currentRung - 1 while the ladder is still in progress", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 3,
+            rungCoverage: [
+                new RungCoverage({ rung: 1, itemIds: ["v1", "v2"], completedAt: "2026-01-09T10:00:00.000Z" }),
+                new RungCoverage({ rung: 2, itemIds: ["v1", "v2"], completedAt: "2026-01-10T10:00:00.000Z" }),
+                new RungCoverage({ rung: 3, itemIds: [] }),
+            ],
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].fullyCompletedRungs, 2);
+    });
+
+    it("is 3 once practiceCompletedAt is set, regardless of currentRung", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 3,
+            practiceCompletedAt: "2026-01-11T10:00:00.000Z",
+            rungCoverage: [
+                new RungCoverage({ rung: 1, itemIds: ["v1", "v2"], completedAt: "2026-01-09T10:00:00.000Z" }),
+                new RungCoverage({ rung: 2, itemIds: ["v1", "v2"], completedAt: "2026-01-10T10:00:00.000Z" }),
+                new RungCoverage({ rung: 3, itemIds: ["v1", "v2"], completedAt: "2026-01-11T10:00:00.000Z" }),
+            ],
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].fullyCompletedRungs, 3);
+    });
+
+    it("is 3 for a module completed before the practice ladder shipped (no rung coverage)", async () => {
+        const progress = makeProgress("a1-1", "completed", { rungCoverage: [], completedAt: "2026-01-02T10:00:00.000Z" });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].fullyCompletedRungs, 3);
+    });
+});
+
+describe("GetMeProgress.do - currentRungCoverage", () => {
+
+    it("is 0/totalCount when no progress record exists for the module", async () => {
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3"]).toBSON()],
+            []
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.deepEqual(result.modules[0].currentRungCoverage, { coveredCount: 0, totalCount: 3 });
+    });
+
+    it("counts practice items covered at the current rung only", async () => {
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 2,
+            rungCoverage: [
+                new RungCoverage({ rung: 1, itemIds: ["v1", "v2"], completedAt: "2026-01-09T10:00:00.000Z" }),
+                new RungCoverage({ rung: 2, itemIds: ["v1"] }),
+            ],
+        });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.deepEqual(result.modules[0].currentRungCoverage, { coveredCount: 1, totalCount: 2 });
+    });
+
+    it("pools vocabulary and grammar concept ids into totalCount", async () => {
+        const module = new Module({
+            id: "a1-1", title: "Module a1-1", theme: "T", communicationGoal: "G",
+            cefrLevel: "A1" as any, vocabularyItemIds: ["v1", "v2"], grammarConceptIds: ["g1"], isUserGenerated: false,
+        });
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 1,
+            rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v1", "g1"] })],
+        });
+        const config = makeMockConfig([makeUser("A1").toBSON()], [module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.deepEqual(result.modules[0].currentRungCoverage, { coveredCount: 2, totalCount: 3 });
+    });
+
+    it("reports full coverage for a completed module even though it holds no rung coverage", async () => {
+        const progress = makeProgress("a1-1", "completed", { rungCoverage: [], completedAt: "2026-01-02T10:00:00.000Z" });
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3"]).toBSON()],
+            [progress.toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.deepEqual(result.modules[0].currentRungCoverage, { coveredCount: 3, totalCount: 3 });
+    });
+});
