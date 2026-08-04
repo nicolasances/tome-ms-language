@@ -780,3 +780,31 @@ describe("GetMeProgress.do - rung 3 practice completion scenarios", () => {
         assert.equal(m.step, "test");  // practiceCompletedAt is set, so the module now awaits the Module Test
     });
 });
+
+describe("GetMeProgress.do - rung 2 practice completion scenario", () => {
+
+    it("reports full rung-2 coverage without crediting the current rung towards fullyCompletedRungs", async () => {
+        const module = new Module({
+            id: "a1-1", title: "Module a1-1", theme: "T", communicationGoal: "G",
+            cefrLevel: "A1" as any, vocabularyItemIds: ["v1", "v2", "v3"], grammarConceptIds: ["g1", "g2"], isUserGenerated: false,
+        });
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 2,
+            rungCoverage: [
+                new RungCoverage({ rung: 1, itemIds: ["v1", "v2", "v3", "g1", "g2"], completedAt: "2026-01-09T10:00:00.000Z" }),
+                new RungCoverage({ rung: 2, itemIds: ["v1", "v2", "v3", "g1", "g2"], completedAt: "2026-01-10T10:00:00.000Z" }),  // all 3 words + both grammar concepts covered
+            ],
+        });
+        const config = makeMockConfig([makeUser("A1").toBSON()], [module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+        const m = result.modules[0];
+
+        assert.equal(m.currentRung, 2);
+        assert.deepEqual(m.currentRungCoverage, { coveredCount: 5, totalCount: 5 });
+        assert.equal(m.fullyCompletedRungs, 1);  // only rung 1 is behind currentRung; rung 2 itself isn't counted until the ladder advances past it
+        assert.equal(m.status, "in_progress");
+        assert.equal(m.step, "practice");
+    });
+});
