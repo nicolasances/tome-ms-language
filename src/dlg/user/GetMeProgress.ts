@@ -6,6 +6,7 @@ import { UserModuleProgressStore } from "../../store/UserModuleProgressStore";
 import { ModuleStore } from "../../store/ModuleStore";
 import { CEFR_LEVELS, CefrLevel } from "../../model/CefrLevels";
 import { Module } from "../../model/Module";
+import { FIRST_PRACTICE_RUNG, LAST_PRACTICE_RUNG } from "../../Config";
 
 type ModuleStep = "grammar" | "practice" | "test" | "done";
 
@@ -104,6 +105,15 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
             const vocabularyItemsPracticedCount = status === "completed" ? m.vocabularyItemIds.length : m.vocabularyItemIds.filter(id => coveredItemIds.has(id)).length;
             const completionPct = m.vocabularyItemIds.length > 0 ? Math.round((vocabularyItemsPracticedCount / m.vocabularyItemIds.length) * 100) : 0;
 
+            // Per-rung practice-ladder progress (F10). Modules completed before the ladder shipped
+            // carry no rungCoverage at all, so — same fallback as vocabularyItemsPracticedCount above —
+            // they are reported as sitting past the last rung, fully covered.
+            const currentRung = progress?.currentRung ?? FIRST_PRACTICE_RUNG;
+            const modulePracticeItemIds = [...m.vocabularyItemIds, ...m.grammarConceptIds];
+            const currentRungCoveredIds = new Set(progress?.coverageAt(currentRung)?.itemIds ?? []);
+            const currentRungCoveredCount = status === "completed" ? modulePracticeItemIds.length : modulePracticeItemIds.filter(id => currentRungCoveredIds.has(id)).length;
+            const fullyCompletedRungs = (status === "completed" || progress?.practiceCompletedAt) ? LAST_PRACTICE_RUNG : currentRung - 1;
+
             // testUnlocksAt: practiceCompletedAt (Step 2 complete) + module unlock delay; null until Step 2 completes
             let testUnlocksAt: string | null = null;
             if (progress?.practiceCompletedAt) {
@@ -135,6 +145,9 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 testUnlocksAt,
                 testRetryAvailableAt,
                 vocabularyItemsPracticedCount,
+                currentRung,
+                currentRungCoverage: { coveredCount: currentRungCoveredCount, totalCount: modulePracticeItemIds.length },
+                fullyCompletedRungs,
             });
 
             previousModule = m;
@@ -166,6 +179,14 @@ interface ModuleProgressEntry {
     testUnlocksAt: string | null;               // ISO-8601 timestamp of when the Module Test unlocks; null until Step 2 coverage is complete
     testRetryAvailableAt: string | null;        // ISO-8601 timestamp of when a failed test retry becomes available; null when no failed attempts exist
     vocabularyItemsPracticedCount: number;      // Number of the module's vocabulary items covered at any rung of the practice ladder; the module's full vocabulary count once it is completed
+    currentRung: number;                        // The practice-ladder rung (1–3) the module is currently practising at; defaults to the first rung when no progress record exists
+    currentRungCoverage: RungCoverageCount;      // Coverage of the module's combined practice items (vocabulary + grammar concepts) at currentRung; fully covered once the module is completed
+    fullyCompletedRungs: number;                 // Number of rungs fully completed before currentRung; 3 once the whole ladder (or a pre-ladder module) is complete
+}
+
+interface RungCoverageCount {
+    coveredCount: number;   // Practice items covered at the rung
+    totalCount: number;     // Practice items in the module — the count that must be reached to complete the rung
 }
 
 interface GetMeProgressResponse {
