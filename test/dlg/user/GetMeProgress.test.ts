@@ -724,3 +724,59 @@ describe("GetMeProgress.do - currentRungCoverage", () => {
         assert.deepEqual(result.modules[0].currentRungCoverage, { coveredCount: 3, totalCount: 3 });
     });
 });
+
+describe("GetMeProgress.do - rung 3 practice completion scenarios", () => {
+
+    it("reports partial rung-3 coverage when the user has covered 2 of 3 words and 1 of 2 grammar concepts", async () => {
+        const module = new Module({
+            id: "a1-1", title: "Module a1-1", theme: "T", communicationGoal: "G",
+            cefrLevel: "A1" as any, vocabularyItemIds: ["v1", "v2", "v3"], grammarConceptIds: ["g1", "g2"], isUserGenerated: false,
+        });
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 3,
+            rungCoverage: [
+                new RungCoverage({ rung: 1, itemIds: ["v1", "v2", "v3", "g1", "g2"], completedAt: "2026-01-09T10:00:00.000Z" }),
+                new RungCoverage({ rung: 2, itemIds: ["v1", "v2", "v3", "g1", "g2"], completedAt: "2026-01-10T10:00:00.000Z" }),
+                new RungCoverage({ rung: 3, itemIds: ["v1", "v2", "g1"] }),  // 2/3 words, 1/2 grammar concepts — rung not yet complete
+            ],
+        });
+        const config = makeMockConfig([makeUser("A1").toBSON()], [module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+        const m = result.modules[0];
+
+        assert.equal(m.currentRung, 3);
+        assert.deepEqual(m.currentRungCoverage, { coveredCount: 3, totalCount: 5 });
+        assert.equal(m.fullyCompletedRungs, 2);
+        assert.equal(m.status, "in_progress");
+        assert.equal(m.step, "practice");
+    });
+
+    it("reports full rung-3 coverage and unlocks the module test when all 3 words and 2 grammar concepts are covered", async () => {
+        const module = new Module({
+            id: "a1-1", title: "Module a1-1", theme: "T", communicationGoal: "G",
+            cefrLevel: "A1" as any, vocabularyItemIds: ["v1", "v2", "v3"], grammarConceptIds: ["g1", "g2"], isUserGenerated: false,
+        });
+        const progress = makeProgress("a1-1", "in_progress", {
+            currentRung: 3,
+            practiceCompletedAt: "2026-01-11T10:00:00.000Z",  // the whole ladder completed with this last rung-3 session
+            rungCoverage: [
+                new RungCoverage({ rung: 1, itemIds: ["v1", "v2", "v3", "g1", "g2"], completedAt: "2026-01-09T10:00:00.000Z" }),
+                new RungCoverage({ rung: 2, itemIds: ["v1", "v2", "v3", "g1", "g2"], completedAt: "2026-01-10T10:00:00.000Z" }),
+                new RungCoverage({ rung: 3, itemIds: ["v1", "v2", "v3", "g1", "g2"], completedAt: "2026-01-11T10:00:00.000Z" }),
+            ],
+        });
+        const config = makeMockConfig([makeUser("A1").toBSON()], [module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+        const m = result.modules[0];
+
+        assert.equal(m.currentRung, 3);
+        assert.deepEqual(m.currentRungCoverage, { coveredCount: 5, totalCount: 5 });
+        assert.equal(m.fullyCompletedRungs, 3);
+        assert.equal(m.status, "in_progress");
+        assert.equal(m.step, "test");  // practiceCompletedAt is set, so the module now awaits the Module Test
+    });
+});
