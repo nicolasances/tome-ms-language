@@ -53,6 +53,33 @@ export class PracticeSessionStore {
     }
 
     /**
+     * Returns the **completed** practice sessions of a user + module pair, optionally bounded to
+     * those completed no later than `completedBefore`.
+     *
+     * Two rules the User Proficiency Score depends on:
+     * - Abandoned sessions are excluded: they hold recorded misses but never ran the retry loop,
+     *   so they would charge errors against effort that was never finished.
+     * - `completedBefore` is the module's own completion timestamp, so "keep practising" runs on
+     *   an already-completed module never move the frozen score.
+     *
+     * @param {string} userId - The user id.
+     * @param {string} moduleId - The module id.
+     * @param {string} completedBefore - Optional ISO-8601 upper bound on `completedAt` (inclusive).
+     *
+     * @returns {Promise<PracticeSession[]>} The matching completed sessions.
+     */
+    async listCompletedByUserAndModule(userId: string, moduleId: string, completedBefore?: string): Promise<PracticeSession[]> {
+
+        const completedAt: Record<string, any> = { $ne: null };
+
+        if (completedBefore) completedAt.$lte = completedBefore;
+
+        const docs = await this.db.collection(COLLECTION).find({ userId, moduleId, completedAt }).toArray();
+
+        return docs.map(doc => PracticeSession.fromBSON(doc as any));
+    }
+
+    /**
      * Appends an answer to the session's answers array.
      */
     async appendAnswer(sessionId: string, answer: PracticeAnswer): Promise<void> {

@@ -72,6 +72,27 @@ export class ModuleTestAttemptStore {
     }
 
     /**
+     * Returns the **earliest submitted** attempt for a user + module pair — pass or fail.
+     * An attempt is submitted when its `takenAt` is set; in-progress attempts are ignored.
+     *
+     * This is the attempt the User Proficiency Score reads: every later attempt is taken after
+     * seeing the review and F12's mistake explanation, so it is not an independent measurement.
+     *
+     * @param {string} userId - The user id.
+     * @param {string} moduleId - The module id.
+     *
+     * @returns {Promise<ModuleTestAttempt | null>} The first submitted attempt, or null when the user never submitted one.
+     */
+    async findFirstSubmittedByUserAndModule(userId: string, moduleId: string): Promise<ModuleTestAttempt | null> {
+
+        const doc = await this.db.collection(COLLECTION).findOne({ userId, moduleId, takenAt: { $ne: null } }, { sort: { takenAt: 1 } });
+
+        if (!doc) return null;
+
+        return ModuleTestAttempt.fromBSON(doc as any);
+    }
+
+    /**
      * Appends a TestAnswer to the attempt's answers array.
      * The first answer to each exercise is final for grading — there is no retry mechanism.
      *

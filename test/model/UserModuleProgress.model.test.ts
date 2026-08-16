@@ -1,5 +1,28 @@
 import { strict as assert } from "assert";
-import { RungCoverage, TestAttemptRecord, UserModuleProgress } from "../../src/model/UserModuleProgress";
+import { ModuleProficiency, RungCoverage, TestAttemptRecord, UserModuleProgress } from "../../src/model/UserModuleProgress";
+
+describe("ModuleProficiency.fromBSON", () => {
+
+    it("round-trips all fields through toBSON and fromBSON", () => {
+        const proficiency = new ModuleProficiency({ score: 88.6, testScore: 86.4, practiceScore: 92, basis: "full", computedAt: "2026-08-16T10:00:00.000Z", version: 1 });
+        const result = ModuleProficiency.fromBSON(proficiency.toBSON());
+
+        assert.equal(result.score, 88.6);
+        assert.equal(result.testScore, 86.4);
+        assert.equal(result.practiceScore, 92);
+        assert.equal(result.basis, "full");
+        assert.equal(result.computedAt, "2026-08-16T10:00:00.000Z");
+        assert.equal(result.version, 1);
+    });
+
+    it("preserves a null practiceScore on a test-only score", () => {
+        const proficiency = new ModuleProficiency({ score: 57.1, testScore: 57.1, practiceScore: null, basis: "test-only", computedAt: "2026-08-16T10:00:00.000Z", version: 1 });
+        const result = ModuleProficiency.fromBSON(proficiency.toBSON());
+
+        assert.equal(result.practiceScore, null);
+        assert.equal(result.basis, "test-only");
+    });
+});
 
 describe("TestAttemptRecord.fromBSON", () => {
 
@@ -70,6 +93,30 @@ describe("UserModuleProgress.fromBSON", () => {
         assert.equal(result.rungCoverage[0].completedAt, "2026-06-02T08:00:00.000Z");
         assert.equal(result.practiceCompletedAt, "2026-06-02T09:00:00.000Z");
         assert.deepEqual(result.testAttempts, []);
+    });
+
+    it("round-trips the proficiency sub-document", () => {
+        const progress = new UserModuleProgress({
+            userId: "user-1",
+            moduleId: "mod-1",
+            status: "completed",
+            startedAt: "2026-06-01T09:00:00.000Z",
+            completedAt: "2026-06-05T09:00:00.000Z",
+            testAttempts: [],
+            proficiency: new ModuleProficiency({ score: 69.5, testScore: 57.1, practiceScore: 88, basis: "full", computedAt: "2026-08-16T10:00:00.000Z", version: 1 }),
+        });
+
+        const result = UserModuleProgress.fromBSON(progress.toBSON());
+
+        assert.equal(result.proficiency!.score, 69.5);
+        assert.equal(result.proficiency!.basis, "full");
+    });
+
+    it("defaults proficiency to null when absent from the document", () => {
+        const doc: any = { userId: "user-1", moduleId: "mod-1", status: "completed", startedAt: null, completedAt: null };
+        const result = UserModuleProgress.fromBSON(doc);
+
+        assert.equal(result.proficiency, null);
     });
 
     it("defaults currentRung to the first rung and rungCoverage to [] when absent from the document", () => {

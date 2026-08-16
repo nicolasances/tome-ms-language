@@ -107,6 +107,42 @@ export const LEVEL_TEST_PASS_THRESHOLD = 75;
 export const LEVEL_TEST_RETRY_DELAY_MINUTES = 30;
 
 /**
+ * Version of the User Proficiency Score (UPS) formula. Stored on every computed
+ * `UserModuleProgress.proficiency`; a stored score carrying a lower version is recomputed the next
+ * time `GET /me/progress` reads it. Bumping this constant is how a change to the weights below is
+ * rolled out — there is no hand-run migration.
+ */
+export const PROFICIENCY_VERSION = 1;
+
+/**
+ * How much a wrong answer in the Module Test is charged, relative to what a correct one is worth,
+ * when computing the UPS test component: `100 × C / (C + k × W)`.
+ *
+ * The test is taken *after* the whole practice ladder is complete, so an error there is far more
+ * diagnostic than an error during practice, where being wrong is the expected path to learning.
+ * At k = 3 the formula is convex: the first slip costs ~2.7× what it would under plain accuracy,
+ * and each subsequent one costs less.
+ */
+export const PROFICIENCY_TEST_ERROR_WEIGHT = 3;
+
+/**
+ * Share of the UPS carried by the test component; the practice component carries the remainder.
+ *
+ * Deliberately not test-heavier: PROFICIENCY_TEST_ERROR_WEIGHT already penalises test errors, and
+ * stacking a 75/25 blend on top would apply the same penalty twice.
+ */
+export const PROFICIENCY_TEST_BLEND_WEIGHT = 0.6;
+
+/**
+ * Weight each practice-ladder rung carries in the UPS practice component.
+ *
+ * Rung 1 (recognition) is excluded entirely — selecting from provided material says little about
+ * proficiency. Rung 3 (free production) counts double rung 2 (cued production), so normalised the
+ * two contribute ⅓ and ⅔ of the component respectively.
+ */
+export const PROFICIENCY_RUNG_WEIGHTS: Record<number, number> = { 1: 0, 2: 1, 3: 2 };
+
+/**
  * IANA timezone used as the single reference civil-day boundary for F24 activity bucketing.
  * All per-day counts bucket timestamps into this timezone — not UTC, not per-user.
  */
