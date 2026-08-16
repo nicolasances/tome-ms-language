@@ -9,6 +9,7 @@ import { ModuleTestAttemptStore } from "../../store/ModuleTestAttemptStore";
 import { UserGrammarConceptProgressStore } from "../../store/UserGrammarConceptProgressStore";
 import { UserModuleProgressStore } from "../../store/UserModuleProgressStore";
 import { UserVocabularyProgressStore } from "../../store/UserVocabularyProgressStore";
+import { computeModuleProficiency } from "../../util/ProficiencyScore";
 
 /**
  * Finalises a Module Test attempt (F11).
@@ -21,7 +22,8 @@ import { UserVocabularyProgressStore } from "../../store/UserVocabularyProgressS
  * 4. Update mastery (F06) for every answered exercise — same loop as CompletePracticeSession.
  * 5. Persist the grading outcome on the attempt (`score`, `passed`, `takenAt`, `exerciseResults`).
  * 6. Record a TestAttemptRecord summary in `UserModuleProgress.testAttempts`.
- * 7. On pass: transition `UserModuleProgress` status to `completed`.
+ * 7. On pass: transition `UserModuleProgress` status to `completed` and freeze the module's
+ *    User Proficiency Score (UPS) on the progress record.
  */
 export class SubmitModuleTest extends TotoDelegate<SubmitModuleTestRequest, SubmitModuleTestResponse> {
 
@@ -109,9 +111,14 @@ export class SubmitModuleTest extends TotoDelegate<SubmitModuleTestRequest, Subm
             new TestAttemptRecord({ id: req.attemptId, score, passed, takenAt })
         );
 
-        // On pass: transition module to completed
+        // On pass: transition module to completed and freeze its proficiency score
         if (passed) {
-            await progressStore.transitionStatus(req.userId, attempt.moduleId, "completed");
+
+            const progress = await progressStore.transitionStatus(req.userId, attempt.moduleId, "completed");
+
+            const proficiency = await computeModuleProficiency({ db, config, userId: req.userId, moduleId: attempt.moduleId, completedAt: progress.completedAt! });
+
+            if (proficiency) await progressStore.setProficiency(req.userId, attempt.moduleId, proficiency);
         }
 
         return { score, passed };
