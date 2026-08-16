@@ -29,6 +29,7 @@ This feature also owns the single aggregate read the app uses to render the Home
 | Practice item | One vocabulary item **or** one grammar concept referenced by the module. Both are tracked by rung coverage |
 | Rung | A difficulty tier of practice: 1 · recognition, 2 · cued production, 3 · free production. Owned by [F10](./F10-practice-session.md); this feature only stores the coverage |
 | Rung coverage | The set of practice items covered at one rung, plus when that rung was completed |
+| User Proficiency Score (UPS) | A 0–100 per-user, per-module score of *how hard the module was*, computed once when the module completes |
 
 ### 2.2. Requirements
 
@@ -53,6 +54,23 @@ This feature also owns the single aggregate read the app uses to render the Home
 
 Both id spaces land in `itemIds` because vocabulary item ids and grammar concept ids are disjoint (F06 relies on this already), so one array per rung suffices.
 
+**ModuleProficiency** (sub-model, embedded in UserModuleProgress)
+
+The **User Proficiency Score (UPS)**: a 0–100 measure of *how hard the module actually was*, as opposed to `completionPct`, which only says whether it was finished. Every completed module otherwise looks identical — the test score is compressed into the 80–100 band by the pass threshold, and practice accuracy always reads 100% because [F10](./F10-practice-session.md)'s missed-retry loop is a precondition of completion.
+
+| Field | Type | Description | Rules |
+|-------|------|-------------|-------|
+| score | number | The UPS | 0–100; `0.60 × testScore + 0.40 × practiceScore`, or `testScore` alone when `basis` is `test-only` |
+| testScore | number | Test component | 0–100; `100 × C / (C + 3W)` over the user's **first submitted** [F11](./F11-module-test.md) attempt |
+| practiceScore | number \| null | Practice component | 0–100; rung-weighted accuracy over the completed [F10](./F10-practice-session.md) sessions. `null` exactly when `basis` is `test-only` |
+| basis | string | Which inputs the score could be computed from | `full` \| `practice-rung2-only` \| `practice-rung3-only` \| `test-only` |
+| computedAt | string | When the score was computed (ISO 8601) | Set server-side |
+| version | number | Formula version (`PROFICIENCY_VERSION`) | Drives recompute-on-read |
+
+Both components share one formula — `100 × correct / (correct + k × wrong)` — differing only in how heavily a wrong answer is charged: `k = 1` for practice (plain accuracy over every answer, retries included), `k = 3` for the test. The weighting is applied **inside each source's own ratio, before the blend**: a module carries ~300 practice answers against 20 test questions, so pooling them into one global ratio would let volume drown the very signal the multiplier exists to amplify.
+
+The `k = 3` makes the test component convex — a first slip on 19/20 costs 13.6 points where plain accuracy charges 5, and each further error costs less. That is the intended shape: after a full practice ladder, the first slip is the damning one. The 60/40 blend is deliberately *not* 75/25; `k = 3` already penalises test errors, and a test-heavier blend would apply the same penalty twice.
+
 **UserModuleProgress**
 
 | Field | Type | Description | Rules |
@@ -66,6 +84,7 @@ Both id spaces land in `itemIds` because vocabulary item ids and grammar concept
 | rungCoverage | RungCoverage[] | Per-rung covered-item sets | Defaults to `[]`; one entry per rung reached; entries are never cleared when the module advances, so the history is preserved |
 | practiceCompletedAt | string \| null | When the whole practice ladder was completed — i.e. when rung 3 was fully covered (ISO 8601) | Nullable; set once by F10 the moment the last rung completes; the timestamp `testUnlockDelayHours` counts from |
 | testAttempts | ModuleTestAttempt[] | All module test attempts | Appended by F11 via `UserModuleProgressStore.appendTestAttempt`, in-process |
+| proficiency | ModuleProficiency \| null | The User Proficiency Score | Defaults to `null`; written once when the module completes and frozen there — later "keep practising" sessions never move it. Recomputed only when `version` falls behind `PROFICIENCY_VERSION` |
 
 > **Note — `vocabularyItemsPracticed` is gone.** It was a single flat set of vocabulary ids that recorded one exposure per item and excluded grammar concepts entirely. `currentRung` + `rungCoverage` replace it. Records written before the practice ladder may still carry the old field on disk; `UserModuleProgress.fromBSON` simply ignores it. There is no migration of old values into rung coverage — a module still in flight is reset to rung 1 instead (see [F10](./F10-practice-session.md)).
 
@@ -78,7 +97,7 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 - `GET /me/progress` — the single aggregate read for the Home dashboard and Module map. Optional query param `?cefrLevel=A1` selects which level's modules to return; when omitted, the user's **current** CEFR level is used. Returns:
   - `currentCefrLevel` — the user's active level (from F05).
   - `levels` — the CEFR rollup across all six tiers: for each level, `{ level, status (locked|current|completed), modulesCompleted, modulesTotal }`. Drives the level-track UI and "11 to reach A2".
-  - `modules` — the per-module list for the selected level: for each module, `{ moduleId, status, step (grammar|practice|test|done), completionPct, startedAt, completedAt }`. Drives the dashboard continue-card and the module map.
+  - `modules` — the per-module list for the selected level: for each module, `{ moduleId, status, step (grammar|practice|test|done), completionPct, startedAt, completedAt, proficiency }`. Drives the dashboard continue-card and the module map. `proficiency` is `{ score, testScore, practiceScore, basis }` for a `completed` module and `null` otherwise; reading it may trigger the lazy backfill described in §2.2.3. There is deliberately **no** cross-level "weakest modules" endpoint — the client merges the per-level responses.
   - For the module currently `in_progress` (if any), the module entry additionally carries the test-timing fields surfaced from F11 so the app can render a local countdown without a second request: `testUnlocksAt` (ISO 8601, absolute — derived from `practiceCompletedAt + testUnlockDelayHours`, so it is `null`/absent until Step 2 coverage is complete) and `testRetryAvailableAt` (ISO 8601, present only when a prior attempt failed and a retry cooldown is active). These are timestamps, not a computed boolean — the client derives "locked / unlocks in 3h59m" itself. The authoritative unlock gate remains server-side in F11.
 
 > **Note — writes and the completion-gate query are not REST endpoints.** Everything below `GET /me/progress` is driven directly, in-process, by the features that need it — all of them (F10, F11, F21) live inside this microservice, so HTTP endpoints here would have no external consumer. Earlier in the redesign these existed as `PUT /me/moduleProgress/:moduleId`, `POST /me/moduleProgress/:moduleId/practicedVocabulary`, `POST /me/moduleProgress/:moduleId/testAttempts`, and `GET /me/levelProgress`; all four were removed per the coding standard ("only create REST endpoints when consumed by an external consumer") — see the [change](./changes/2026-06-08-remove-internal-module-progress-endpoint.md) [records](./changes/2026-06-08-remove-internal-only-rest-endpoints.md).
@@ -87,6 +106,7 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 - **Rung coverage accumulation**: `UserModuleProgressStore.appendRungCoverage(userId, moduleId, rung, itemIds)` adds practice item ids to that rung's `itemIds` with de-duplicated, set-union semantics (`$addToSet`), creating the rung's entry on first use. F10 calls it after each practice session.
 - **Rung completion**: `UserModuleProgressStore.completeRung(userId, moduleId, rung, completedAt)` stamps `completedAt` on the rung and advances `currentRung` to `rung + 1`, capped at the last rung. It is idempotent — the update only matches a rung whose `completedAt` is still null, so a later session at the same rung cannot move the timestamp or re-advance the module. That matters at the last rung, where `currentRung` stops climbing and further "keep practising" sessions keep re-detecting full coverage.
 - **Test-attempt recording**: `UserModuleProgressStore.appendTestAttempt(userId, moduleId, attempt)` appends a `ModuleTestAttempt` record. F11 calls it once a module test is graded.
+- **Proficiency storage**: `UserModuleProgressStore.setProficiency(userId, moduleId, proficiency)` writes the `proficiency` sub-document and nothing else. F11 calls it the moment a passing test transitions the module to `completed`; `GET /me/progress` calls it when it backfills a missing or out-of-version score. The score itself is produced by `computeModuleProficiency` in `src/util/ProficiencyScore.ts`, which reads `ModuleTestAttemptStore.findFirstSubmittedByUserAndModule` and `PracticeSessionStore.listCompletedByUserAndModule`.
 - **Completion-gate query**: F21 reads the user's CEFR level (F05's `UserStore`), lists that level's modules (F03's `ModuleStore.list`), and maps each to its progress record via `UserModuleProgressStore.listByUser` (defaulting to `locked` when no record exists) to determine whether every module is `completed`. This is a small in-process aggregation F21 performs itself — not a shared store method — mirroring how `GetMeProgress` already aggregates across F03/F05/F07.
 
 #### 2.2.3. Business Logic
@@ -100,6 +120,12 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 - `rungCoverage` accumulates with set-union semantics (no duplicates) per rung and is preserved across status transitions. `currentRung` only ever increases.
 - `GET /me/progress` derives `completionPct` and `vocabularyItemsPracticedCount` from the union of covered items across every rung, intersected with `Module.vocabularyItemIds`. A module whose status is `completed` is always reported as 100% — modules completed before the practice ladder shipped hold no rung coverage at all, and would otherwise read as 0% on the module map.
 - `testAttempts` are always preserved across status transitions.
+- **The UPS is a frozen snapshot, not a current standing.** It is computed once, when the module completes, from the user's *first* submitted test attempt and the practice sessions completed *before* `completedAt`. Only the first attempt counts because every later one is taken after seeing `GET …/review` and F12's mistake explanation, so it is not an independent measurement; using it also restores the range the 80% pass threshold collapses. Only sessions completed before `completedAt` count so that "keep practising" runs on an already-completed module never move the score. There is no time-based decay: the score answers "how hard was this", not "how stale is this".
+- **Practice answers are pooled per rung across sessions**, never averaged per session — a short final session must not count as much as a long stretch of them. Rung 1 (recognition) is excluded entirely; rung 3 (free production) counts double rung 2 (cued production). The rung is resolved **per answer** from the exercise type via F10's `rungOfType`, not per session, so pre-ladder sessions that mixed types still split correctly. Retries are what make this a difficulty measure: because a completed session ends with one correct answer per exercise, the surplus answers *are* the errors, and an item fought over five times costs five times an item missed once.
+- **Only completed practice sessions count** (matching F24's rule): an abandoned session holds recorded misses but never ran the retry loop, so it would charge errors against effort that was never finished.
+- **F13-verified practice misses are discounted.** In a practice session F13 accepts a disputed answer *without* flipping `isCorrect` — it only records the exercise on `verifiedExerciseIds`. For such an exercise the first wrong answer of that session is treated as correct, matching the module test, where the same AI ruling flips `isCorrect` before the score is computed.
+- **Degraded inputs are renormalised, never invented.** A module with answers at only one weighted rung is scored from that rung alone (`practice-rung2-only` / `practice-rung3-only`); one with no weighted practice answers at all falls back to `UPS = testScore` with `practiceScore = null` (`test-only`). `basis` is carried in the response so the client can tell the cases apart.
+- **Backfill is lazy, on read.** When `GET /me/progress` meets a `completed` module whose `proficiency` is absent or carries a `version` below `PROFICIENCY_VERSION`, it computes the score, stores it, and returns it — so changing the weights is a version bump rather than a hand-run migration. A completed module with no submitted test attempt has nothing to score and simply reports `null`.
 - The completion-gate check (F21) reads all modules at the user's current CEFR level, maps each to its progress record (defaulting to `locked` if no record exists), and derives `allCompleted` plus a per-module status array.
 
 ---
@@ -113,6 +139,7 @@ All endpoints are `/me/...` — the user is identified from the auth token, not 
 | CS-03 | Query whether all modules at the user's current level are completed | the Level Test feature (F21) can gate test eligibility |
 | CS-04 | Append a test attempt record to a module's progress | F11 can persist the attempt outcome without owning the progress store |
 | CS-05 | Transition a module's status | session and test features can drive the lifecycle without direct DB access |
+| CS-06 | Read, per completed module, how hard it actually was | the app can tint the module map by proficiency and point the learner at what is worth re-practising, instead of showing a flat wall of green at 100% |
 
 ---
 

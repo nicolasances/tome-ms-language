@@ -6,7 +6,9 @@ import { UserModuleProgressStore } from "../../store/UserModuleProgressStore";
 import { ModuleStore } from "../../store/ModuleStore";
 import { CEFR_LEVELS, CefrLevel } from "../../model/CefrLevels";
 import { Module } from "../../model/Module";
-import { FIRST_PRACTICE_RUNG, LAST_PRACTICE_RUNG } from "../../Config";
+import { ModuleProficiency, ProficiencyBasis, UserModuleProgress } from "../../model/UserModuleProgress";
+import { FIRST_PRACTICE_RUNG, LAST_PRACTICE_RUNG, PROFICIENCY_VERSION } from "../../Config";
+import { computeModuleProficiency } from "../../util/ProficiencyScore";
 
 type ModuleStep = "grammar" | "practice" | "test" | "done";
 
@@ -45,9 +47,11 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
         const viewedLevel = req.cefrLevel ?? user.cefrLevel;
 
         // 2. Load all modules and all progress records in two queries
+        const progressStore = new UserModuleProgressStore({ db, config });
+
         const allModules = await new ModuleStore(db).list();
         const allModuleIds = allModules.map(m => m.id);
-        const allProgress = await new UserModuleProgressStore({ db, config }).listByUser(user.id, allModuleIds);
+        const allProgress = await progressStore.listByUser(user.id, allModuleIds);
         const progressMap = new Map(allProgress.map(p => [p.moduleId, p]));
 
         // 3. Levels rollup - status derived purely from the user's position in the CEFR sequence
@@ -72,6 +76,25 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
         // Modules are sorted by ascending id
         const viewedModules = allModules.filter(m => m.cefrLevel === viewedLevel).sort((a, b) => a.id > b.id ? 1 : -1);
 
+        // 5. Lazily backfill the User Proficiency Score of the completed modules that carry none —
+        // or one computed by an older formula version. This is the only write this read performs:
+        // the score is stored, so the first call after a deploy pays for it and every later call is
+        // a plain read. The per-module reads run concurrently because each one is scoped to a
+        // single (user, module) pair — there is no bulk form of "the first attempt of each module".
+        const staleProgress = viewedModules
+            .map(m => progressMap.get(m.id))
+            .filter((p): p is UserModuleProgress => p !== undefined && p.status === "completed" && (p.proficiency === null || p.proficiency.version < PROFICIENCY_VERSION));
+
+        const backfilled = new Map<string, ModuleProficiency | null>(await Promise.all(staleProgress.map(async p => {
+
+            const proficiency = await computeModuleProficiency({ db, config, userId: user.id, moduleId: p.moduleId, completedAt: p.completedAt ?? undefined });
+
+            if (proficiency) await progressStore.setProficiency(user.id, p.moduleId, proficiency);
+
+            return [p.moduleId, proficiency] as [string, ModuleProficiency | null];
+        })));
+
+        // 6. Build the per-module entries
         const modules: ModuleProgressEntry[] = [];
 
         let previousModule: Module | null = null;
@@ -134,12 +157,18 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 }
             }
 
+            // The frozen User Proficiency Score — how hard this module actually was. Only a
+            // completed module has one; a completed module the user never tested (no submitted
+            // attempt to score) reports null too.
+            const proficiency = backfilled.has(m.id) ? backfilled.get(m.id)! : (progress?.proficiency ?? null);
+
             modules.push({
                 moduleId: m.id,
                 title: m.title,
                 status,
                 step,
                 completionPct,
+                proficiency: status === "completed" && proficiency ? { score: proficiency.score, testScore: proficiency.testScore, practiceScore: proficiency.practiceScore, basis: proficiency.basis } : null,
                 startedAt: progress?.startedAt ?? null,
                 completedAt: progress?.completedAt ?? null,
                 testUnlocksAt,
@@ -174,6 +203,7 @@ interface ModuleProgressEntry {
     status: string;                             // Module status: locked | available | in_progress | completed
     step: ModuleStep | null;                    // Current step within the module flow; null when locked
     completionPct: number;                      // Overall module completion percentage (0 or 100)
+    proficiency: ModuleProficiencyEntry | null; // How hard the module actually was (F07/UPS); null for any module that is not completed, or completed without a scoreable test attempt
     startedAt: string | null;                   // ISO-8601 timestamp of when the user first started the module
     completedAt: string | null;                 // ISO-8601 timestamp of when the module was completed
     testUnlocksAt: string | null;               // ISO-8601 timestamp of when the Module Test unlocks; null until Step 2 coverage is complete
@@ -182,6 +212,13 @@ interface ModuleProgressEntry {
     currentRung: number;                        // The practice-ladder rung (1–3) the module is currently practising at; defaults to the first rung when no progress record exists
     currentRungCoverage: RungCoverageCount;      // Coverage of the module's combined practice items (vocabulary + grammar concepts) at currentRung; fully covered once the module is completed
     fullyCompletedRungs: number;                 // Number of rungs fully completed before currentRung; 3 once the whole ladder (or a pre-ladder module) is complete
+}
+
+interface ModuleProficiencyEntry {
+    score: number;                  // The User Proficiency Score (0–100): lower means the module was harder work
+    testScore: number;              // The test component: the first submitted attempt with errors charged ×3 (0–100)
+    practiceScore: number | null;   // The practice component: rung-weighted accuracy over the practice sessions (0–100); null when the module holds no weighted practice answers
+    basis: ProficiencyBasis;        // Which inputs the score could be computed from — a "test-only" score must not be read as a flawless practice run
 }
 
 interface RungCoverageCount {

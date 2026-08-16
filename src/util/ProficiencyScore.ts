@@ -213,5 +213,5 @@ export interface ComputeModuleProficiencyInput {
     config: ControllerConfig;                   // The service config.
     userId: string;                             // The user to score.
     moduleId: string;                           // The module to score.
-    completedAt: string;                        // ISO-8601 timestamp of when the module was completed; upper-bounds the practice sessions that count.
+    completedAt?: string;                       // ISO-8601 timestamp of when the module was completed; upper-bounds the practice sessions that count. Absent on a legacy record that carries no completion timestamp, in which case every completed session counts.
 }
