@@ -106,6 +106,83 @@ export class TestAttemptRecord {
     }
 }
 
+/**
+ * What the User Proficiency Score (UPS) could be computed from. Carried in the response so a
+ * test-only score is never mistaken for a genuine flawless practice run.
+ *
+ * Modules completed before the practice ladder shipped may hold no answers at some rungs; rather
+ * than inventing data, the practice component is renormalised over whatever exists.
+ */
+export const PROFICIENCY_BASES = ["full", "practice-rung2-only", "practice-rung3-only", "test-only"] as const;
+export type ProficiencyBasis = typeof PROFICIENCY_BASES[number];
+
+/**
+ * The User Proficiency Score of one module for one user — how hard the module actually was —
+ * embedded in UserModuleProgress.proficiency.
+ *
+ * Computed **once**, when the module transitions to `completed`, and frozen there: "keep
+ * practising" runs on an already-completed module never move it. It is a snapshot of the first
+ * pass through the module, not a current-standing metric.
+ */
+export class ModuleProficiency {
+
+    score: number;                  // The UPS itself (0–100): the blend of testScore and practiceScore. Equals testScore when basis is "test-only".
+    testScore: number;              // First submitted test attempt scored with errors charged ×3 (0–100).
+    practiceScore: number | null;   // Rung-weighted accuracy over the completed practice sessions (0–100); null when no weighted practice answer exists.
+    basis: ProficiencyBasis;        // Which inputs the score could be computed from.
+    computedAt: string;             // ISO-8601 timestamp of when the score was computed.
+    version: number;                // Formula version (PROFICIENCY_VERSION at computation time); drives recompute-on-read.
+
+    constructor({ score, testScore, practiceScore, basis, computedAt, version }: ModuleProficiencyInput) {
+
+        this.score = score;
+        this.testScore = testScore;
+        this.practiceScore = practiceScore ?? null;
+        this.basis = basis;
+        this.computedAt = computedAt;
+        this.version = version;
+    }
+
+    /**
+     * Creates a ModuleProficiency from a raw BSON sub-document.
+     */
+    static fromBSON(data: any): ModuleProficiency {
+
+        return new ModuleProficiency({
+            score: data.score,
+            testScore: data.testScore,
+            practiceScore: data.practiceScore ?? null,
+            basis: data.basis,
+            computedAt: data.computedAt,
+            version: data.version,
+        });
+    }
+
+    /**
+     * Serializes the score to a plain object for MongoDB storage (embedded in UserModuleProgress).
+     */
+    toBSON(): any {
+
+        return {
+            score: this.score,
+            testScore: this.testScore,
+            practiceScore: this.practiceScore,
+            basis: this.basis,
+            computedAt: this.computedAt,
+            version: this.version,
+        };
+    }
+}
+
+export interface ModuleProficiencyInput {
+    score: number;                   // The UPS (0–100).
+    testScore: number;               // Test component (0–100).
+    practiceScore?: number | null;   // Practice component (0–100), or null when there is none. Defaults to null.
+    basis: ProficiencyBasis;         // Which inputs the score was computed from.
+    computedAt: string;              // ISO-8601 timestamp of computation.
+    version: number;                 // Formula version.
+}
+
 export class UserModuleProgress {
 
     userId: string;
@@ -117,8 +194,9 @@ export class UserModuleProgress {
     rungCoverage: RungCoverage[];
     practiceCompletedAt: string | null;
     testAttempts: TestAttemptRecord[];
+    proficiency: ModuleProficiency | null;
 
-    constructor({ userId, moduleId, status, startedAt, completedAt, currentRung, rungCoverage, practiceCompletedAt, testAttempts }: UserModuleProgressInput) {
+    constructor({ userId, moduleId, status, startedAt, completedAt, currentRung, rungCoverage, practiceCompletedAt, testAttempts, proficiency }: UserModuleProgressInput) {
         this.userId = userId;
         this.moduleId = moduleId;
         this.status = status;
@@ -128,6 +206,7 @@ export class UserModuleProgress {
         this.rungCoverage = rungCoverage ?? [];
         this.practiceCompletedAt = practiceCompletedAt ?? null;
         this.testAttempts = testAttempts;
+        this.proficiency = proficiency ?? null;
     }
 
     static fromBSON(data: WithId<any>): UserModuleProgress {
@@ -141,6 +220,7 @@ export class UserModuleProgress {
             rungCoverage: (data.rungCoverage ?? []).map((c: any) => RungCoverage.fromBSON(c)),
             practiceCompletedAt: data.practiceCompletedAt ?? null,
             testAttempts: (data.testAttempts ?? []).map((a: any) => TestAttemptRecord.fromBSON(a)),
+            proficiency: data.proficiency ? ModuleProficiency.fromBSON(data.proficiency) : null,
         });
     }
 
@@ -155,6 +235,7 @@ export class UserModuleProgress {
             rungCoverage: this.rungCoverage.map(c => c.toBSON()),
             practiceCompletedAt: this.practiceCompletedAt,
             testAttempts: this.testAttempts.map(a => a.toBSON()),
+            proficiency: this.proficiency ? this.proficiency.toBSON() : null,
         };
     }
 
@@ -205,4 +286,5 @@ interface UserModuleProgressInput {
     rungCoverage?: RungCoverage[];     // Per-rung covered-item sets, one entry per rung reached. Defaults to [].
     practiceCompletedAt?: string | null; // ISO-8601 timestamp of when the whole ladder completed. Defaults to null.
     testAttempts: TestAttemptRecord[]; // All module test attempts recorded for this user+module.
+    proficiency?: ModuleProficiency | null; // The frozen User Proficiency Score, written when the module completes. Defaults to null.
 }

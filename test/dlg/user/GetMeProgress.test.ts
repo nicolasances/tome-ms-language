@@ -2,8 +2,11 @@
 import { Request } from "express";
 import { User } from "../../../src/model/User";
 import { Module } from "../../../src/model/Module";
-import { UserModuleProgress, RungCoverage, TestAttemptRecord } from "../../../src/model/UserModuleProgress";
+import { ModuleProficiency, UserModuleProgress, RungCoverage, TestAttemptRecord } from "../../../src/model/UserModuleProgress";
 import { GetMeProgress } from "../../../src/dlg/user/GetMeProgress";
+import { Exercise } from "../../../src/model/Exercise";
+import { PROFICIENCY_VERSION } from "../../../src/Config";
+import { ObjectId } from "mongodb";
 
 const userContext = { email: "alice@example.com", userId: "u1", authProvider: "test" };
 
@@ -61,6 +64,12 @@ function makeMockConfig(userDocs: any[], moduleDocs: any[], progressDocs: any[])
                 return true;
             }),
         }),
+        updateOne: async (_filter: any, _update: any) => ({ matchedCount: 1 }),
+    };
+    // Empty proficiency inputs: the lazy backfill finds no submitted test attempt and stays a no-op.
+    const emptyCol = {
+        findOne: async () => null,
+        find: (_filter: any) => ({ toArray: async () => [] }),
     };
     return {
         getDBName: () => "test",
@@ -68,7 +77,8 @@ function makeMockConfig(userDocs: any[], moduleDocs: any[], progressDocs: any[])
             collection: (name: string) => {
                 if (name === "users") return userCol;
                 if (name === "modules") return moduleCol;
-                return progressCol;
+                if (name === "userModuleProgress") return progressCol;
+                return emptyCol;
             },
         }),
     } as any;
@@ -806,5 +816,172 @@ describe("GetMeProgress.do - rung 2 practice completion scenario", () => {
         assert.equal(m.fullyCompletedRungs, 1);  // only rung 1 is behind currentRung; rung 2 itself isn't counted until the ladder advances past it
         assert.equal(m.status, "in_progress");
         assert.equal(m.step, "practice");
+    });
+});
+
+describe("GetMeProgress.do - module proficiency", () => {
+
+    /**
+     * Builds a mock config that additionally backs the three collections the lazy User Proficiency
+     * Score backfill reads, and records every write to the progress collection.
+     */
+    function makeProficiencyMockConfig(moduleDocs: any[], progressDocs: any[], { attemptDocs = [] as any[], sessionDocs = [] as any[], exerciseDocs = [] as any[] } = {}) {
+
+        const updates: any[] = [];
+        const reads = { attempts: 0 };
+
+        const collections: Record<string, any> = {
+            users: { findOne: async () => makeUser("A1").toBSON() },
+            modules: { find: () => ({ sort: () => ({ toArray: async () => moduleDocs }) }) },
+            userModuleProgress: {
+                find: (filter: any) => ({ toArray: async () => progressDocs.filter(d => d.userId === filter.userId) }),
+                updateOne: async (filter: any, update: any) => {
+                    updates.push({ filter, update });
+                    return { matchedCount: 1 };
+                },
+            },
+            moduleTestAttempts: {
+                findOne: async (filter: any, options: any = {}) => {
+                    reads.attempts++;
+                    const submitted = attemptDocs.filter(d => d.moduleId === filter.moduleId && d.takenAt !== null);
+                    if (options.sort?.takenAt === 1) submitted.sort((a, b) => a.takenAt > b.takenAt ? 1 : -1);
+                    return submitted[0] ?? null;
+                },
+            },
+            practiceSessions: {
+                find: (filter: any) => ({ toArray: async () => sessionDocs.filter(d => d.moduleId === filter.moduleId && d.completedAt !== null) }),
+            },
+            exercises: {
+                find: (filter: any) => ({ toArray: async () => exerciseDocs.filter(d => filter.id.$in.includes(d.id)) }),
+            },
+        };
+
+        const config = {
+            getDBName: () => "test",
+            getMongoDb: async () => ({ collection: (name: string) => collections[name] }),
+        } as any;
+
+        return { config, updates, reads };
+    }
+
+    function makeSubmittedAttempt(moduleId: string, correct: number, total: number, takenAt: string) {
+        const exerciseIds = Array.from({ length: total }, (_, i) => `t-${moduleId}-${i}`);
+        return {
+            _id: new ObjectId(),
+            userId: "uuid-001",
+            moduleId,
+            exerciseIds,
+            answers: exerciseIds.map((id, i) => ({ exerciseId: id, isCorrect: i < correct, userAnswer: "hej", answeredAt: takenAt })),
+            startedAt: "2026-06-11T09:00:00.000Z",
+            takenAt,
+        };
+    }
+
+    const module = makeModule("a1-1", "A1", ["v1"]);
+
+    it("reports no proficiency for a module that is not completed", async () => {
+
+        const { config } = makeProficiencyMockConfig([module.toBSON()], [makeProgress("a1-1", "in_progress").toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.isNull(result.modules[0].proficiency);
+    });
+
+    it("returns the stored proficiency of a completed module", async () => {
+
+        const progress = makeProgress("a1-1", "completed", { completedAt: "2026-06-12T10:00:00.000Z" });
+        progress.proficiency = new ModuleProficiency({ score: 69.5, testScore: 57.1, practiceScore: 88, basis: "full", computedAt: "2026-08-01T10:00:00.000Z", version: PROFICIENCY_VERSION });
+
+        const { config } = makeProficiencyMockConfig([module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.deepEqual(result.modules[0].proficiency, { score: 69.5, testScore: 57.1, practiceScore: 88, basis: "full" });
+    });
+
+    it("does not recompute a stored score that is already at the current formula version", async () => {
+
+        const progress = makeProgress("a1-1", "completed", { completedAt: "2026-06-12T10:00:00.000Z" });
+        progress.proficiency = new ModuleProficiency({ score: 69.5, testScore: 57.1, practiceScore: 88, basis: "full", computedAt: "2026-08-01T10:00:00.000Z", version: PROFICIENCY_VERSION });
+
+        const { config, updates, reads } = makeProficiencyMockConfig([module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        await delegate.do({}, userContext);
+
+        assert.equal(reads.attempts, 0, "a stored score at the current version must be a plain read");
+        assert.equal(updates.length, 0);
+    });
+
+    it("backfills and stores the proficiency of a completed module that has none", async () => {
+
+        const progress = makeProgress("a1-1", "completed", { completedAt: "2026-06-12T10:00:00.000Z" });
+        const attempt = makeSubmittedAttempt("a1-1", 16, 20, "2026-06-12T09:00:00.000Z");
+
+        const { config, updates } = makeProficiencyMockConfig([module.toBSON()], [progress.toBSON()], { attemptDocs: [attempt] });
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        // 16/20 on the first attempt → 100 × 16 / (16 + 3×4) = 57.1 ; no practice answers → test-only
+        assert.equal(result.modules[0].proficiency!.score, 57.1);
+        assert.equal(result.modules[0].proficiency!.basis, "test-only");
+        assert.isNull(result.modules[0].proficiency!.practiceScore);
+
+        assert.equal(updates.length, 1, "the backfilled score must be persisted");
+        assert.equal(updates[0].update.$set.proficiency.score, 57.1);
+    });
+
+    it("recomputes a stored score that carries an older formula version", async () => {
+
+        const progress = makeProgress("a1-1", "completed", { completedAt: "2026-06-12T10:00:00.000Z" });
+        progress.proficiency = new ModuleProficiency({ score: 12.3, testScore: 12.3, practiceScore: null, basis: "test-only", computedAt: "2026-08-01T10:00:00.000Z", version: PROFICIENCY_VERSION - 1 });
+        const attempt = makeSubmittedAttempt("a1-1", 20, 20, "2026-06-12T09:00:00.000Z");
+
+        const { config, updates } = makeProficiencyMockConfig([module.toBSON()], [progress.toBSON()], { attemptDocs: [attempt] });
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].proficiency!.score, 100);
+        assert.equal(updates.length, 1);
+    });
+
+    it("reports no proficiency when a completed module has no submitted test attempt to score", async () => {
+
+        const progress = makeProgress("a1-1", "completed", { completedAt: "2026-06-12T10:00:00.000Z" });
+
+        const { config, updates } = makeProficiencyMockConfig([module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.isNull(result.modules[0].proficiency);
+        assert.equal(updates.length, 0, "nothing to store when there is nothing to score");
+    });
+
+    it("blends the practice answers of the sessions completed before the module was completed", async () => {
+
+        const progress = makeProgress("a1-1", "completed", { completedAt: "2026-06-12T10:00:00.000Z" });
+        const attempt = makeSubmittedAttempt("a1-1", 20, 20, "2026-06-12T09:00:00.000Z");
+        const exercise = new Exercise({ id: "ex-r3", moduleId: "a1-1", type: "translation_active", prompt: "p", answer: "a", vocabularyItemId: "v1" });
+        const session = {
+            _id: new ObjectId(), userId: "uuid-001", moduleId: "a1-1",
+            answers: [{ exerciseId: "ex-r3", isCorrect: false, userAnswer: "x", answeredAt: "2026-06-10T10:00:00.000Z" }, { exerciseId: "ex-r3", isCorrect: true, userAnswer: "a", answeredAt: "2026-06-10T10:01:00.000Z" }],
+            verifiedExerciseIds: [], startedAt: "2026-06-10T09:00:00.000Z", completedAt: "2026-06-10T10:02:00.000Z",
+        };
+
+        const { config } = makeProficiencyMockConfig([module.toBSON()], [progress.toBSON()], { attemptDocs: [attempt], sessionDocs: [session], exerciseDocs: [exercise.toBSON()] });
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        // Flawless test (100) blended with a 1-of-2 rung-3 practice run (50) → 0.6×100 + 0.4×50
+        assert.equal(result.modules[0].proficiency!.practiceScore, 50);
+        assert.equal(result.modules[0].proficiency!.score, 80);
+        assert.equal(result.modules[0].proficiency!.basis, "practice-rung3-only");
     });
 });

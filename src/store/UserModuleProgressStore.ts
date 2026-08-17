@@ -1,6 +1,6 @@
 import { Db } from "mongodb";
 import { ControllerConfig, LAST_PRACTICE_RUNG } from "../Config";
-import { UserModuleProgress, RungCoverage, TestAttemptRecord } from "../model/UserModuleProgress";
+import { UserModuleProgress, ModuleProficiency, RungCoverage, TestAttemptRecord } from "../model/UserModuleProgress";
 
 const COLLECTION = "userModuleProgress";
 
@@ -81,6 +81,29 @@ export class UserModuleProgressStore {
         });
 
         return this.upsert(updated);
+    }
+
+    /**
+     * Stores the User Proficiency Score on a user's module progress record.
+     *
+     * Written once, when the module completes, and refreshed only when the formula version moves
+     * — the score is a frozen snapshot of the first pass through the module. Only the
+     * `proficiency` field is touched, so it is safe to call on a record another flow is reading.
+     *
+     * @param {string} userId - The user id.
+     * @param {string} moduleId - The module id.
+     * @param {ModuleProficiency} proficiency - The computed score to store.
+     *
+     * @returns {Promise<boolean>} True when a progress record was matched and updated.
+     */
+    async setProficiency(userId: string, moduleId: string, proficiency: ModuleProficiency): Promise<boolean> {
+
+        const result = await this.db.collection(COLLECTION).updateOne(
+            { userId, moduleId },
+            { $set: { proficiency: proficiency.toBSON() } } as any
+        );
+
+        return result.matchedCount > 0;
     }
 
     async appendTestAttempt(userId: string, moduleId: string, attempt: TestAttemptRecord): Promise<UserModuleProgress | null> {

@@ -50,10 +50,32 @@ function makeAttemptBSON(oid: ObjectId, count: number, correctCount: number, ove
 }
 
 /**
+ * Builds a completed practice session over the given exercise ids, all answered correctly.
+ */
+function makePracticeSessionBSON(exerciseIds: string[], overrides: any = {}): any {
+    return {
+        _id: new ObjectId(),
+        userId: "user-1",
+        moduleId: "mod-1",
+        exerciseIds,
+        answers: exerciseIds.map(id => ({ exerciseId: id, isCorrect: true, userAnswer: "hej", answeredAt: "2026-06-10T10:00:00.000Z" })),
+        currentPosition: exerciseIds.length,
+        retryQueue: [],
+        verifiedExerciseIds: [],
+        startedAt: "2026-06-10T09:00:00.000Z",
+        completedAt: "2026-06-10T10:00:00.000Z",
+        ...overrides,
+    };
+}
+
+/**
  * Builds a mock config wiring all collections needed by SubmitModuleTest.
  * Records mutations for assertion.
+ *
+ * `earlierAttemptDocs` are already-submitted attempts of the same user+module — what the
+ * proficiency computation reads instead of the attempt being submitted now.
  */
-function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[]) {
+function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[], { sessionDocs = [] as any[], earlierAttemptDocs = [] as any[] } = {}) {
 
     const mutations: any[] = [];
     let currentAttempt: any = attemptDoc ? { ...attemptDoc } : null;
@@ -62,10 +84,15 @@ function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[]) {
 
     const collections: Record<string, any> = {
         moduleTestAttempts: {
-            findOne: async (filter: any) => {
-                if (!currentAttempt) return null;
-                if (filter._id) return currentAttempt._id.equals(filter._id) ? currentAttempt : null;
-                return null;
+            findOne: async (filter: any, options: any = {}) => {
+                if (filter._id) return currentAttempt?._id.equals(filter._id) ? currentAttempt : null;
+
+                const submitted = [...earlierAttemptDocs, ...(currentAttempt ? [currentAttempt] : [])]
+                    .filter(d => d.userId === filter.userId && d.moduleId === filter.moduleId && d.takenAt !== null);
+
+                if (options.sort?.takenAt === 1) submitted.sort((a, b) => a.takenAt > b.takenAt ? 1 : -1);
+
+                return submitted[0] ?? null;
             },
             updateOne: async (_filter: any, update: any) => {
                 if (!currentAttempt) return { matchedCount: 0 };
@@ -73,6 +100,16 @@ function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[]) {
                 mutations.push({ op: "submitAttempt", update });
                 return { matchedCount: 1 };
             },
+        },
+        practiceSessions: {
+            find: (filter: any) => ({
+                toArray: async () => sessionDocs.filter(d => {
+                    if (d.userId !== filter.userId || d.moduleId !== filter.moduleId) return false;
+                    if (d.completedAt === null) return false;
+                    if (filter.completedAt?.$lte && d.completedAt > filter.completedAt.$lte) return false;
+                    return true;
+                }),
+            }),
         },
         exercises: {
             find: (_filter: any) => ({ toArray: async () => exerciseDocs }),
@@ -94,7 +131,8 @@ function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[]) {
                 return { upsertedCount: 1 };
             },
             updateOne: async (_filter: any, update: any) => {
-                mutations.push({ op: "appendTestAttempt", update });
+                if (update.$set?.proficiency) mutations.push({ op: "setProficiency", proficiency: update.$set.proficiency });
+                else mutations.push({ op: "appendTestAttempt", update });
                 return { matchedCount: 1 };
             },
         },
@@ -226,6 +264,74 @@ describe("SubmitModuleTest.do", () => {
 
         const completedTransition = mutations.find(m => m.op === "upsertProgress" && m.doc?.status === "completed");
         assert.isFalse(!!completedTransition, "module must NOT be transitioned to completed on a fail");
+    });
+
+    it("computes and stores the module proficiency when the module completes", async () => {
+
+        const oid = new ObjectId();
+        const exercises = Array.from({ length: 20 }, (_, i) => makeExerciseBSON(`ex-${i + 1}`));
+        const sessions = [makePracticeSessionBSON(["ex-1", "ex-2", "ex-3", "ex-4"])];
+
+        const { config, mutations } = makeMockConfig(makeAttemptBSON(oid, 20, 18), exercises, { sessionDocs: sessions });
+        const delegate = new SubmitModuleTest({} as any, config);
+
+        await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        const stored = mutations.find(m => m.op === "setProficiency");
+
+        assert.isTrue(!!stored, "expected the proficiency to be stored on completion");
+        // testScore = 100 × 18 / (18 + 3×2) = 75 ; practice is a clean rung-3 run = 100 → 0.6×75 + 0.4×100
+        assert.equal(stored.proficiency.testScore, 75);
+        assert.equal(stored.proficiency.practiceScore, 100);
+        assert.equal(stored.proficiency.score, 85);
+        assert.equal(stored.proficiency.basis, "practice-rung3-only");
+    });
+
+    it("does NOT compute a proficiency when the test fails", async () => {
+
+        const oid = new ObjectId();
+        const exercises = Array.from({ length: 20 }, (_, i) => makeExerciseBSON(`ex-${i + 1}`));
+
+        const { config, mutations } = makeMockConfig(makeAttemptBSON(oid, 20, 14), exercises);
+        const delegate = new SubmitModuleTest({} as any, config);
+
+        await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        assert.isFalse(mutations.some(m => m.op === "setProficiency"), "a failed attempt must not freeze a proficiency score");
+    });
+
+    it("scores the user's first submitted attempt, not the passing retry", async () => {
+
+        const oid = new ObjectId();
+        const exercises = Array.from({ length: 20 }, (_, i) => makeExerciseBSON(`ex-${i + 1}`));
+        const firstFailedAttempt = makeAttemptBSON(new ObjectId(), 20, 10, { takenAt: "2026-06-10T10:00:00.000Z", score: 50, passed: false });
+
+        const { config, mutations } = makeMockConfig(makeAttemptBSON(oid, 20, 20), exercises, { earlierAttemptDocs: [firstFailedAttempt] });
+        const delegate = new SubmitModuleTest({} as any, config);
+
+        await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        const stored = mutations.find(m => m.op === "setProficiency");
+
+        // The retry was flawless, but the first attempt scored 10/20 → 100 × 10 / (10 + 3×10) = 25
+        assert.equal(stored.proficiency.testScore, 25);
+    });
+
+    it("excludes practice sessions completed after the module was completed", async () => {
+
+        const oid = new ObjectId();
+        const exercises = Array.from({ length: 20 }, (_, i) => makeExerciseBSON(`ex-${i + 1}`));
+        const laterSession = makePracticeSessionBSON(["ex-1"], { completedAt: "2099-01-01T00:00:00.000Z" });
+
+        const { config, mutations } = makeMockConfig(makeAttemptBSON(oid, 20, 20), exercises, { sessionDocs: [laterSession] });
+        const delegate = new SubmitModuleTest({} as any, config);
+
+        await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        const stored = mutations.find(m => m.op === "setProficiency");
+
+        assert.equal(stored.proficiency.basis, "test-only");
+        assert.equal(stored.proficiency.practiceScore, null);
     });
 
     it("throws 404 when the attempt does not exist", async () => {
