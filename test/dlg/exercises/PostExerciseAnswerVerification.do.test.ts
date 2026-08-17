@@ -464,4 +464,16 @@ describe("PostExerciseAnswerVerification.do", () => {
             assert.equal(err.code, 409);
         }
     });
+
+    it("sends a prompt to the AI that instructs it to disregard punctuation differences", async () => {
+
+        const capturedPrompts: string[] = [];
+        const { config } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = { generate: async (prompt: string) => { capturedPrompts.push(prompt); return JSON.stringify({ valid: true }); } };
+
+        await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg spiser.", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.match(capturedPrompts[0], /ignore punctuation/i, "expected the prompt to instruct the AI to ignore punctuation differences");
+    });
 });
