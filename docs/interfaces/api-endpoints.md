@@ -17,6 +17,7 @@
 - [Level Test Banks (F20)](#level-test-banks-f20)
 - [Level Test (F21)](#level-test-f21)
 - [Activity Stats (F24)](#activity-stats-f24)
+- [Operations](#operations)
 - [API Design compliance](#api-design-compliance)
 
 ---
@@ -337,6 +338,17 @@
 ### GET /me/stats/dailyActivity
 **Used for:** Backing the Home Dashboard's "This week" activity chart. Returns per-day counts of completed practice sessions, passed module tests, and passed level tests across a rolling 7-day window. The user is resolved from the auth token. Optional `from` query param (YYYYMMDD) sets the first day of the window; defaults to `today − 6` so the window always ends today. Returns exactly 7 entries (oldest → newest), zero-filled for days with no activity.
 **Request & Response:** `GetDailyActivityRequest` / `GetDailyActivityResponse` in `src/dlg/stats/GetDailyActivity.ts`
+
+---
+
+## Operations
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| POST | `/backup` | Dumps every collection to the `BACKUP_BUCKET` GCS bucket and prunes the 2-day-old file |
+
+### POST /backup
+**Used for:** Disaster recovery of user-generated learning data (profiles, CEFR levels, mastery/progress state, practice session history, module and level test attempts), which — unlike the seeded catalog content — cannot be regenerated. For each collection listed in `ControllerConfig.getCollections()`, streams every document to a local `YYYYMMDD-<collection>.json` file (one JSON document per line), uploads it to the `BACKUP_BUCKET` bucket, deletes the local copy, then deletes the same-named file from 2 days ago in the bucket (`ignoreNotFound`). Intended to be called on a schedule (e.g. nightly Cloud Scheduler); no restore endpoint exists yet on this service.
+**Request & Response:** `StartBackupRequest` (empty) / `StartBackupResponse` in `src/dlg/backup/StartBackup.ts`
 
 ---
 
