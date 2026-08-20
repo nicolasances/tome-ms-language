@@ -58,8 +58,7 @@ export class GcsBackupStorageClient implements BackupStorageClient {
  */
 export function buildBackupStorageClient(): BackupStorageClient {
 
-    const bucketName = process.env.BACKUP_BUCKET;
-    if (!bucketName) throw new Error("BACKUP_BUCKET env var is not set");
+    const bucketName = `${process.env.GCP_PID}-tome-bucket`;
 
     return new GcsBackupStorageClient({ bucketName });
 }

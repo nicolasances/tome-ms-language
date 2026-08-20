@@ -14,6 +14,7 @@ import { BackupStorageClient, buildBackupStorageClient } from "../../gcp/BackupS
  * microservices (toto-ms-supermarket, toto-ms-expenses).
  */
 const BACKUP_RETENTION_DAYS = 2;
+const BUCKET_FOLDER = "backups";
 
 export class StartBackup extends TotoDelegate<StartBackupRequest, StartBackupResponse> {
 
@@ -52,8 +53,10 @@ export class StartBackup extends TotoDelegate<StartBackupRequest, StartBackupRes
             const destination = `${today}-${collectionName}.json`;
             const localFilePath = path.join(os.tmpdir(), destination);
 
+            const bucketFileDestination = `${BUCKET_FOLDER}/${destination}`;
+
             await dumpToFile(store.findAll(collectionName), localFilePath);
-            await client.upload(localFilePath, destination);
+            await client.upload(localFilePath, bucketFileDestination);
 
             fs.rmSync(localFilePath);
 
