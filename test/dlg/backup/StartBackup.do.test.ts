@@ -39,6 +39,8 @@ function makeMockStorageClient() {
                 uploads.push({ localFilePath, destination, contentAtUploadTime });
             },
             deleteIfExists: async (destination: string) => { deletes.push(destination); },
+            exists: async (_destination: string) => false,
+            createReadStream: (_destination: string) => { throw new Error("not used by StartBackup"); },
         },
         uploads,
         deletes,
