@@ -91,7 +91,7 @@ describe("StartRestore.do", () => {
 
         const result = await delegate.do({ date: "20260821" });
 
-        assert.deepEqual(result, { restore: "done", date: "20260821", restored: ["users"], skipped: ["vocabulary"] });
+        assert.deepEqual(result, { db: { host: null }, restore: "done", date: "20260821", restored: [{ collectionName: "users", total: 1, inserted: 1 }], skipped: ["vocabulary"] });
     });
 
     it("reads backup files from the backups/<date>-<collection>.json path", async () => {
