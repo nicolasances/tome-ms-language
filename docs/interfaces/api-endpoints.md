@@ -345,10 +345,15 @@
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
 | POST | `/backup` | Dumps every collection to the `BACKUP_BUCKET` GCS bucket and prunes the 2-day-old file |
+| POST | `/restore` | Restores every collection that has a backup for the given date, from the `BACKUP_BUCKET` GCS bucket |
 
 ### POST /backup
-**Used for:** Disaster recovery of user-generated learning data (profiles, CEFR levels, mastery/progress state, practice session history, module and level test attempts), which — unlike the seeded catalog content — cannot be regenerated. For each collection listed in `ControllerConfig.getCollections()`, streams every document to a local `YYYYMMDD-<collection>.json` file (one JSON document per line), uploads it to the `BACKUP_BUCKET` bucket, deletes the local copy, then deletes the same-named file from 2 days ago in the bucket (`ignoreNotFound`). Intended to be called on a schedule (e.g. nightly Cloud Scheduler); no restore endpoint exists yet on this service.
+**Used for:** Disaster recovery of user-generated learning data (profiles, CEFR levels, mastery/progress state, practice session history, module and level test attempts), which — unlike the seeded catalog content — cannot be regenerated. For each collection listed in `ControllerConfig.getCollections()`, streams every document to a local `YYYYMMDD-<collection>.json` file (one JSON document per line), uploads it to the `backups/` folder of the `BACKUP_BUCKET` bucket, deletes the local copy, then deletes the same-named file from 2 days ago in the bucket (`ignoreNotFound`). Intended to be called on a schedule (e.g. nightly Cloud Scheduler).
 **Request & Response:** `StartBackupRequest` (empty) / `StartBackupResponse` in `src/dlg/backup/StartBackup.ts`
+
+### POST /restore
+**Used for:** Restoring the database from a `/backup` snapshot after data loss (corruption, a bad migration, a destructive bug). Takes `{ date }` (YYYYMMDD, matching `/backup`'s file naming) in the request body. For each collection listed in `ControllerConfig.getCollections()`, checks whether `backups/<date>-<collection>.json` exists in the `BACKUP_BUCKET` bucket; if it does, deletes all of that collection's current documents and re-inserts the backed-up ones (restoring each document's `_id` as an `ObjectId`). A collection with no backup file for that date is left untouched — restore is best-effort across collections, not all-or-nothing. If none of the collections have a backup for the given date, the request fails with `400`. This is destructive: any data written to a restored collection after the backup date is permanently lost.
+**Request & Response:** `StartRestoreRequest` / `StartRestoreResponse` in `src/dlg/backup/StartRestore.ts`
 
 ---
 

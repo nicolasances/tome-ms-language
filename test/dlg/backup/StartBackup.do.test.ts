@@ -68,7 +68,7 @@ describe("StartBackup.do", () => {
         assert.equal(vocabularyUpload.contentAtUploadTime, '{"id":"v1"}\n');
     });
 
-    it("names each uploaded file <today as YYYYMMDD>-<collection>.json", async () => {
+    it("names each uploaded file backups/<today as YYYYMMDD>-<collection>.json", async () => {
 
         const config = makeMockConfig({ users: [] });
         const { client, uploads } = makeMockStorageClient();
@@ -77,7 +77,7 @@ describe("StartBackup.do", () => {
 
         await delegate.do({});
 
-        assert.equal(uploads[0].destination, `${moment.tz(REFERENCE_TIMEZONE).format("YYYYMMDD")}-users.json`);
+        assert.equal(uploads[0].destination, `backups/${moment.tz(REFERENCE_TIMEZONE).format("YYYYMMDD")}-users.json`);
     });
 
     it("deletes the local dump file after uploading it", async () => {

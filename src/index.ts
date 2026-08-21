@@ -46,6 +46,7 @@ import { SubmitLevelTest } from './dlg/levelTests/SubmitLevelTest';
 import { GetLevelTestReview } from './dlg/levelTests/GetLevelTestReview';
 import { GetDailyActivity } from './dlg/stats/GetDailyActivity';
 import { StartBackup } from './dlg/backup/StartBackup';
+import { StartRestore } from './dlg/backup/StartRestore';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -115,6 +116,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'GET', path: '/users/:userId/levelTests/:attemptId/review', delegate: GetLevelTestReview },
 
             { method: 'POST', path: '/backup', delegate: StartBackup },
+            { method: 'POST', path: '/restore', delegate: StartRestore },
         ],
         apiOptions: { noCorrelationId: true }
     },
