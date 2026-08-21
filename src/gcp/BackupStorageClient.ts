@@ -1,8 +1,9 @@
 import { Storage } from "@google-cloud/storage";
+import { Readable } from "stream";
 
 /**
- * Contract for uploading a local backup file to cloud storage and pruning an old one.
- * Injectable so `StartBackup` can be unit-tested without a live GCS call.
+ * Contract for uploading, reading back, and pruning backup files in cloud storage.
+ * Injectable so `StartBackup` and `StartRestore` can be unit-tested without a live GCS call.
  */
 export interface BackupStorageClient {
 
@@ -24,6 +25,24 @@ export interface BackupStorageClient {
      * @returns {Promise<void>}
      */
     deleteIfExists(destination: string): Promise<void>;
+
+    /**
+     * Checks whether a file is present in the backup bucket.
+     *
+     * @param {string} destination - Name of the file to look for in the bucket.
+     *
+     * @returns {Promise<boolean>} true if the file exists, false otherwise.
+     */
+    exists(destination: string): Promise<boolean>;
+
+    /**
+     * Opens a readable stream over a file in the backup bucket, for restoring its content.
+     *
+     * @param {string} destination - Name of the file to read from the bucket.
+     *
+     * @returns {Readable} a stream of the file's raw content.
+     */
+    createReadStream(destination: string): Readable;
 }
 
 /**
@@ -50,6 +69,22 @@ export class GcsBackupStorageClient implements BackupStorageClient {
         const storage = new Storage();
 
         await storage.bucket(this.bucketName).file(destination).delete({ ignoreNotFound: true });
+    }
+
+    async exists(destination: string): Promise<boolean> {
+
+        const storage = new Storage();
+
+        const [exists] = await storage.bucket(this.bucketName).file(destination).exists();
+
+        return exists;
+    }
+
+    createReadStream(destination: string): Readable {
+
+        const storage = new Storage();
+
+        return storage.bucket(this.bucketName).file(destination).createReadStream();
     }
 }
 
