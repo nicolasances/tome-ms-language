@@ -159,6 +159,34 @@ export class ControllerConfig extends TotoControllerConfig {
 
     }
 
+    /**
+     * Lists every Mongo collection currently in use by this service.
+     *
+     * Backs `POST /backup`: each collection returned here is dumped in full and uploaded to
+     * `BACKUP_BUCKET`. There is no auto-discovery mechanism — a collection added later must be
+     * added here explicitly, or it silently falls out of the backup.
+     *
+     * @returns {string[]} the names of all backed-up collections
+     */
+    public getCollections(): string[] {
+
+        return [
+            "exercises",
+            "grammar",
+            "modules",
+            "levelTestBanks",
+            "levelTestAttempts",
+            "moduleTestAttempts",
+            "practiceSessions",
+            "userGrammarProgress",
+            "userModuleProgress",
+            "userVocabularyProgress",
+            "users",
+            "vocabulary",
+        ];
+
+    }
+
     public getDBName() {
         return "tomelang";
     }
