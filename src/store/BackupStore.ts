@@ -50,7 +50,7 @@ export class BackupStore {
 
         for await (const doc of docs) {
 
-            doc._id = new ObjectId(doc._id);
+            doc._id = new ObjectId(String(doc._id));
             batch.push(doc);
             count++;
 
