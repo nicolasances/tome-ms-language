@@ -45,12 +45,12 @@ export class StartRestore extends TotoDelegate<StartRestoreRequest, StartRestore
 
         const outcomes = await Promise.all(config.getCollections().map(collectionName => restoreCollection(client, store, collectionName, req.date)));
 
-        const restored = outcomes.filter(outcome => outcome.restored).map(outcome => outcome.collectionName);
+        const restored = outcomes.filter(outcome => outcome.restored).map(outcome => ({ collectionName: outcome.collectionName, total: outcome.count, inserted: outcome.insertedCount }));
         const skipped = outcomes.filter(outcome => !outcome.restored).map(outcome => outcome.collectionName);
 
         if (restored.length === 0) throw new ValidationError(400, `No backup data available for date [${req.date}]`);
 
-        return { restore: "done", date: req.date, restored, skipped };
+        return { db: {host: config.getMongoHost()}, restore: "done", date: req.date, restored, skipped };
     }
 }
 
@@ -62,19 +62,19 @@ export class StartRestore extends TotoDelegate<StartRestoreRequest, StartRestore
  * @param {string} collectionName - Name of the collection to restore.
  * @param {string} date - The date to restore, formatted YYYYMMDD.
  *
- * @returns {Promise<{ collectionName: string; restored: boolean }>} whether the collection had a backup and was restored.
+ * @returns {Promise<{ collectionName: string; restored: boolean; count: number; insertedCount: number }>} whether the collection had a backup and was restored.
  */
-async function restoreCollection(client: BackupStorageClient, store: BackupStore, collectionName: string, date: string): Promise<{ collectionName: string; restored: boolean }> {
+async function restoreCollection(client: BackupStorageClient, store: BackupStore, collectionName: string, date: string): Promise<{ collectionName: string; restored: boolean; count: number; insertedCount: number }> {
 
     const destination = `${BUCKET_FOLDER}/backups_${date}-${collectionName}.json`;
 
     const exists = await client.exists(destination);
 
-    if (!exists) return { collectionName, restored: false };
+    if (!exists) return { collectionName, restored: false, count: 0, insertedCount: 0 };
 
-    await store.replaceAll(collectionName, parseJsonLines(client.createReadStream(destination)));
+    const { count, insertedCount } = await store.replaceAll(collectionName, parseJsonLines(client.createReadStream(destination)));
 
-    return { collectionName, restored: true };
+    return { collectionName, restored: true, count, insertedCount };
 }
 
 /**
@@ -99,8 +99,9 @@ interface StartRestoreRequest {
 }
 
 interface StartRestoreResponse {
+    db: { host: string | null };  // The MongoDB host used for the restore operation.
     restore: string;      // "done" once every collection has been checked and, where available, restored.
     date: string;          // The date that was restored, echoed back from the request.
-    restored: string[];    // Names of collections that had a backup for this date and were restored.
+    restored: { collectionName: string; total: number; inserted: number }[];    // Collections that had a backup for this date and were restored.
     skipped: string[];     // Names of collections with no backup for this date, left untouched.
 }

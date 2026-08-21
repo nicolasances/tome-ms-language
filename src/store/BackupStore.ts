@@ -37,15 +37,16 @@ export class BackupStore {
      * @param {string} collectionName - Name of the collection to restore.
      * @param {AsyncIterable<any>} docs - The documents to restore, as read back from a backup file.
      *
-     * @returns {Promise<number>} the count of documents restored.
+     * @returns {Promise<{ count: number; insertedCount: number }>} the count of documents restored.
      */
-    async replaceAll(collectionName: string, docs: AsyncIterable<any>): Promise<number> {
+    async replaceAll(collectionName: string, docs: AsyncIterable<any>): Promise<{ count: number; insertedCount: number }> {
 
         const collection = this.db.collection(collectionName);
 
         await collection.deleteMany({});
 
         let count = 0;
+        let insertedCount = 0;
         let batch: any[] = [];
 
         for await (const doc of docs) {
@@ -60,8 +61,11 @@ export class BackupStore {
             }
         }
 
-        if (batch.length > 0) await collection.insertMany(batch);
+        if (batch.length > 0) insertedCount = (await collection.insertMany(batch)).insertedCount;
 
-        return count;
+        return {
+            count,
+            insertedCount
+        };
     }
 }

@@ -195,4 +195,8 @@ export class ControllerConfig extends TotoControllerConfig {
         return {}
     }
 
+    getMongoHost(): string | null {
+        return this.mongoHost || null;
+    }
+
 }
