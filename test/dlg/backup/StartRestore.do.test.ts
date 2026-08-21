@@ -18,7 +18,7 @@ function makeMockConfig(collectionNames: string[]) {
     for (const name of collectionNames) {
         collections[name] = {
             deleteMany: async (_filter: any) => { stored[name] = []; },
-            insertMany: async (docs: any[]) => { stored[name].push(...docs); },
+            insertMany: async (docs: any[]) => { stored[name].push(...docs); return { insertedCount: docs.length }; },
         };
     }
 
@@ -27,6 +27,7 @@ function makeMockConfig(collectionNames: string[]) {
             getDBName: () => "test",
             getMongoDb: async () => ({ collection: (name: string) => collections[name] }),
             getCollections: () => collectionNames,
+            getMongoHost: () => "test-host",
         } as any,
         stored,
     };
@@ -91,7 +92,7 @@ describe("StartRestore.do", () => {
 
         const result = await delegate.do({ date: "20260821" });
 
-        assert.deepEqual(result, { db: { host: null }, restore: "done", date: "20260821", restored: [{ collectionName: "users", total: 1, inserted: 1 }], skipped: ["vocabulary"] });
+        assert.deepEqual(result, { db: { host: "test-host" }, restore: "done", date: "20260821", restored: [{ collectionName: "users", total: 1, inserted: 1 }], skipped: ["vocabulary"] });
     });
 
     it("reads backup files from the backups/<date>-<collection>.json path", async () => {

@@ -15,7 +15,7 @@ function makeMockCollection() {
     return {
         collection: {
             deleteMany: async (filter: any) => { deleteManyCalls.push(filter); stored = []; },
-            insertMany: async (docs: any[]) => { insertManyCalls.push(docs); stored.push(...docs); },
+            insertMany: async (docs: any[]) => { insertManyCalls.push(docs); stored.push(...docs); return { insertedCount: docs.length }; },
         },
         deleteManyCalls,
         insertManyCalls,
@@ -80,17 +80,17 @@ describe("BackupStore.replaceAll", () => {
         const { collection } = makeMockCollection();
         const db = { collection: (_name: string) => collection } as any;
 
-        const count = await new BackupStore(db).replaceAll("users", asAsyncIterable([{ _id: new ObjectId().toHexString() }, { _id: new ObjectId().toHexString() }]));
+        const { count } = await new BackupStore(db).replaceAll("users", asAsyncIterable([{ _id: new ObjectId().toHexString() }, { _id: new ObjectId().toHexString() }]));
 
         assert.equal(count, 2);
     });
 
-    it("returns 0 and issues no insertMany call when the iterable is empty", async () => {
+    it("returns a count of 0 and issues no insertMany call when the iterable is empty", async () => {
 
         const { collection, insertManyCalls } = makeMockCollection();
         const db = { collection: (_name: string) => collection } as any;
 
-        const count = await new BackupStore(db).replaceAll("users", asAsyncIterable([]));
+        const { count } = await new BackupStore(db).replaceAll("users", asAsyncIterable([]));
 
         assert.equal(count, 0);
         assert.equal(insertManyCalls.length, 0);
@@ -102,9 +102,31 @@ describe("BackupStore.replaceAll", () => {
         const db = { collection: (_name: string) => collection } as any;
         const docs = Array.from({ length: 450 }, () => ({ _id: new ObjectId().toHexString() }));
 
-        const count = await new BackupStore(db).replaceAll("users", asAsyncIterable(docs));
+        const { count } = await new BackupStore(db).replaceAll("users", asAsyncIterable(docs));
 
         assert.equal(count, 450);
         assert.deepEqual(insertManyCalls.map(batch => batch.length), [200, 200, 50]);
+    });
+
+    it("sums insertedCount across every batch, not just the last one", async () => {
+
+        const { collection } = makeMockCollection();
+        const db = { collection: (_name: string) => collection } as any;
+        const docs = Array.from({ length: 450 }, () => ({ _id: new ObjectId().toHexString() }));
+
+        const { insertedCount } = await new BackupStore(db).replaceAll("users", asAsyncIterable(docs));
+
+        assert.equal(insertedCount, 450);
+    });
+
+    it("sums insertedCount correctly when the total is an exact multiple of the batch size", async () => {
+
+        const { collection } = makeMockCollection();
+        const db = { collection: (_name: string) => collection } as any;
+        const docs = Array.from({ length: 400 }, () => ({ _id: new ObjectId().toHexString() }));
+
+        const { insertedCount } = await new BackupStore(db).replaceAll("users", asAsyncIterable(docs));
+
+        assert.equal(insertedCount, 400);
     });
 });

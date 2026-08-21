@@ -56,12 +56,12 @@ export class BackupStore {
             count++;
 
             if (batch.length === RESTORE_BATCH_SIZE) {
-                await collection.insertMany(batch);
+                insertedCount += (await collection.insertMany(batch)).insertedCount;
                 batch = [];
             }
         }
 
-        if (batch.length > 0) insertedCount = (await collection.insertMany(batch)).insertedCount;
+        if (batch.length > 0) insertedCount += (await collection.insertMany(batch)).insertedCount;
 
         return {
             count,

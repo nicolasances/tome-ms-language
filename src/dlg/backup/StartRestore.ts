@@ -66,7 +66,7 @@ export class StartRestore extends TotoDelegate<StartRestoreRequest, StartRestore
  */
 async function restoreCollection(client: BackupStorageClient, store: BackupStore, collectionName: string, date: string): Promise<{ collectionName: string; restored: boolean; count: number; insertedCount: number }> {
 
-    const destination = `${BUCKET_FOLDER}/backups_${date}-${collectionName}.json`;
+    const destination = `${BUCKET_FOLDER}/${date}-${collectionName}.json`;
 
     const exists = await client.exists(destination);
 
