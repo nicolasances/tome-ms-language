@@ -165,6 +165,7 @@ export class StartModuleTest extends TotoDelegate<StartModuleTestRequest, StartM
             startedAt,
             takenAt: null,
             exerciseResults: [],
+            passNumber: progress.passNumber,
         });
 
         const attemptId = await attemptStore.create(attempt);

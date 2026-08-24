@@ -22,6 +22,20 @@ describe("ModuleProficiency.fromBSON", () => {
         assert.equal(result.practiceScore, null);
         assert.equal(result.basis, "test-only");
     });
+
+    it("defaults passNumber to 1 when absent from the document (F25 — legacy scores predate re-practice)", () => {
+        const result = ModuleProficiency.fromBSON({ score: 88.6, testScore: 86.4, practiceScore: 92, basis: "full", computedAt: "2026-08-16T10:00:00.000Z", version: 1 });
+
+        assert.equal(result.passNumber, 1);
+    });
+
+    it("round-trips a non-default passNumber through toBSON and fromBSON", () => {
+        const proficiency = new ModuleProficiency({ score: 60, testScore: 60, practiceScore: null, basis: "test-only", computedAt: "2026-08-16T10:00:00.000Z", version: 1, passNumber: 2 });
+        const result = ModuleProficiency.fromBSON(proficiency.toBSON());
+
+        assert.equal(proficiency.toBSON().passNumber, 2);
+        assert.equal(result.passNumber, 2);
+    });
 });
 
 describe("TestAttemptRecord.fromBSON", () => {
@@ -126,6 +140,24 @@ describe("UserModuleProgress.fromBSON", () => {
         assert.equal(result.currentRung, 1);
         assert.deepEqual(result.rungCoverage, []);
         assert.equal(result.practiceCompletedAt, null);
+    });
+
+    it("defaults passNumber to 1 when absent from the document (F25 — legacy records predate re-practice)", () => {
+        const doc: any = { userId: "user-1", moduleId: "mod-1", status: "completed", startedAt: null, completedAt: null };
+        const result = UserModuleProgress.fromBSON(doc);
+
+        assert.equal(result.passNumber, 1);
+    });
+
+    it("round-trips a non-default passNumber through toBSON and fromBSON", () => {
+        const progress = new UserModuleProgress({
+            userId: "user-1", moduleId: "mod-1", status: "available", startedAt: null, completedAt: null, testAttempts: [], passNumber: 2,
+        });
+
+        const result = UserModuleProgress.fromBSON(progress.toBSON());
+
+        assert.equal(progress.toBSON().passNumber, 2);
+        assert.equal(result.passNumber, 2);
     });
 
     it("ignores a legacy vocabularyItemsPracticed field left over from before the practice ladder", () => {

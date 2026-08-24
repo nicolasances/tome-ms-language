@@ -137,6 +137,7 @@ export class StartPracticeSession extends TotoDelegate<StartPracticeSessionReque
             retryQueue: [],
             startedAt: now,
             completedAt: null,
+            passNumber: progress?.passNumber ?? 1,
         });
 
         const sessionId = await practiceSessionStore.create(session);

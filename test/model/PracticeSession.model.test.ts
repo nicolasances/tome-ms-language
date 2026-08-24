@@ -125,5 +125,31 @@ describe("PracticeSession model", () => {
             assert.deepEqual(session.answers, []);
             assert.deepEqual(session.retryQueue, []);
         });
+
+        it("defaults passNumber to 1 when absent from BSON (F25 — legacy sessions predate re-practice)", () => {
+
+            const oid = new ObjectId();
+            const bson = {
+                _id: oid,
+                userId: "user-1",
+                moduleId: "mod-1",
+                exerciseIds: ["ex-1"],
+                currentPosition: 0,
+                startedAt: "2026-06-09T09:00:00.000Z",
+            };
+
+            const session = PracticeSession.fromBSON(bson as any);
+
+            assert.equal(session.passNumber, 1);
+        });
+
+        it("round-trips a non-default passNumber through toBSON and fromBSON", () => {
+
+            const session = makeSession({ passNumber: 2 });
+            const roundTripped = PracticeSession.fromBSON({ _id: new ObjectId(), ...session.toBSON() } as any);
+
+            assert.equal(session.toBSON().passNumber, 2);
+            assert.equal(roundTripped.passNumber, 2);
+        });
     });
 });
