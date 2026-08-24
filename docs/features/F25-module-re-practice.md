@@ -1,6 +1,6 @@
 # F25 — Module Re-practice
 
-![Status](https://img.shields.io/badge/status-open-blue?style=flat-square)
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
 
 ## 1. Purpose & Scope
 

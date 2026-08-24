@@ -1,5 +1,5 @@
 import { Db } from "mongodb";
-import { ControllerConfig, LAST_PRACTICE_RUNG } from "../Config";
+import { ControllerConfig, FIRST_PRACTICE_RUNG, LAST_PRACTICE_RUNG } from "../Config";
 import { UserModuleProgress, ModuleProficiency, RungCoverage, TestAttemptRecord } from "../model/UserModuleProgress";
 
 const COLLECTION = "userModuleProgress";
@@ -39,10 +39,13 @@ export class UserModuleProgressStore {
     /**
      * Transitions a module's status (in_progress | completed) for a user, upserting the record.
      *
-     * **`completed` is terminal.** A module that has been passed is never moved back to
-     * `in_progress`: re-entering it via "Keep practising" starts a session, which would otherwise
-     * un-complete it, hiding it from F21's level-test gate (which requires every module at the
-     * level to be `completed`) and re-showing the module test on the dashboard.
+     * **`completed` is terminal — but only against this method.** A module that has been passed
+     * is never moved back to `in_progress` here: re-entering it via "Keep practising" starts a
+     * session, which would otherwise un-complete it, hiding it from F21's level-test gate (which
+     * requires every module at the level to be `completed`) and re-showing the module test on the
+     * dashboard. This guard is not a defense against re-practice (F25): a genuine reset
+     * un-completes the module on purpose, and does so through `resetForRePractice`, a dedicated
+     * operation that bypasses this guard entirely rather than relaxing it.
      *
      * Idempotent timestamps: startedAt is set once on the first in_progress transition and
      * never overwritten; practiceCompletedAt is set once (whenever first provided) and never
@@ -104,6 +107,50 @@ export class UserModuleProgressStore {
         );
 
         return result.matchedCount > 0;
+    }
+
+    /**
+     * Resets a completed module's progress record for a new pass (F25 — Module Re-practice).
+     *
+     * Deliberately un-completes the module, bypassing `transitionStatus`'s "completed is
+     * terminal" guard through this dedicated operation rather than relaxing it: `status` returns
+     * to `available`, `startedAt`/`completedAt`/`practiceCompletedAt` are cleared, the ladder
+     * restarts at `currentRung` = `FIRST_PRACTICE_RUNG` with `rungCoverage` emptied, and
+     * `passNumber` is incremented. `testAttempts` and `proficiency` are left untouched — they are
+     * the pass history and the score the new pass will replace, not state this reset owns.
+     *
+     * Callers must have already verified the module is `completed` and quiet (no open practice
+     * session or test attempt); this method performs no precondition checks of its own.
+     *
+     * @param {string} userId - The user id.
+     * @param {string} moduleId - The module id.
+     *
+     * @returns {Promise<UserModuleProgress | null>} The reset record, or null if no progress record exists for (userId, moduleId).
+     */
+    async resetForRePractice(userId: string, moduleId: string): Promise<UserModuleProgress | null> {
+
+        const existing = await this.findByUserAndModule(userId, moduleId);
+
+        if (!existing) return null;
+
+        const result = await this.db.collection(COLLECTION).updateOne(
+            { userId, moduleId },
+            {
+                $set: {
+                    status: "available",
+                    startedAt: null,
+                    completedAt: null,
+                    currentRung: FIRST_PRACTICE_RUNG,
+                    rungCoverage: [],
+                    practiceCompletedAt: null,
+                    passNumber: existing.passNumber + 1,
+                },
+            } as any
+        );
+
+        if (result.matchedCount === 0) return null;
+
+        return this.findByUserAndModule(userId, moduleId);
     }
 
     async appendTestAttempt(userId: string, moduleId: string, attempt: TestAttemptRecord): Promise<UserModuleProgress | null> {
