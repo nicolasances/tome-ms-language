@@ -88,7 +88,15 @@ export class RePracticeModule extends TotoDelegate<RePracticeModuleRequest, RePr
 
         const reset = await progressStore.resetForRePractice(req.userId, req.moduleId);
 
-        return { moduleId: req.moduleId, status: reset!.status, passNumber: reset!.passNumber };
+        return {
+            moduleId: req.moduleId,
+            status: reset!.status,
+            startedAt: reset!.startedAt,
+            completedAt: reset!.completedAt,
+            practiceCompletedAt: reset!.practiceCompletedAt,
+            currentRung: reset!.currentRung,
+            passNumber: reset!.passNumber,
+        };
     }
 }
 
@@ -98,7 +106,11 @@ interface RePracticeModuleRequest {
 }
 
 interface RePracticeModuleResponse {
-    moduleId: string;   // The module id
-    status: string;     // The module's status after the reset — always "available"
-    passNumber: number; // The new pass number the module is now on
+    moduleId: string;                    // The module id
+    status: string;                      // The module's status after the reset — always "available"
+    startedAt: string | null;            // Always null — re-stamped when the new pass's first practice session starts
+    completedAt: string | null;          // Always null — the reset un-completes the module
+    practiceCompletedAt: string | null;  // Always null — re-stamped when the new pass's ladder completes
+    currentRung: number;                 // Always the first rung — the new pass starts the ladder over
+    passNumber: number;                  // The new pass number the module is now on
 }

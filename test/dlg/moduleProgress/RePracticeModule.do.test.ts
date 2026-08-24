@@ -73,6 +73,10 @@ describe("RePracticeModule.do", () => {
         assert.equal(result.moduleId, "mod-1");
         assert.equal(result.status, "available");
         assert.equal(result.passNumber, 2);
+        assert.isNull(result.startedAt);
+        assert.isNull(result.completedAt);
+        assert.isNull(result.practiceCompletedAt);
+        assert.equal(result.currentRung, 1);
     });
 
     it("throws 404 when no progress record exists for the user + module", async () => {
