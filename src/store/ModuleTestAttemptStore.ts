@@ -72,20 +72,30 @@ export class ModuleTestAttemptStore {
     }
 
     /**
-     * Returns the **earliest submitted** attempt for a user + module pair — pass or fail.
-     * An attempt is submitted when its `takenAt` is set; in-progress attempts are ignored.
+     * Returns the **earliest submitted** attempt of one pass (F25) for a user + module pair —
+     * pass or fail. An attempt is submitted when its `takenAt` is set; in-progress attempts are
+     * ignored.
      *
-     * This is the attempt the User Proficiency Score reads: every later attempt is taken after
-     * seeing the review and F12's mistake explanation, so it is not an independent measurement.
+     * This is the attempt the User Proficiency Score reads: every later attempt of the same pass
+     * is taken after seeing the review and F12's mistake explanation, so it is not an independent
+     * measurement. Only attempts stamped with `passNumber` are considered, so a re-practice's
+     * score never reads an earlier pass's attempt. An attempt with no `passNumber` field at all
+     * predates F25 and is the pass-1 attempt it always was — matched via the `$exists: false`
+     * branch below, since a plain equality filter never matches a field that is entirely missing.
      *
      * @param {string} userId - The user id.
      * @param {string} moduleId - The module id.
+     * @param {number} passNumber - The pass to score.
      *
-     * @returns {Promise<ModuleTestAttempt | null>} The first submitted attempt, or null when the user never submitted one.
+     * @returns {Promise<ModuleTestAttempt | null>} The first submitted attempt of that pass, or null when the user never submitted one.
      */
-    async findFirstSubmittedByUserAndModule(userId: string, moduleId: string): Promise<ModuleTestAttempt | null> {
+    async findFirstSubmittedByUserAndModule(userId: string, moduleId: string, passNumber: number): Promise<ModuleTestAttempt | null> {
 
-        const doc = await this.db.collection(COLLECTION).findOne({ userId, moduleId, takenAt: { $ne: null } }, { sort: { takenAt: 1 } });
+        const passNumberFilter = passNumber === 1
+            ? { $or: [{ passNumber: 1 }, { passNumber: { $exists: false } }] }
+            : { passNumber };
+
+        const doc = await this.db.collection(COLLECTION).findOne({ userId, moduleId, takenAt: { $ne: null }, ...passNumberFilter }, { sort: { takenAt: 1 } });
 
         if (!doc) return null;
 

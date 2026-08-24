@@ -49,8 +49,10 @@ export class UserModuleProgressStore {
      *
      * Idempotent timestamps: startedAt is set once on the first in_progress transition and
      * never overwritten; practiceCompletedAt is set once (whenever first provided) and never
-     * overwritten. currentRung, rungCoverage and testAttempts carry over from any existing
-     * record across transitions.
+     * overwritten. currentRung, rungCoverage, testAttempts and passNumber carry over from any
+     * existing record across transitions — passNumber in particular must survive this, since a
+     * re-practised module (F25) starts its new pass through this same method, and every session
+     * or attempt created afterwards is stamped from it.
      *
      * @param userId the user id
      * @param moduleId the module id
@@ -81,6 +83,7 @@ export class UserModuleProgressStore {
             rungCoverage: existing?.rungCoverage ?? [],
             practiceCompletedAt: existing?.practiceCompletedAt ?? practiceCompletedAt ?? null,
             testAttempts: existing?.testAttempts ?? [],
+            passNumber: existing?.passNumber,
         });
 
         return this.upsert(updated);

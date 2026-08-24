@@ -69,13 +69,34 @@ function makePracticeSessionBSON(exerciseIds: string[], overrides: any = {}): an
 }
 
 /**
+ * Matches a document against the `passNumber` / `$or` legacy-fallback filter the real stores
+ * build, so these mocks exercise the same pass-scoping the production query does.
+ */
+function matchesPassNumberFilter(doc: any, filter: any): boolean {
+
+    if (filter.$or) {
+        return filter.$or.some((clause: any) => {
+            const val = clause.passNumber;
+            if (val && typeof val === "object" && "$exists" in val) return val.$exists === false ? !("passNumber" in doc) : ("passNumber" in doc);
+            return doc.passNumber === val;
+        });
+    }
+
+    if (filter.passNumber !== undefined) return doc.passNumber === filter.passNumber;
+
+    return true;
+}
+
+/**
  * Builds a mock config wiring all collections needed by SubmitModuleTest.
  * Records mutations for assertion.
  *
  * `earlierAttemptDocs` are already-submitted attempts of the same user+module — what the
- * proficiency computation reads instead of the attempt being submitted now.
+ * proficiency computation reads instead of the attempt being submitted now. `progressPassNumber`
+ * is the passNumber on the module's progress record (F25) — it is what the proficiency
+ * computation scopes its reads to.
  */
-function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[], { sessionDocs = [] as any[], earlierAttemptDocs = [] as any[] } = {}) {
+function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[], { sessionDocs = [] as any[], earlierAttemptDocs = [] as any[], progressPassNumber = 1 } = {}) {
 
     const mutations: any[] = [];
     let currentAttempt: any = attemptDoc ? { ...attemptDoc } : null;
@@ -88,7 +109,7 @@ function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[], { sessionDo
                 if (filter._id) return currentAttempt?._id.equals(filter._id) ? currentAttempt : null;
 
                 const submitted = [...earlierAttemptDocs, ...(currentAttempt ? [currentAttempt] : [])]
-                    .filter(d => d.userId === filter.userId && d.moduleId === filter.moduleId && d.takenAt !== null);
+                    .filter(d => d.userId === filter.userId && d.moduleId === filter.moduleId && d.takenAt !== null && matchesPassNumberFilter(d, filter));
 
                 if (options.sort?.takenAt === 1) submitted.sort((a, b) => a.takenAt > b.takenAt ? 1 : -1);
 
@@ -107,6 +128,7 @@ function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[], { sessionDo
                     if (d.userId !== filter.userId || d.moduleId !== filter.moduleId) return false;
                     if (d.completedAt === null) return false;
                     if (filter.completedAt?.$lte && d.completedAt > filter.completedAt.$lte) return false;
+                    if (!matchesPassNumberFilter(d, filter)) return false;
                     return true;
                 }),
             }),
@@ -125,6 +147,7 @@ function makeMockConfig(attemptDoc: any | null, exerciseDocs: any[], { sessionDo
                 rungCoverage: [],
                 practiceCompletedAt: "2026-06-01T00:00:00.000Z",
                 testAttempts: [],
+                passNumber: progressPassNumber,
             }),
             replaceOne: async (_f: any, doc: any) => {
                 mutations.push({ op: "upsertProgress", doc });
@@ -315,6 +338,36 @@ describe("SubmitModuleTest.do", () => {
 
         // The retry was flawless, but the first attempt scored 10/20 → 100 × 10 / (10 + 3×10) = 25
         assert.equal(stored.proficiency.testScore, 25);
+    });
+
+    it("scores only the record's current pass, ignoring an earlier pass's attempt and sessions (F25)", async () => {
+
+        const oid = new ObjectId();
+        const exercises = Array.from({ length: 20 }, (_, i) => makeExerciseBSON(`ex-${i + 1}`));
+
+        // Pass 1's attempt scored 25 (10/20 correct) and its session was a clean run — if either
+        // leaked into a pass-2 score they would pull it far from the pass-2-only result asserted below.
+        const passOneAttempt = makeAttemptBSON(new ObjectId(), 20, 10, { takenAt: "2026-06-01T10:00:00.000Z", score: 50, passed: false, passNumber: 1 });
+        const passOneSession = makePracticeSessionBSON(["ex-1", "ex-2", "ex-3", "ex-4"], { passNumber: 1 });
+        const passTwoSession = makePracticeSessionBSON(["ex-1", "ex-2", "ex-3", "ex-4"], { passNumber: 2, completedAt: "2026-07-10T10:00:00.000Z" });
+
+        const currentAttempt = makeAttemptBSON(oid, 20, 18, { passNumber: 2 });
+
+        const { config, mutations } = makeMockConfig(currentAttempt, exercises, {
+            sessionDocs: [passOneSession, passTwoSession],
+            earlierAttemptDocs: [passOneAttempt],
+            progressPassNumber: 2,
+        });
+        const delegate = new SubmitModuleTest({} as any, config);
+
+        await delegate.do({ userId: "user-1", attemptId: oid.toString() }, {} as any);
+
+        const stored = mutations.find(m => m.op === "setProficiency");
+
+        // testScore = 100 × 18 / (18 + 3×2) = 75 (the pass-2 attempt) ; practice is the pass-2 session, a clean rung-3 run = 100
+        assert.equal(stored.proficiency.testScore, 75);
+        assert.equal(stored.proficiency.practiceScore, 100);
+        assert.equal(stored.proficiency.passNumber, 2);
     });
 
     it("excludes practice sessions completed after the module was completed", async () => {

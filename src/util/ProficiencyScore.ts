@@ -172,40 +172,41 @@ export function buildProficiency(input: BuildProficiencyInput): ModuleProficienc
         ? testScore
         : roundScore(PROFICIENCY_TEST_BLEND_WEIGHT * testScore + (1 - PROFICIENCY_TEST_BLEND_WEIGHT) * practiceScore);
 
-    return new ModuleProficiency({ score, testScore, practiceScore, basis, computedAt: input.computedAt, version: PROFICIENCY_VERSION });
+    return new ModuleProficiency({ score, testScore, practiceScore, basis, computedAt: input.computedAt, version: PROFICIENCY_VERSION, passNumber: input.passNumber });
 }
 
 /**
- * Loads everything the UPS is derived from and computes it: the user's first submitted Module Test
- * attempt, the practice sessions completed before the module was completed, and the exercises
- * those answers point at (one bulk read, never one per answer).
+ * Loads everything the UPS is derived from and computes it: the given pass's (F25) first
+ * submitted Module Test attempt, the practice sessions of that pass completed before the module
+ * was completed, and the exercises those answers point at (one bulk read, never one per answer).
  *
- * @param {ComputeModuleProficiencyInput} input - The db handle, service config, user + module to score, and the module's completion timestamp.
+ * @param {ComputeModuleProficiencyInput} input - The db handle, service config, user + module to score, the pass to score, and the module's completion timestamp.
  *
- * @returns {Promise<ModuleProficiency | null>} The computed score, or null when the user has no submitted test attempt for the module — without one there is nothing to score.
+ * @returns {Promise<ModuleProficiency | null>} The computed score, or null when the user has no submitted test attempt for that pass — without one there is nothing to score.
  */
 export async function computeModuleProficiency(input: ComputeModuleProficiencyInput): Promise<ModuleProficiency | null> {
 
-    const { db, config, userId, moduleId, completedAt } = input;
+    const { db, config, userId, moduleId, passNumber, completedAt } = input;
 
-    const attempt = await new ModuleTestAttemptStore({ db, config }).findFirstSubmittedByUserAndModule(userId, moduleId);
+    const attempt = await new ModuleTestAttemptStore({ db, config }).findFirstSubmittedByUserAndModule(userId, moduleId, passNumber);
 
     if (!attempt) return null;
 
-    const sessions = await new PracticeSessionStore({ db, config }).listCompletedByUserAndModule(userId, moduleId, completedAt);
+    const sessions = await new PracticeSessionStore({ db, config }).listCompletedByUserAndModule(userId, moduleId, passNumber, completedAt);
 
     const answeredExerciseIds = [...new Set(sessions.flatMap(s => s.answers.map(a => a.exerciseId)))];
 
     const exercises = await new ExerciseStore(db).findByIds(answeredExerciseIds);
 
-    return buildProficiency({ attempt, sessions, exercisesById: new Map(exercises.map(e => [e.id, e])), computedAt: new Date().toISOString() });
+    return buildProficiency({ attempt, sessions, exercisesById: new Map(exercises.map(e => [e.id, e])), computedAt: new Date().toISOString(), passNumber });
 }
 
 export interface BuildProficiencyInput {
-    attempt: ModuleTestAttempt;                 // The user's first submitted Module Test attempt for the module.
-    sessions: PracticeSession[];                // The practice sessions completed before the module was completed.
+    attempt: ModuleTestAttempt;                 // The user's first submitted Module Test attempt for the pass being scored.
+    sessions: PracticeSession[];                // The practice sessions of that pass completed before the module was completed.
     exercisesById: Map<string, Exercise>;       // The exercises the practice answers point at, keyed by id.
     computedAt: string;                         // ISO-8601 timestamp to stamp on the score.
+    passNumber?: number;                        // The pass this score was computed from (F25). Defaults to 1.
 }
 
 export interface ComputeModuleProficiencyInput {
@@ -213,5 +214,6 @@ export interface ComputeModuleProficiencyInput {
     config: ControllerConfig;                   // The service config.
     userId: string;                             // The user to score.
     moduleId: string;                           // The module to score.
+    passNumber: number;                         // The pass (F25) to score — only this pass's sessions and attempt count.
     completedAt?: string;                       // ISO-8601 timestamp of when the module was completed; upper-bounds the practice sessions that count. Absent on a legacy record that carries no completion timestamp, in which case every completed session counts.
 }

@@ -120,9 +120,11 @@ export type ProficiencyBasis = typeof PROFICIENCY_BASES[number];
  * The User Proficiency Score of one module for one user — how hard the module actually was —
  * embedded in UserModuleProgress.proficiency.
  *
- * Computed **once**, when the module transitions to `completed`, and frozen there: "keep
- * practising" runs on an already-completed module never move it. It is a snapshot of the first
- * pass through the module, not a current-standing metric.
+ * Computed when the module transitions to `completed`, from that pass's (F25) sessions and test
+ * attempt alone; "keep practising" runs on an already-completed module never move it. Reports the
+ * **most recently completed pass** (v2.0 — replaces "computed once and frozen"): a re-practice
+ * recomputes and replaces it, so it is a current standing, not a permanent snapshot of the first
+ * attempt.
  */
 export class ModuleProficiency {
 

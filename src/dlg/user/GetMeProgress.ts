@@ -87,7 +87,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
 
         const backfilled = new Map<string, ModuleProficiency | null>(await Promise.all(staleProgress.map(async p => {
 
-            const proficiency = await computeModuleProficiency({ db, config, userId: user.id, moduleId: p.moduleId, completedAt: p.completedAt ?? undefined });
+            const proficiency = await computeModuleProficiency({ db, config, userId: user.id, moduleId: p.moduleId, passNumber: p.passNumber, completedAt: p.completedAt ?? undefined });
 
             if (proficiency) await progressStore.setProficiency(user.id, p.moduleId, proficiency);
 
@@ -113,7 +113,10 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                     const previousProgress = progressMap.get(previousModule.id);
                     
                     if (!previousProgress) status = "locked"; // Previous module has no progress record, so this one is locked
-                    else if (previousProgress.status === "completed") status = "available"; // Previous module is completed, so this one is available
+                    // Previous module is completed, or was completed at least once and is now mid re-practice
+                    // (F25 — passNumber >= 2): either way this one stays available. Without the passNumber
+                    // check, resetting an earlier module would re-lock a later one the user had already earned.
+                    else if (previousProgress.status === "completed" || previousProgress.passNumber >= 2) status = "available";
                     else status = "locked"; // Previous module is not completed, so this one is locked
                 }
 

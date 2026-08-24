@@ -151,6 +151,27 @@ describe("UserModuleProgressStore.transitionStatus", () => {
         assert.equal(result.practiceCompletedAt, "2026-06-01T08:00:00.000Z");
     });
 
+    it("preserves passNumber from the existing record across a status transition (F25)", async () => {
+
+        // A re-practised module (passNumber 2) starting its new pass's first session must not have
+        // its pass stamp silently reset to 1 — every session/attempt created afterwards, and the
+        // score computed on completion, would otherwise be scoped to the wrong pass.
+        const docs = [makeProgress({ status: "available", passNumber: 2 }).toBSON()];
+        const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });
+
+        const result = await store.transitionStatus("user-1", "mod-1", "in_progress");
+
+        assert.equal(result.passNumber, 2);
+    });
+
+    it("defaults passNumber to 1 for a brand-new record", async () => {
+        const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection([])), config: {} as any });
+
+        const result = await store.transitionStatus("user-1", "mod-1", "in_progress");
+
+        assert.equal(result.passNumber, 1);
+    });
+
     it("returns the updated record persisted via replaceOne", async () => {
         const docs: any[] = [];
         const store = new UserModuleProgressStore({ db: makeMockDb(makeMockCollection(docs)), config: {} as any });
