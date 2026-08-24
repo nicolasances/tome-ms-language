@@ -171,7 +171,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 status,
                 step,
                 completionPct,
-                proficiency: status === "completed" && proficiency ? { score: proficiency.score, testScore: proficiency.testScore, practiceScore: proficiency.practiceScore, basis: proficiency.basis } : null,
+                proficiency: status === "completed" && proficiency ? { score: proficiency.score, testScore: proficiency.testScore, practiceScore: proficiency.practiceScore, basis: proficiency.basis, passNumber: proficiency.passNumber } : null,
                 startedAt: progress?.startedAt ?? null,
                 completedAt: progress?.completedAt ?? null,
                 testUnlocksAt,
@@ -222,6 +222,7 @@ interface ModuleProficiencyEntry {
     testScore: number;              // The test component: the first submitted attempt with errors charged ×3 (0–100)
     practiceScore: number | null;   // The practice component: rung-weighted accuracy over the practice sessions (0–100); null when the module holds no weighted practice answers
     basis: ProficiencyBasis;        // Which inputs the score could be computed from — a "test-only" score must not be read as a flawless practice run
+    passNumber: number;             // Which pass (F25) this score was computed from
 }
 
 interface RungCoverageCount {

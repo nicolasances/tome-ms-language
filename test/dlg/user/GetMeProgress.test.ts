@@ -918,7 +918,20 @@ describe("GetMeProgress.do - module proficiency", () => {
 
         const result = await delegate.do({}, userContext);
 
-        assert.deepEqual(result.modules[0].proficiency, { score: 69.5, testScore: 57.1, practiceScore: 88, basis: "full" });
+        assert.deepEqual(result.modules[0].proficiency, { score: 69.5, testScore: 57.1, practiceScore: 88, basis: "full", passNumber: 1 });
+    });
+
+    it("rides passNumber along on the proficiency of a re-practised module (F25)", async () => {
+
+        const progress = makeProgress("a1-1", "completed", { completedAt: "2026-06-12T10:00:00.000Z", passNumber: 2 });
+        progress.proficiency = new ModuleProficiency({ score: 80, testScore: 80, practiceScore: null, basis: "test-only", computedAt: "2026-08-01T10:00:00.000Z", version: PROFICIENCY_VERSION, passNumber: 2 });
+
+        const { config } = makeProficiencyMockConfig([module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].proficiency!.passNumber, 2);
     });
 
     it("does not recompute a stored score that is already at the current formula version", async () => {
