@@ -19,8 +19,9 @@ export class PracticeSession {
     verifiedExerciseIds: string[];      // Exercise ids for which AI answer verification was already used this session (one-per-attempt guard)
     startedAt: string;                  // ISO-8601 timestamp of session start
     completedAt: string | null;         // ISO-8601 timestamp of completion, or null if still active
+    passNumber: number;                 // Which pass through the module (F25) this session belongs to. Copied from UserModuleProgress.passNumber on creation; defaults to 1 for sessions predating re-practice.
 
-    constructor({ id, userId, moduleId, exerciseIds, answers, currentPosition, retryQueue, verifiedExerciseIds, startedAt, completedAt }: PracticeSessionInput) {
+    constructor({ id, userId, moduleId, exerciseIds, answers, currentPosition, retryQueue, verifiedExerciseIds, startedAt, completedAt, passNumber }: PracticeSessionInput) {
 
         this.id = id;
         this.userId = userId;
@@ -32,6 +33,7 @@ export class PracticeSession {
         this.verifiedExerciseIds = verifiedExerciseIds ?? [];
         this.startedAt = startedAt;
         this.completedAt = completedAt ?? null;
+        this.passNumber = passNumber ?? 1;
     }
 
     /**
@@ -50,6 +52,7 @@ export class PracticeSession {
             verifiedExerciseIds: data.verifiedExerciseIds ?? [],
             startedAt: data.startedAt,
             completedAt: data.completedAt ?? null,
+            passNumber: data.passNumber ?? 1,
         });
     }
 
@@ -69,6 +72,7 @@ export class PracticeSession {
             verifiedExerciseIds: this.verifiedExerciseIds,
             startedAt: this.startedAt,
             completedAt: this.completedAt,
+            passNumber: this.passNumber,
         };
     }
 }
@@ -84,4 +88,5 @@ interface PracticeSessionInput {
     verifiedExerciseIds?: string[];
     startedAt: string;
     completedAt?: string | null;
+    passNumber?: number;
 }

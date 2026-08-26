@@ -98,4 +98,36 @@ describe("ModuleTestAttempt.fromBSON", () => {
         assert.equal(result.takenAt, null);
         assert.deepEqual(result.exerciseResults, []);
     });
+
+    it("defaults passNumber to 1 when absent from the document (F25 — legacy attempts predate re-practice)", () => {
+
+        const oid = new ObjectId();
+        const doc: any = {
+            _id: oid,
+            userId: "user-1",
+            moduleId: "mod-1",
+            startedAt: "2026-06-11T09:00:00.000Z",
+        };
+
+        const result = ModuleTestAttempt.fromBSON(doc);
+
+        assert.equal(result.passNumber, 1);
+    });
+
+    it("round-trips a non-default passNumber through toBSON / fromBSON", () => {
+
+        const oid = new ObjectId();
+        const attempt = new ModuleTestAttempt({
+            userId: "user-1",
+            moduleId: "mod-1",
+            startedAt: "2026-06-11T09:00:00.000Z",
+            passNumber: 3,
+        });
+
+        const bson = { _id: oid, ...attempt.toBSON() };
+        const result = ModuleTestAttempt.fromBSON(bson as any);
+
+        assert.equal(bson.passNumber, 3);
+        assert.equal(result.passNumber, 3);
+    });
 });

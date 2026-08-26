@@ -120,9 +120,11 @@ export type ProficiencyBasis = typeof PROFICIENCY_BASES[number];
  * The User Proficiency Score of one module for one user — how hard the module actually was —
  * embedded in UserModuleProgress.proficiency.
  *
- * Computed **once**, when the module transitions to `completed`, and frozen there: "keep
- * practising" runs on an already-completed module never move it. It is a snapshot of the first
- * pass through the module, not a current-standing metric.
+ * Computed when the module transitions to `completed`, from that pass's (F25) sessions and test
+ * attempt alone; "keep practising" runs on an already-completed module never move it. Reports the
+ * **most recently completed pass** (v2.0 — replaces "computed once and frozen"): a re-practice
+ * recomputes and replaces it, so it is a current standing, not a permanent snapshot of the first
+ * attempt.
  */
 export class ModuleProficiency {
 
@@ -132,8 +134,9 @@ export class ModuleProficiency {
     basis: ProficiencyBasis;        // Which inputs the score could be computed from.
     computedAt: string;             // ISO-8601 timestamp of when the score was computed.
     version: number;                // Formula version (PROFICIENCY_VERSION at computation time); drives recompute-on-read.
+    passNumber: number;             // The pass (F25) this score was computed from. Defaults to 1 for scores written before re-practice shipped.
 
-    constructor({ score, testScore, practiceScore, basis, computedAt, version }: ModuleProficiencyInput) {
+    constructor({ score, testScore, practiceScore, basis, computedAt, version, passNumber }: ModuleProficiencyInput) {
 
         this.score = score;
         this.testScore = testScore;
@@ -141,6 +144,7 @@ export class ModuleProficiency {
         this.basis = basis;
         this.computedAt = computedAt;
         this.version = version;
+        this.passNumber = passNumber ?? 1;
     }
 
     /**
@@ -155,6 +159,7 @@ export class ModuleProficiency {
             basis: data.basis,
             computedAt: data.computedAt,
             version: data.version,
+            passNumber: data.passNumber ?? 1,
         });
     }
 
@@ -170,6 +175,7 @@ export class ModuleProficiency {
             basis: this.basis,
             computedAt: this.computedAt,
             version: this.version,
+            passNumber: this.passNumber,
         };
     }
 }
@@ -179,8 +185,9 @@ export interface ModuleProficiencyInput {
     testScore: number;               // Test component (0–100).
     practiceScore?: number | null;   // Practice component (0–100), or null when there is none. Defaults to null.
     basis: ProficiencyBasis;         // Which inputs the score was computed from.
-    computedAt: string;              // ISO-8601 timestamp of computation.
+    computedAt: string;               // ISO-8601 timestamp of computation.
     version: number;                 // Formula version.
+    passNumber?: number;              // The pass this score was computed from. Defaults to 1.
 }
 
 export class UserModuleProgress {
@@ -195,8 +202,9 @@ export class UserModuleProgress {
     practiceCompletedAt: string | null;
     testAttempts: TestAttemptRecord[];
     proficiency: ModuleProficiency | null;
+    passNumber: number;
 
-    constructor({ userId, moduleId, status, startedAt, completedAt, currentRung, rungCoverage, practiceCompletedAt, testAttempts, proficiency }: UserModuleProgressInput) {
+    constructor({ userId, moduleId, status, startedAt, completedAt, currentRung, rungCoverage, practiceCompletedAt, testAttempts, proficiency, passNumber }: UserModuleProgressInput) {
         this.userId = userId;
         this.moduleId = moduleId;
         this.status = status;
@@ -207,6 +215,7 @@ export class UserModuleProgress {
         this.practiceCompletedAt = practiceCompletedAt ?? null;
         this.testAttempts = testAttempts;
         this.proficiency = proficiency ?? null;
+        this.passNumber = passNumber ?? 1;
     }
 
     static fromBSON(data: WithId<any>): UserModuleProgress {
@@ -221,6 +230,7 @@ export class UserModuleProgress {
             practiceCompletedAt: data.practiceCompletedAt ?? null,
             testAttempts: (data.testAttempts ?? []).map((a: any) => TestAttemptRecord.fromBSON(a)),
             proficiency: data.proficiency ? ModuleProficiency.fromBSON(data.proficiency) : null,
+            passNumber: data.passNumber ?? 1,
         });
     }
 
@@ -236,6 +246,7 @@ export class UserModuleProgress {
             practiceCompletedAt: this.practiceCompletedAt,
             testAttempts: this.testAttempts.map(a => a.toBSON()),
             proficiency: this.proficiency ? this.proficiency.toBSON() : null,
+            passNumber: this.passNumber,
         };
     }
 
@@ -287,4 +298,5 @@ interface UserModuleProgressInput {
     practiceCompletedAt?: string | null; // ISO-8601 timestamp of when the whole ladder completed. Defaults to null.
     testAttempts: TestAttemptRecord[]; // All module test attempts recorded for this user+module.
     proficiency?: ModuleProficiency | null; // The frozen User Proficiency Score, written when the module completes. Defaults to null.
+    passNumber?: number;               // Which pass through the module the user is on (F25). Defaults to 1; incremented only by a re-practice reset.
 }

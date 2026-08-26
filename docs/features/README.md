@@ -75,6 +75,11 @@ Features are grouped by layer. Lower groups depend on higher ones.
 |---|---------|---------------|--------|
 | F24 | [Activity Stats (Rolling Window)](./F24-activity-stats.md) | — (read-only aggregate over PracticeSession, ModuleTestAttempt, LevelTestAttempt) | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
+### Group J — Module re-practice
+| # | Feature | Primary model | Status |
+|---|---------|---------------|--------|
+| F25 | [Module Re-practice](./F25-module-re-practice.md) | UserModuleProgress (passNumber; amends F07) | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+
 ## Build order
 
 | Priority | Features | Notes |
@@ -85,6 +90,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | 4 — AI touchpoints | F12, F13 | On-demand; can be added after core loop works |
 | 5 — Level progression | F20, F21 | After at least one full level's modules are seeded |
 | 6 — Extended | F22, F23, F24 | User vocabulary capture + content analysis reports + activity stats (F24 depends on F10/F11/F21) |
+| 7 — Re-practice | F25 | Depends on F07/F09/F10/F11 (resets into the existing flow, adds no branch to it) |
 
 ## MVP slice
 

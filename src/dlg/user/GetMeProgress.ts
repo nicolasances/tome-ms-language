@@ -87,7 +87,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
 
         const backfilled = new Map<string, ModuleProficiency | null>(await Promise.all(staleProgress.map(async p => {
 
-            const proficiency = await computeModuleProficiency({ db, config, userId: user.id, moduleId: p.moduleId, completedAt: p.completedAt ?? undefined });
+            const proficiency = await computeModuleProficiency({ db, config, userId: user.id, moduleId: p.moduleId, passNumber: p.passNumber, completedAt: p.completedAt ?? undefined });
 
             if (proficiency) await progressStore.setProficiency(user.id, p.moduleId, proficiency);
 
@@ -113,7 +113,10 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                     const previousProgress = progressMap.get(previousModule.id);
                     
                     if (!previousProgress) status = "locked"; // Previous module has no progress record, so this one is locked
-                    else if (previousProgress.status === "completed") status = "available"; // Previous module is completed, so this one is available
+                    // Previous module is completed, or was completed at least once and is now mid re-practice
+                    // (F25 — passNumber >= 2): either way this one stays available. Without the passNumber
+                    // check, resetting an earlier module would re-lock a later one the user had already earned.
+                    else if (previousProgress.status === "completed" || previousProgress.passNumber >= 2) status = "available";
                     else status = "locked"; // Previous module is not completed, so this one is locked
                 }
 
@@ -168,7 +171,7 @@ export class GetMeProgress extends TotoDelegate<GetMeProgressRequest, GetMeProgr
                 status,
                 step,
                 completionPct,
-                proficiency: status === "completed" && proficiency ? { score: proficiency.score, testScore: proficiency.testScore, practiceScore: proficiency.practiceScore, basis: proficiency.basis } : null,
+                proficiency: status === "completed" && proficiency ? { score: proficiency.score, testScore: proficiency.testScore, practiceScore: proficiency.practiceScore, basis: proficiency.basis, passNumber: proficiency.passNumber } : null,
                 startedAt: progress?.startedAt ?? null,
                 completedAt: progress?.completedAt ?? null,
                 testUnlocksAt,
@@ -219,6 +222,7 @@ interface ModuleProficiencyEntry {
     testScore: number;              // The test component: the first submitted attempt with errors charged ×3 (0–100)
     practiceScore: number | null;   // The practice component: rung-weighted accuracy over the practice sessions (0–100); null when the module holds no weighted practice answers
     basis: ProficiencyBasis;        // Which inputs the score could be computed from — a "test-only" score must not be read as a flawless practice run
+    passNumber: number;             // Which pass (F25) this score was computed from
 }
 
 interface RungCoverageCount {

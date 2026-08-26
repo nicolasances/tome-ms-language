@@ -1,6 +1,6 @@
 # F25 — Module Re-practice
 
-![Status](https://img.shields.io/badge/status-open-blue?style=flat-square)
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
 
 ## 1. Purpose & Scope
 
@@ -189,7 +189,7 @@ Every existing progress record, practice session and test attempt reads back as 
 | OQ-02 | Should a re-practice move the UPS at all, given it was specified as a frozen first-pass snapshot? | **Resolved**: yes — redefined as the latest completed pass. A signal the user cannot act on is not worth showing. |
 | OQ-03 | Should the module stay `completed` during a re-practice, with completion derived from a separate `completedAt`? | **Resolved**: no. It genuinely un-completes. Accepted consequences: the level count drops, the level test closes, the proficiency signal disappears until the pass finishes. |
 | OQ-04 | Does a reset drop the user at grammar or at practice? | **Resolved**: grammar (`available`). A full reset means the whole flow. |
-| OQ-05 | Should re-practising a module re-lock a later, untouched module? | **Resolved (proposed)**: no — sequential unlock treats `passNumber >= 2` as previously completed. Called out because it is the one place this spec declines the literal reading of "un-complete it"; overrule it if the stricter behaviour is wanted. |
+| OQ-05 | Should re-practising a module re-lock a later, untouched module? | **Resolved**: no — sequential unlock treats `passNumber >= 2` as previously completed, implemented in `GetMeProgress`. This is the one place this spec declines the literal reading of "un-complete it". |
 | OQ-06 | Does the pass need its own timestamp, or a pass marker on each session and attempt? | **Resolved**: a stored marker. Deriving the pass from `startedAt` works only for the pass you are currently in — each reset overwrites the previous boundary, so from pass 3 onward earlier passes cannot be told apart. One integer per session and attempt keeps every pass identifiable permanently. |
 | OQ-07 | Should an open practice session be force-closed by the reset instead of blocking it? | **Resolved**: no. Discarding a round the user is in the middle of is worse than asking them to finish it, and the client already knows how to resume from a 409. |
 | OQ-08 | Should the UPS score the *last* submitted attempt rather than the first of the pass? | **Open**: it would fix the pre-existing oddity that a failed first attempt scores a module the user later passed. But it floors the test component near 57 and stops charging for retries. Purely a question about the metric. |

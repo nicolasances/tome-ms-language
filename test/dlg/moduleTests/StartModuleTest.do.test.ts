@@ -171,6 +171,35 @@ describe("StartModuleTest.do", () => {
         assert.equal(result.exercises.length, 10);
     });
 
+    it("stamps the new attempt with the progress record's passNumber (F25)", async () => {
+
+        const mod = makeModule();
+        const exercises = makeLargeExercisePool();
+        const progress = makeProgress({ passNumber: 2 });
+
+        let insertedDoc: any = null;
+        const insertedOid = new ObjectId();
+
+        const collections: Record<string, any> = {
+            modules: { findOne: async () => mod.toBSON() },
+            exercises: { find: () => ({ toArray: async () => exercises.map(e => e.toBSON()) }) },
+            userModuleProgress: { findOne: async () => progress.toBSON(), replaceOne: async () => ({ upsertedCount: 1 }) },
+            userVocabularyProgress: { find: () => ({ toArray: async () => [] }) },
+            userGrammarProgress: { find: () => ({ toArray: async () => [] }) },
+            moduleTestAttempts: {
+                findOne: async () => null,
+                insertOne: async (doc: any) => { insertedDoc = doc; return { insertedId: insertedOid }; },
+            },
+        };
+
+        const config = { getDBName: () => "test", getMongoDb: async () => ({ collection: (name: string) => collections[name] }) } as any;
+        const delegate = new StartModuleTest({} as any, config);
+
+        await delegate.do({ userId: "user-1", moduleId: "mod-1", now: new Date("2026-06-11T14:00:00.000Z") }, {} as any);
+
+        assert.equal(insertedDoc.passNumber, 2);
+    });
+
     it("throws 409 with attemptId when an active attempt already exists", async () => {
 
         const mod = makeModule();

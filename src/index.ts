@@ -47,6 +47,7 @@ import { GetLevelTestReview } from './dlg/levelTests/GetLevelTestReview';
 import { GetDailyActivity } from './dlg/stats/GetDailyActivity';
 import { StartBackup } from './dlg/backup/StartBackup';
 import { StartRestore } from './dlg/backup/StartRestore';
+import { RePracticeModule } from './dlg/moduleProgress/RePracticeModule';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -85,6 +86,8 @@ const config: TotoMicroserviceConfiguration = {
 
             { method: 'GET', path: '/me/progress', delegate: GetMeProgress },
             { method: 'GET', path: '/me/stats/dailyActivity', delegate: GetDailyActivity },
+
+            { method: 'POST', path: '/users/:userId/modules/:moduleId/rePractice', delegate: RePracticeModule },
 
             { method: 'GET', path: '/users/:userId/vocabularyProgress', delegate: GetUserVocabularyProgress },
             { method: 'GET', path: '/users/:userId/vocabularyProgress/:vocabularyItemId', delegate: GetUserVocabularyProgressItem },

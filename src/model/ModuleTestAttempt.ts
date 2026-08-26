@@ -37,8 +37,9 @@ export class ModuleTestAttempt {
     startedAt: string;                  // ISO-8601 timestamp of when the attempt was started
     takenAt: string | null;             // ISO-8601 timestamp of submission; null while in-progress
     exerciseResults: ExerciseResult[];  // Per-exercise mastery results (F06); populated on submit
+    passNumber: number;                 // Which pass through the module (F25) this attempt belongs to. Copied from UserModuleProgress.passNumber on creation; defaults to 1 for attempts predating re-practice.
 
-    constructor({ id, userId, moduleId, exerciseIds, answers, currentPosition, verifiedExerciseIds, score, passed, startedAt, takenAt, exerciseResults }: ModuleTestAttemptInput) {
+    constructor({ id, userId, moduleId, exerciseIds, answers, currentPosition, verifiedExerciseIds, score, passed, startedAt, takenAt, exerciseResults, passNumber }: ModuleTestAttemptInput) {
 
         this.id = id;
         this.userId = userId;
@@ -52,6 +53,7 @@ export class ModuleTestAttempt {
         this.startedAt = startedAt;
         this.takenAt = takenAt ?? null;
         this.exerciseResults = exerciseResults ?? [];
+        this.passNumber = passNumber ?? 1;
     }
 
     /**
@@ -72,6 +74,7 @@ export class ModuleTestAttempt {
             startedAt: data.startedAt,
             takenAt: data.takenAt ?? null,
             exerciseResults: (data.exerciseResults ?? []).map((r: any) => ExerciseResult.fromBSON(r)),
+            passNumber: data.passNumber ?? 1,
         });
     }
 
@@ -93,6 +96,7 @@ export class ModuleTestAttempt {
             startedAt: this.startedAt,
             takenAt: this.takenAt,
             exerciseResults: this.exerciseResults.map(r => r.toBSON()),
+            passNumber: this.passNumber,
         };
     }
 }
@@ -110,4 +114,5 @@ interface ModuleTestAttemptInput {
     startedAt: string;
     takenAt?: string | null;
     exerciseResults?: ExerciseResult[];
+    passNumber?: number;
 }

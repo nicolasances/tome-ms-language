@@ -29,6 +29,7 @@ function makeProgress(moduleId: string, status: string, overrides: Partial<{
     testAttempts: TestAttemptRecord[];
     currentRung: number;
     rungCoverage: RungCoverage[];
+    passNumber: number;
 }> = {}): UserModuleProgress {
     return new UserModuleProgress({
         userId: "uuid-001", moduleId, status: status as any,
@@ -304,6 +305,24 @@ describe("GetMeProgress.do - per-module status and step", () => {
             [makeUser("A1").toBSON()],
             [makeModule("a1-1", "A1", ["v1", "v2", "v3"]).toBSON(), makeModule("a1-2", "A1").toBSON()],
             [makeProgress("a1-1", "completed", { rungCoverage: [new RungCoverage({ rung: 1, itemIds: ["v1", "v2", "v3"] })], completedAt: "2026-01-02T10:00:00.000Z" }).toBSON()]
+        );
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+        const m = result.modules[1];
+
+        assert.equal(m.status, "available");
+        assert.equal(m.step, "grammar");
+    });
+
+    it("module after a re-practised (available, passNumber >= 2) module is still 'available', not re-locked (F25)", async () => {
+        // Module a1-1 was completed, then reset by a re-practice: status is back to 'available'
+        // and passNumber climbed to 2. Module a1-2 holds no progress record of its own, so its
+        // lock state is derived from a1-1 — and must not be re-locked by a decision about a1-1.
+        const config = makeMockConfig(
+            [makeUser("A1").toBSON()],
+            [makeModule("a1-1", "A1", ["v1", "v2", "v3"]).toBSON(), makeModule("a1-2", "A1").toBSON()],
+            [makeProgress("a1-1", "available", { passNumber: 2 }).toBSON()]
         );
         const delegate = new GetMeProgress({} as any, config);
 
@@ -899,7 +918,20 @@ describe("GetMeProgress.do - module proficiency", () => {
 
         const result = await delegate.do({}, userContext);
 
-        assert.deepEqual(result.modules[0].proficiency, { score: 69.5, testScore: 57.1, practiceScore: 88, basis: "full" });
+        assert.deepEqual(result.modules[0].proficiency, { score: 69.5, testScore: 57.1, practiceScore: 88, basis: "full", passNumber: 1 });
+    });
+
+    it("rides passNumber along on the proficiency of a re-practised module (F25)", async () => {
+
+        const progress = makeProgress("a1-1", "completed", { completedAt: "2026-06-12T10:00:00.000Z", passNumber: 2 });
+        progress.proficiency = new ModuleProficiency({ score: 80, testScore: 80, practiceScore: null, basis: "test-only", computedAt: "2026-08-01T10:00:00.000Z", version: PROFICIENCY_VERSION, passNumber: 2 });
+
+        const { config } = makeProficiencyMockConfig([module.toBSON()], [progress.toBSON()]);
+        const delegate = new GetMeProgress({} as any, config);
+
+        const result = await delegate.do({}, userContext);
+
+        assert.equal(result.modules[0].proficiency!.passNumber, 2);
     });
 
     it("does not recompute a stored score that is already at the current formula version", async () => {

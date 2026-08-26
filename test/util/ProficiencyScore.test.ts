@@ -259,10 +259,11 @@ describe("ProficiencyScore.buildProficiency", () => {
  */
 function makeMockDb(attemptDocs: any[], sessionDocs: any[], exerciseDocs: any[]) {
 
-    const calls = { exerciseFinds: 0, sessionFilter: null as any };
+    const calls = { exerciseFinds: 0, sessionFilter: null as any, attemptFilter: null as any };
 
     const attemptCol = {
         findOne: async (filter: any, options: any = {}) => {
+            calls.attemptFilter = filter;
             let matching = attemptDocs.filter(d => d.userId === filter.userId && d.moduleId === filter.moduleId && d.takenAt !== null);
             if (options.sort?.takenAt === 1) matching = [...matching].sort((a, b) => a.takenAt > b.takenAt ? 1 : -1);
             return matching[0] ?? null;
@@ -306,7 +307,7 @@ describe("ProficiencyScore.computeModuleProficiency", () => {
 
         const { db } = makeMockDb(attemptDocs, sessionDocs, [RUNG_3_EXERCISE.toBSON()]);
 
-        const result = await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", completedAt: "2026-06-12T10:00:00.000Z" });
+        const result = await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", passNumber: 1, completedAt: "2026-06-12T10:00:00.000Z" });
 
         // First attempt: 1 correct, 1 wrong → 100 × 1 / (1 + 3) = 25. Practice: 100. → 0.6×25 + 0.4×100 = 55
         assert.equal(result!.testScore, 25);
@@ -318,7 +319,7 @@ describe("ProficiencyScore.computeModuleProficiency", () => {
 
         const { db } = makeMockDb([], [], []);
 
-        const result = await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", completedAt: "2026-06-12T10:00:00.000Z" });
+        const result = await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", passNumber: 1, completedAt: "2026-06-12T10:00:00.000Z" });
 
         assert.isNull(result);
     });
@@ -329,7 +330,7 @@ describe("ProficiencyScore.computeModuleProficiency", () => {
 
         const { db, calls } = makeMockDb(attemptDocs, [], []);
 
-        await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", completedAt: "2026-06-12T10:00:00.000Z" });
+        await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", passNumber: 1, completedAt: "2026-06-12T10:00:00.000Z" });
 
         assert.equal(calls.sessionFilter.completedAt.$lte, "2026-06-12T10:00:00.000Z");
     });
@@ -344,7 +345,7 @@ describe("ProficiencyScore.computeModuleProficiency", () => {
 
         const { db, calls } = makeMockDb(attemptDocs, sessionDocs, [RUNG_2_EXERCISE.toBSON(), RUNG_3_EXERCISE.toBSON()]);
 
-        await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", completedAt: "2026-06-12T10:00:00.000Z" });
+        await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", passNumber: 1, completedAt: "2026-06-12T10:00:00.000Z" });
 
         assert.equal(calls.exerciseFinds, 1);
     });
@@ -355,9 +356,32 @@ describe("ProficiencyScore.computeModuleProficiency", () => {
 
         const { db, calls } = makeMockDb(attemptDocs, [], []);
 
-        const result = await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", completedAt: "2026-06-12T10:00:00.000Z" });
+        const result = await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", passNumber: 1, completedAt: "2026-06-12T10:00:00.000Z" });
 
         assert.equal(calls.exerciseFinds, 0);
         assert.equal(result!.basis, "test-only");
+    });
+
+    it("threads passNumber through to both the attempt and the session store (F25)", async () => {
+
+        const attemptDocs = [{ _id: new ObjectId(), userId: "user-1", moduleId: "mod-1", exerciseIds: ["t-1"], answers: [{ exerciseId: "t-1", isCorrect: true, userAnswer: "a", answeredAt: "x" }], startedAt: "2026-07-11T09:00:00.000Z", takenAt: "2026-07-11T10:00:00.000Z" }];
+
+        const { db, calls } = makeMockDb(attemptDocs, [], []);
+
+        await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", passNumber: 2, completedAt: "2026-07-12T10:00:00.000Z" });
+
+        assert.equal(calls.attemptFilter.passNumber, 2);
+        assert.equal(calls.sessionFilter.passNumber, 2);
+    });
+
+    it("stamps the resulting score with the pass it was computed from", async () => {
+
+        const attemptDocs = [{ _id: new ObjectId(), userId: "user-1", moduleId: "mod-1", exerciseIds: ["t-1"], answers: [{ exerciseId: "t-1", isCorrect: true, userAnswer: "a", answeredAt: "x" }], startedAt: "2026-07-11T09:00:00.000Z", takenAt: "2026-07-11T10:00:00.000Z" }];
+
+        const { db } = makeMockDb(attemptDocs, [], []);
+
+        const result = await computeModuleProficiency({ db, config: {} as any, userId: "user-1", moduleId: "mod-1", passNumber: 2, completedAt: "2026-07-12T10:00:00.000Z" });
+
+        assert.equal(result!.passNumber, 2);
     });
 });

@@ -53,28 +53,37 @@ export class PracticeSessionStore {
     }
 
     /**
-     * Returns the **completed** practice sessions of a user + module pair, optionally bounded to
-     * those completed no later than `completedBefore`.
+     * Returns the **completed** practice sessions of one pass (F25) of a user + module pair,
+     * optionally bounded to those completed no later than `completedBefore`.
      *
-     * Two rules the User Proficiency Score depends on:
+     * Rules the User Proficiency Score depends on:
      * - Abandoned sessions are excluded: they hold recorded misses but never ran the retry loop,
      *   so they would charge errors against effort that was never finished.
      * - `completedBefore` is the module's own completion timestamp, so "keep practising" runs on
-     *   an already-completed module never move the frozen score.
+     *   an already-completed module never move the score.
+     * - Only sessions stamped with `passNumber` count, so a re-practice's score is computed from
+     *   that pass alone. A session with no `passNumber` field at all predates F25 and is the
+     *   pass-1 session it always was — matched via the `$exists: false` branch below, since a
+     *   plain equality filter never matches a field that is entirely missing.
      *
      * @param {string} userId - The user id.
      * @param {string} moduleId - The module id.
+     * @param {number} passNumber - The pass to score.
      * @param {string} completedBefore - Optional ISO-8601 upper bound on `completedAt` (inclusive).
      *
      * @returns {Promise<PracticeSession[]>} The matching completed sessions.
      */
-    async listCompletedByUserAndModule(userId: string, moduleId: string, completedBefore?: string): Promise<PracticeSession[]> {
+    async listCompletedByUserAndModule(userId: string, moduleId: string, passNumber: number, completedBefore?: string): Promise<PracticeSession[]> {
 
         const completedAt: Record<string, any> = { $ne: null };
 
         if (completedBefore) completedAt.$lte = completedBefore;
 
-        const docs = await this.db.collection(COLLECTION).find({ userId, moduleId, completedAt }).toArray();
+        const passNumberFilter = passNumber === 1
+            ? { $or: [{ passNumber: 1 }, { passNumber: { $exists: false } }] }
+            : { passNumber };
+
+        const docs = await this.db.collection(COLLECTION).find({ userId, moduleId, completedAt, ...passNumberFilter }).toArray();
 
         return docs.map(doc => PracticeSession.fromBSON(doc as any));
     }

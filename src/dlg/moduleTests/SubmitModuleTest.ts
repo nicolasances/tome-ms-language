@@ -22,8 +22,9 @@ import { computeModuleProficiency } from "../../util/ProficiencyScore";
  * 4. Update mastery (F06) for every answered exercise — same loop as CompletePracticeSession.
  * 5. Persist the grading outcome on the attempt (`score`, `passed`, `takenAt`, `exerciseResults`).
  * 6. Record a TestAttemptRecord summary in `UserModuleProgress.testAttempts`.
- * 7. On pass: transition `UserModuleProgress` status to `completed` and freeze the module's
- *    User Proficiency Score (UPS) on the progress record.
+ * 7. On pass: transition `UserModuleProgress` status to `completed` and (re)compute the module's
+ *    User Proficiency Score (UPS) for the record's current pass (F25), replacing whatever score
+ *    was stored there.
  */
 export class SubmitModuleTest extends TotoDelegate<SubmitModuleTestRequest, SubmitModuleTestResponse> {
 
@@ -116,7 +117,7 @@ export class SubmitModuleTest extends TotoDelegate<SubmitModuleTestRequest, Subm
 
             const progress = await progressStore.transitionStatus(req.userId, attempt.moduleId, "completed");
 
-            const proficiency = await computeModuleProficiency({ db, config, userId: req.userId, moduleId: attempt.moduleId, completedAt: progress.completedAt! });
+            const proficiency = await computeModuleProficiency({ db, config, userId: req.userId, moduleId: attempt.moduleId, passNumber: progress.passNumber, completedAt: progress.completedAt! });
 
             if (proficiency) await progressStore.setProficiency(req.userId, attempt.moduleId, proficiency);
         }

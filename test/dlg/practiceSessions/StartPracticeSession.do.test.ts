@@ -324,6 +324,63 @@ describe("StartPracticeSession.do", () => {
         assert.equal(storedStatus, "completed", "the module must not be knocked back to in_progress");
     });
 
+    it("stamps the new session with the progress record's passNumber (F25)", async () => {
+
+        const mod = makeModule({ practiceSessionSize: 2 });
+        const exercises = [makeExercise("ex-mc-1", "multiple_choice", "v-1"), makeExercise("ex-ta-1", "translation_active", "v-2")];
+        const progress = makeProgress({ passNumber: 2 });
+
+        let insertedDoc: any = null;
+        const insertedId = new ObjectId();
+
+        const collections: Record<string, any> = {
+            modules: { findOne: async () => mod.toBSON() },
+            exercises: { find: () => ({ toArray: async () => exercises.map(e => e.toBSON()) }) },
+            userModuleProgress: { findOne: async () => progress.toBSON(), replaceOne: async () => ({ upsertedCount: 1 }) },
+            userVocabularyProgress: { find: () => ({ toArray: async () => [] }) },
+            userGrammarProgress: { find: () => ({ toArray: async () => [] }) },
+            practiceSessions: {
+                findOne: async () => null,
+                insertOne: async (doc: any) => { insertedDoc = doc; return { insertedId }; },
+            },
+        };
+
+        const config = { getDBName: () => "test", getMongoDb: async () => ({ collection: (name: string) => collections[name] }) } as any;
+        const delegate = new StartPracticeSession({} as any, config);
+
+        await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.equal(insertedDoc.passNumber, 2);
+    });
+
+    it("stamps a new session with passNumber 1 when no progress record exists yet", async () => {
+
+        const mod = makeModule({ practiceSessionSize: 2 });
+        const exercises = [makeExercise("ex-mc-1", "multiple_choice", "v-1"), makeExercise("ex-ta-1", "translation_active", "v-2")];
+
+        let insertedDoc: any = null;
+        const insertedId = new ObjectId();
+
+        const collections: Record<string, any> = {
+            modules: { findOne: async () => mod.toBSON() },
+            exercises: { find: () => ({ toArray: async () => exercises.map(e => e.toBSON()) }) },
+            userModuleProgress: { findOne: async () => null, replaceOne: async () => ({ upsertedCount: 1 }) },
+            userVocabularyProgress: { find: () => ({ toArray: async () => [] }) },
+            userGrammarProgress: { find: () => ({ toArray: async () => [] }) },
+            practiceSessions: {
+                findOne: async () => null,
+                insertOne: async (doc: any) => { insertedDoc = doc; return { insertedId }; },
+            },
+        };
+
+        const config = { getDBName: () => "test", getMongoDb: async () => ({ collection: (name: string) => collections[name] }) } as any;
+        const delegate = new StartPracticeSession({} as any, config);
+
+        await delegate.do({ userId: "user-1", moduleId: "mod-1" }, { userId: "user-1" } as any);
+
+        assert.equal(insertedDoc.passNumber, 1);
+    });
+
     it("throws 409 when an active session already exists for this user+module", async () => {
 
         const mod = makeModule();
