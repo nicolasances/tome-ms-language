@@ -5,6 +5,9 @@ on:
     branches: 
       - 'feature/**'
       - main
+    paths-ignore: 
+      - 'docs/**'
+      - '**.md'
 
 jobs:
   # This workflow contains a single job called "release"

@@ -5,6 +5,10 @@ on:
     branches: 
       - 'release/**'
       - main
+    paths-ignore: 
+      - 'docs/**'
+      - '**.md'
+      - 'k8s/**'
 
 jobs:
   # This workflow contains a single job called "release"
