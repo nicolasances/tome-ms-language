@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tome-ms-language-deployment
+spec: 
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tome-ms-language
+  template:
+    metadata:
+      name: tome-ms-language-pod
+      labels:
+        app: tome-ms-language
+    spec:
+      containers:
+        - name: tome-ms-language
+          image: europe-west1-docker.pkg.dev/totolive/tome-ms-language/tome-ms-language:1.0.0
+          ports:
+            - containerPort: 8080

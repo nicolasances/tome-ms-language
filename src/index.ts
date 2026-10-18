@@ -53,7 +53,7 @@ const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
     basePath: '/tomelang',
     environment: {
-        hyperscaler: process.env.HYPERSCALER as SupportedHyperscalers || "aws",
+        hyperscaler: process.env.HYPERSCALER as SupportedHyperscalers || "gcp",
         hyperscalerConfiguration: getHyperscalerConfiguration()
     },
     customConfiguration: ControllerConfig,
