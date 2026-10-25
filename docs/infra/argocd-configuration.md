@@ -80,25 +80,12 @@ It needs two more things to actually do anything useful:
 
 **a) The same git write credentials as Argo CD.** Point it at the same repo-creds secret Argo CD uses, or give it its own — either way it needs `contents:write` on this repo to commit tag bumps.
 
-**b) Read access to Artifact Registry**, via its own Workload Identity binding (same pattern as the app's own GSAs):
+**b) Read access to Artifact Registry**, via its own Workload Identity binding (same pattern as the app's own GSAs). This is already provisioned by the Terraform in `infra/terraform/` (see [the migration doc §2](./gke-gitops-migration.md#2-workload-identity-bindings)) — `terraform apply` there creates the `argocd-image-updater` GSA, grants it `roles/artifactregistry.reader` on both `totoexperiments` and `totolive`, and binds it to `CLUSTER_PROJECT.svc.id.goog[argocd-image-updater/argocd-image-updater]`.
+
+The only remaining manual step is annotating the Kubernetes ServiceAccount that Image Updater's own install manifest creates (it isn't part of this app's Kustomize tree, so it's not declared in git the way the app's own KSA is):
 ```bash
-gcloud iam service-accounts create argocd-image-updater \
-  --project=CLUSTER_PROJECT --display-name="Argo CD Image Updater"
-
-gcloud projects add-iam-policy-binding totoexperiments \
-  --member="serviceAccount:argocd-image-updater@CLUSTER_PROJECT.iam.gserviceaccount.com" \
-  --role="roles/artifactregistry.reader"
-gcloud projects add-iam-policy-binding totolive \
-  --member="serviceAccount:argocd-image-updater@CLUSTER_PROJECT.iam.gserviceaccount.com" \
-  --role="roles/artifactregistry.reader"
-
-gcloud iam service-accounts add-iam-policy-binding \
-  argocd-image-updater@CLUSTER_PROJECT.iam.gserviceaccount.com \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="serviceAccount:CLUSTER_PROJECT.svc.id.goog[argocd-image-updater/argocd-image-updater]"
-
 kubectl annotate serviceaccount argocd-image-updater -n argocd-image-updater \
-  iam.gke.io/gcp-service-account=argocd-image-updater@CLUSTER_PROJECT.iam.gserviceaccount.com
+  iam.gke.io/gcp-service-account="$(terraform -chdir=infra/terraform output -raw argocd_image_updater_gsa_email)"
 ```
 
 **c) The update-strategy annotations on each Application.** These are what actually turn on tracking — add them to the `metadata.annotations` of `application-dev.yaml` / `application-prod.yaml` (already included if you copied them from the migration doc; shown here for reference):

@@ -9,6 +9,7 @@ on:
       - 'docs/**'
       - '**.md'
       - 'k8s/**'
+      - 'infra/**'
 
 jobs:
   # This workflow contains a single job called "release"

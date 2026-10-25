@@ -222,36 +222,24 @@ images:
 
 ## 2. Workload Identity bindings
 
+All GCP-side IAM provisioning (the two app GSAs, their Secret Manager grants, and their Workload Identity bindings) is managed by Terraform at `infra/terraform/`, not ad-hoc `gcloud` commands — see `main.tf` for the `google_service_account` / `google_project_iam_member` / `google_service_account_iam_member` resources. This keeps the IAM graph reviewable in a PR diff and re-appliable, instead of one-off commands someone has to remember they ran.
+
 ```bash
-# Create the two GSAs in the cluster's own project
-gcloud iam service-accounts create tome-ms-language-dev \
-  --project=CLUSTER_PROJECT --display-name="tome-ms-language (dev) - Workload Identity"
-gcloud iam service-accounts create tome-ms-language-prod \
-  --project=CLUSTER_PROJECT --display-name="tome-ms-language (prod) - Workload Identity"
+cd infra/terraform
+terraform init
+terraform plan \
+  -var="cluster_project=CLUSTER_PROJECT"
+terraform apply \
+  -var="cluster_project=CLUSTER_PROJECT"
+```
+(`dev_project`/`prod_project` default to `totoexperiments`/`totolive` — override with `-var` if that's ever not the case.)
 
-# Grant Secret Manager access in each target environment's project
-# (cross-project grants if CLUSTER_PROJECT differs from totoexperiments/totolive)
-gcloud projects add-iam-policy-binding totoexperiments \
-  --member="serviceAccount:tome-ms-language-dev@CLUSTER_PROJECT.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
-gcloud projects add-iam-policy-binding totolive \
-  --member="serviceAccount:tome-ms-language-prod@CLUSTER_PROJECT.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
+This creates `tome-ms-language-dev`/`tome-ms-language-prod`, grants each `roles/secretmanager.secretAccessor` in its respective project, and binds each to its namespace/KSA pair (`CLUSTER_PROJECT.svc.id.goog[dev/tome-ms-language]`, `[prod/tome-ms-language]`) via `roles/iam.workloadIdentityUser`. It also provisions the `argocd-image-updater` GSA used in the [Argo CD configuration doc](./argocd-configuration.md).
 
-# Namespaces
+The namespaces themselves are plain Kubernetes objects, not GCP resources, so they stay as `kubectl`:
+```bash
 kubectl create namespace dev
 kubectl create namespace prod
-
-# Bind each KSA (created declaratively by base/serviceaccount.yaml, once Argo CD
-# applies it) to impersonate its GSA
-gcloud iam service-accounts add-iam-policy-binding \
-  tome-ms-language-dev@CLUSTER_PROJECT.iam.gserviceaccount.com \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="serviceAccount:CLUSTER_PROJECT.svc.id.goog[dev/tome-ms-language]"
-gcloud iam service-accounts add-iam-policy-binding \
-  tome-ms-language-prod@CLUSTER_PROJECT.iam.gserviceaccount.com \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="serviceAccount:CLUSTER_PROJECT.svc.id.goog[prod/tome-ms-language]"
 ```
 
 ---
@@ -382,6 +370,7 @@ Net effect: both workflows shrink to checkout → auth → compute version → g
 
 ### Critical files
 - `k8s/tome-ms-language.yaml` → replaced by `k8s/base/` + `k8s/overlays/` + `k8s/argocd/`
+- `infra/terraform/` (GSAs, IAM grants, Workload Identity bindings — replaces the `gcloud` commands this doc used to show inline)
 - `.github/workflows/release-dev.yml`, `.github/workflows/release-prod.yml`
 - `src/Config.ts` (confirms Mongo secret names + `GCP_PID`-scoped Secret Manager access the Workload Identity design must satisfy)
 - `Dockerfile` (optional hardening, section 6)
