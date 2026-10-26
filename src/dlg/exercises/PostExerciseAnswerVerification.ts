@@ -8,6 +8,9 @@ import { LevelTestAttemptStore } from "../../store/LevelTestAttemptStore";
 import { VocabularyItemStore } from "../../store/VocabularyItemStore";
 import { VertexAIClient, buildVertexAIClient } from "../../ai/VertexAIClient";
 
+/** Model for the answer check. Judging real-world Danish needs more than the smallest tier. Overridable with VERTEX_AI_VERIFICATION_MODEL. */
+const VERIFICATION_MODEL = process.env.VERTEX_AI_VERIFICATION_MODEL ?? "gemini-2.5-flash";
+
 export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAnswerVerificationRequest, PostExerciseAnswerVerificationResponse> {
 
     /** Injectable AI client. If null, lazily initialised from env vars on first call. */
@@ -44,10 +47,14 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
      *   level test attempt (F21) — sessionId is tried against PracticeSessionStore first, then
      *   ModuleTestAttemptStore, then LevelTestAttemptStore.
      * - Only one verification is allowed per (sessionId, exerciseId) pair.
+     * - The verdict is decided on the English prompt, the student's answer and the CEFR level alone: the AI never sees the
+     *   accepted answers or the linked vocabulary item, so a correct but different phrasing is accepted.
      * - If the AI validates the answer: for a practice session, removes the exercise from the retry
      *   queue; for a module test or level test attempt, flips the stored answer's isCorrect flag
      *   (neither has a retry queue). In all cases, appends the answer to the exercise's
      *   userContributedAnswers and records the verification.
+     *   Then, as a separate step, the AI is shown the accepted answers and target vocabulary item to write an optional
+     *   short note on how the answer differs. A failure of that step never affects the verdict.
      * - If the AI rejects the answer: returns an explanation; no state is mutated.
      *
      * @param {PostExerciseAnswerVerificationRequest} req - The validated request.
@@ -95,12 +102,9 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
 
         if (!vocab) throw new ValidationError(404, `Vocabulary item not found for id '${exercise.vocabularyItemId}'`);
 
-        const vocabContext = vocab.context ?? vocab.type;
-        const prompt = buildPrompt({ exercise, userAnswer: req.userAnswer, cefrLevel: req.cefrLevel, vocabContext, vocabDanish: vocab.danish, vocabEnglish: vocab.english });
+        const client = this.aiClient ?? (this.aiClient = buildVertexAIClient(VERIFICATION_MODEL));
 
-        const client = this.aiClient ?? (this.aiClient = buildVertexAIClient());
-
-        const raw = await client.generate(prompt);
+        const raw = await client.generate(buildVerdictPrompt({ exercisePrompt: exercise.prompt, userAnswer: req.userAnswer, cefrLevel: req.cefrLevel }));
 
         const parsed = JSON.parse(raw) as AIVerificationResponse;
 
@@ -119,57 +123,125 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
 
             await exerciseStore.appendUserContributedAnswer(req.exerciseId, req.userAnswer);
 
-            return { valid: true };
+            const note = await this.buildNote({ client, exercise, userAnswer: req.userAnswer, cefrLevel: req.cefrLevel, vocabDanish: vocab.danish, vocabEnglish: vocab.english, vocabContext: vocab.context ?? vocab.type });
+
+            return note ? { valid: true, explanation: note } : { valid: true };
         }
 
         return { valid: false, explanation: parsed.explanation };
     }
+
+    /**
+     * Asks the AI for a short note on a valid answer that differs from the expected answer / target vocabulary item.
+     * The note is a nicety: any failure (AI error, unparsable output) yields no note instead of failing the verification.
+     *
+     * @param {NoteInput} input - The AI client, the exercise data, the student's answer and the linked vocabulary item.
+     *
+     * @returns {Promise<string | undefined>} The note, or undefined if there is nothing to add.
+     */
+    private async buildNote(input: NoteInput): Promise<string | undefined> {
+
+        try {
+
+            const raw = await input.client.generate(buildNotePrompt(input));
+
+            const parsed = JSON.parse(raw) as AINoteResponse;
+
+            return parsed.explanation?.trim() || undefined;
+
+        } catch (error) {
+
+            console.error("Could not generate the note for a valid answer", error);
+
+            return undefined;
+
+        }
+    }
 }
 
 /**
- * Builds the CEFR-aware prompt for the answer verification request.
+ * Builds the verdict prompt. It deliberately contains only the English prompt, the student's answer and the CEFR level:
+ * no accepted answers and no linked vocabulary item, so the student is judged against real-world Danish and not
+ * against the exercise's expected answer.
  *
- * @param {PromptInput} input - Exercise data, user answer, CEFR level, and vocabulary context.
+ * @param {VerdictPromptInput} input - The exercise prompt, the student's answer and the CEFR level.
  *
  * @returns {string} The fully-formed prompt string.
  */
-function buildPrompt({ exercise, userAnswer, cefrLevel, vocabContext, vocabDanish, vocabEnglish }: PromptInput): string {
+function buildVerdictPrompt({ exercisePrompt, userAnswer, cefrLevel }: VerdictPromptInput): string {
 
-    const allAccepted = [exercise.answer, ...exercise.alternativeAnswers].join('", "');
+    return `You are a Danish language tutor. A student translated an English sentence into Danish and you give an independent opinion on their translation.
 
-    return `You are a Danish language tutor verifying whether a student's translation is acceptable.
-
-            Exercise prompt: "${exercise.prompt}"
-            Accepted answers: ["${allAccepted}"]
-            Student's answer: "${userAnswer}"
-
-            Linked vocabulary item: "${vocabDanish}" (${vocabEnglish}) — ${vocabContext}
+            English sentence: "${exercisePrompt}"
+            Student's Danish translation: "${userAnswer}"
             Student's CEFR level: ${cefrLevel}
 
-            Determine whether the student's answer is a valid translation of the exercise prompt.
-            A minor spelling variation or a valid synonym is acceptable. An incorrect meaning or wrong grammar is not.
-            
-            Other considerations to keep in mind: 
+            Consider: is this translation correct, would a Danish speaker easily understand it, and is it a proper way to express this in everyday Danish?
+
+            The translation is NOT valid only if it is grammatically or syntactically wrong, changes the meaning of the English sentence, sounds really odd to a native speaker, or is inappropriate.
+            A different but correct phrasing is valid. There is no single expected translation: do not mark it wrong because other phrasings exist, or because it uses different words than you would have used.
+
+            Other considerations to keep in mind:
             - Ignore case, always.
             - Ignore punctuation differences (periods, commas, quotation marks, dashes, etc.), always.
-            - Be mindful of the broader context: the user is learning Danish and may use some other correct formulations, maybe not using the exact words in the prompt. That's ok, as long as the meaning is correct, the grammar is correct and this is a valid Danish sentence, that is valid in an everyday context.
 
-            Return a JSON object with exactly these fields:
-            - valid: boolean — true if the translation is acceptable, false otherwise
+            Return a JSON object with exactly these fields, in this order:
+            - reasoning: string — a brief analysis of the student's translation: grammar, meaning and naturalness
+            - valid: boolean — true if the translation is valid, false otherwise. It must follow from your reasoning.
             - explanation: string (only when valid is false) — a brief explanation in English of why the translation is not valid, tailored to CEFR level ${cefrLevel}
     `;
 }
 
-interface PromptInput {
-    exercise: { prompt: string; answer: string; alternativeAnswers: string[] };    // Exercise data for the prompt
+/**
+ * Builds the note prompt, used only after the answer has been judged valid. This is the only step that sees the
+ * accepted answers and the target vocabulary item.
+ *
+ * @param {NoteInput} input - Exercise data, the student's answer, CEFR level and the linked vocabulary item.
+ *
+ * @returns {string} The fully-formed prompt string.
+ */
+function buildNotePrompt({ exercise, userAnswer, cefrLevel, vocabDanish, vocabEnglish, vocabContext }: NoteInput): string {
+
+    const allAccepted = [exercise.answer, ...exercise.alternativeAnswers].join('", "');
+
+    return `You are a Danish language tutor. A student's Danish translation has already been judged correct. Do not question that.
+
+            English sentence: "${exercise.prompt}"
+            Student's Danish translation: "${userAnswer}"
+            Expected answers: ["${allAccepted}"]
+            Target vocabulary item of this exercise: "${vocabDanish}" (${vocabEnglish}) — ${vocabContext}
+            Student's CEFR level: ${cefrLevel}
+
+            If the student's translation is the same as one of the expected answers (ignoring case and punctuation), there is nothing to add.
+            Otherwise, write a short, friendly note in English, tailored to CEFR level ${cefrLevel}, that tells the student their answer is correct and shows the expected phrasing or the target vocabulary item as another common way to say it. For example: "Correct! 'vel' is another common way to say this: Du er vel enig med mig?"
+
+            Return a JSON object with exactly this field:
+            - explanation: string (only when there is something to add) — the note
+    `;
+}
+
+interface VerdictPromptInput {
+    exercisePrompt: string;                                                         // The English prompt of the exercise
     userAnswer: string;                                                             // The student's answer to verify
+    cefrLevel: string;                                                              // The student's CEFR level
+}
+
+interface NoteInput {
+    client: VertexAIClient;                                                         // The AI client to call
+    exercise: { prompt: string; answer: string; alternativeAnswers: string[] };    // Exercise data for the prompt
+    userAnswer: string;                                                             // The student's answer
     cefrLevel: string;                                                              // The student's CEFR level
     vocabContext: string;                                                           // Context or type of the linked vocab item
     vocabDanish: string;                                                            // Danish form of the linked vocab item
     vocabEnglish: string;                                                           // English translation of the linked vocab item
 }
 
+interface AINoteResponse {
+    explanation?: string;       // Short note on how the valid answer differs from the expected one, if anything is worth saying
+}
+
 interface AIVerificationResponse {
+    reasoning: string;          // The AI's analysis, produced before the verdict
     valid: boolean;             // Whether the translation is acceptable
     explanation?: string;       // Present only when valid is false
 }
@@ -183,5 +255,5 @@ interface PostExerciseAnswerVerificationRequest {
 
 interface PostExerciseAnswerVerificationResponse {
     valid: boolean;             // Whether the AI accepted the translation
-    explanation?: string;       // Present only when valid is false
+    explanation?: string;       // Required when valid is false (why). Optional when valid is true (a note on how the answer differs from the expected one)
 }
