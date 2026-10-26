@@ -23,7 +23,7 @@ export interface VertexAIClient {
  */
 export class VertexAIClientImpl implements VertexAIClient {
 
-    private model: string;        // Vertex AI model id, e.g. "gemini-2.5-flash-lite"
+    private model: string;        // Vertex AI model id, e.g. "gemini-2.5-flash"
     private projectId: string;    // GCP project id, read from GCP_PID env var
     private location: string;     // Vertex AI region, read from VERTEX_AI_LOCATION env var
 
@@ -65,18 +65,25 @@ export class VertexAIClientImpl implements VertexAIClient {
 
 }
 
+/** Model used by default (e.g. F12 mistake explanations): the smallest, cheapest tier. */
+export const DEFAULT_VERTEX_AI_MODEL = "gemini-2.5-flash-lite";
+
 /**
  * Builds a VertexAIClientImpl from standard environment variables.
  * GCP_PID must be set; VERTEX_AI_LOCATION defaults to "europe-west1".
+ *
+ * @param {string} model - Vertex AI model id to call. Defaults to DEFAULT_VERTEX_AI_MODEL.
+ *
+ * @returns {VertexAIClient} The client.
  */
-export function buildVertexAIClient(): VertexAIClient {
+export function buildVertexAIClient(model: string = DEFAULT_VERTEX_AI_MODEL): VertexAIClient {
 
     const projectId = process.env.GCP_PID;
     if (!projectId) throw new Error("GCP_PID env var is not set");
 
     const location = process.env.VERTEX_AI_LOCATION ?? "europe-west1";
 
-    return new VertexAIClientImpl({ model: "gemini-2.5-flash-lite", projectId, location });
+    return new VertexAIClientImpl({ model, projectId, location });
 
 }
 
