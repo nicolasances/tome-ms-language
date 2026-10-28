@@ -477,3 +477,182 @@ describe("PostExerciseAnswerVerification.do", () => {
         assert.match(capturedPrompts[0], /ignore punctuation/i, "expected the prompt to instruct the AI to ignore punctuation differences");
     });
 });
+
+/**
+ * Builds an AI client that replays the given responses in order (1st call = verdict, 2nd call = note on a valid answer)
+ * and records every prompt it receives. A response that is an Error is thrown instead of returned.
+ */
+function makeSequencedAIClient(responses: (string | Error)[]) {
+
+    const prompts: string[] = [];
+
+    const client: VertexAIClient = {
+        generate: async (prompt: string) => {
+            prompts.push(prompt);
+            const next = responses[prompts.length - 1];
+            if (next instanceof Error) throw next;
+            return next;
+        }
+    };
+
+    return { client, prompts };
+}
+
+describe("PostExerciseAnswerVerification.do — judging against real-world Danish (issue #106)", () => {
+
+    it("accepts a correct answer that differs from the expected one and returns a note about it", async () => {
+
+        const { config, sessionUpdates } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client, prompts } = makeSequencedAIClient([
+            JSON.stringify({ reasoning: "Natural and correct Danish.", valid: true }),
+            JSON.stringify({ explanation: "Correct! 'jeg spiser mad' is another common way to say this." }),
+        ]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        const result = await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg æder", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.isTrue(result.valid);
+        assert.equal(result.explanation, "Correct! 'jeg spiser mad' is another common way to say this.");
+        assert.equal(prompts.length, 2, "expected one verdict call and one note call");
+        assert.isDefined(sessionUpdates.find((u: any) => u.update.$push?.verifiedExerciseIds === "ex-1"), "expected the verification to be recorded");
+    });
+
+    it("rejects an answer with a grammar error, returns the explanation and skips the note call", async () => {
+
+        const { config, sessionUpdates, exerciseUpdates } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client, prompts } = makeSequencedAIClient([
+            JSON.stringify({ reasoning: "The verb is not conjugated.", valid: false, explanation: "The verb must be in the present tense: 'spiser'." }),
+        ]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        const result = await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg spise", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.isFalse(result.valid);
+        assert.equal(result.explanation, "The verb must be in the present tense: 'spiser'.");
+        assert.equal(prompts.length, 1, "the note call must only happen for valid answers");
+        assert.equal(sessionUpdates.length, 0);
+        assert.equal(exerciseUpdates.length, 0);
+    });
+
+    it("rejects an answer that changes the meaning", async () => {
+
+        const { config, sessionUpdates, exerciseUpdates } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client } = makeSequencedAIClient([
+            JSON.stringify({ reasoning: "'drikker' means 'drink'.", valid: false, explanation: "'drikker' means 'drink', not 'eat'." }),
+        ]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        const result = await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg drikker", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.isFalse(result.valid);
+        assert.equal(result.explanation, "'drikker' means 'drink', not 'eat'.");
+        assert.equal(sessionUpdates.length, 0);
+        assert.equal(exerciseUpdates.length, 0);
+    });
+
+    it("accepts a correct answer that skips the target vocabulary word", async () => {
+
+        const { config, exerciseUpdates } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client, prompts } = makeSequencedAIClient([
+            JSON.stringify({ reasoning: "Correct and natural, even without the target word.", valid: true }),
+            JSON.stringify({ explanation: "Correct! The target word here was 'spise', but this works too." }),
+        ]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        const result = await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg indtager min mad", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.isTrue(result.valid);
+        assert.include(result.explanation, "spise");
+        assert.isDefined(exerciseUpdates.find((u: any) => u.update.$push?.userContributedAnswers === "jeg indtager min mad"));
+        assert.include(prompts[1], "spise", "the note step is the one that sees the target word");
+    });
+
+    it("does not include the accepted answers or the linked vocabulary item in the verdict prompt", async () => {
+
+        const { config } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client, prompts } = makeSequencedAIClient([JSON.stringify({ reasoning: "ok", valid: true }), JSON.stringify({})]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg æder", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.include(prompts[0], "I eat");
+        assert.include(prompts[0], "jeg æder");
+        assert.include(prompts[0], "A1");
+        assert.notInclude(prompts[0], "jeg spiser", "the verdict prompt must not contain the accepted answers");
+        assert.notInclude(prompts[0], "jeg spiser mad", "the verdict prompt must not contain the alternative answers");
+        assert.notInclude(prompts[0], "spise", "the verdict prompt must not contain the linked vocabulary item");
+        assert.notInclude(prompts[0], "used for eating food", "the verdict prompt must not contain the vocabulary context");
+        assert.notMatch(prompts[0], /accepted answers/i);
+    });
+
+    it("asks the model for its reasoning before the verdict", async () => {
+
+        const { config } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client, prompts } = makeSequencedAIClient([JSON.stringify({ reasoning: "ok", valid: true }), JSON.stringify({})]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg æder", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        const fields = prompts[0].slice(prompts[0].indexOf("exactly these fields"));
+
+        assert.isAbove(fields.indexOf("reasoning"), -1);
+        assert.isBelow(fields.indexOf("reasoning"), fields.indexOf("valid"), "reasoning must be listed before valid");
+    });
+
+    it("gives the note step the accepted answers and the target vocabulary item", async () => {
+
+        const { config } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client, prompts } = makeSequencedAIClient([JSON.stringify({ reasoning: "ok", valid: true }), JSON.stringify({})]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg æder", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.include(prompts[1], "jeg spiser");
+        assert.include(prompts[1], "jeg spiser mad");
+        assert.include(prompts[1], "spise");
+        assert.include(prompts[1], "jeg æder");
+    });
+
+    it("returns no explanation when the note step has nothing to add", async () => {
+
+        const { config } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client } = makeSequencedAIClient([JSON.stringify({ reasoning: "ok", valid: true }), JSON.stringify({})]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        const result = await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg spiser", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.isTrue(result.valid);
+        assert.isUndefined(result.explanation);
+    });
+
+    it("still returns valid: true when the note step fails", async () => {
+
+        const { config, exerciseUpdates } = makeMockConfig(makeTranslationExercise("ex-1"), makeVocabBSON(), makeSessionBSON());
+        const { client } = makeSequencedAIClient([JSON.stringify({ reasoning: "ok", valid: true }), new Error("Vertex AI unavailable")]);
+
+        const delegate = new PostExerciseAnswerVerification({} as any, config);
+        delegate.aiClient = client;
+
+        const result = await delegate.do({ exerciseId: "ex-1", userAnswer: "jeg æder", sessionId: SESSION_ID, cefrLevel: "A1" });
+
+        assert.isTrue(result.valid);
+        assert.isUndefined(result.explanation);
+        assert.isDefined(exerciseUpdates.find((u: any) => u.update.$push?.userContributedAnswers === "jeg æder"), "the verdict must still be applied");
+    });
+});
