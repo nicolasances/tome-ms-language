@@ -9,7 +9,7 @@ import { VocabularyItemStore } from "../../store/VocabularyItemStore";
 import { VertexAIClient, buildVertexAIClient } from "../../ai/VertexAIClient";
 
 /** Model for the answer check. Judging real-world Danish needs more than the smallest tier. Overridable with VERTEX_AI_VERIFICATION_MODEL. */
-const VERIFICATION_MODEL = process.env.VERTEX_AI_VERIFICATION_MODEL ?? "gemini-2.5-flash";
+const VERIFICATION_MODEL = process.env.VERTEX_AI_VERIFICATION_MODEL ?? "gemini-3.8-flash";
 
 export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAnswerVerificationRequest, PostExerciseAnswerVerificationResponse> {
 
