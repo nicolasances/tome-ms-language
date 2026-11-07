@@ -45,7 +45,11 @@ export class VertexAIClientImpl implements VertexAIClient {
      */
     async generate(prompt: string): Promise<string> {
 
-        const vertexAI = new VertexAI({ project: this.projectId, location: this.location });
+        const vertexAI = new VertexAI({
+            project: this.projectId,
+            location: this.location,
+            apiEndpoint: this.location === "global" ? "aiplatform.googleapis.com" : undefined,
+        });
 
         const generativeModel = vertexAI.getGenerativeModel({
             model: this.model,
@@ -81,7 +85,7 @@ export function buildVertexAIClient(model: string = DEFAULT_VERTEX_AI_MODEL): Ve
     const projectId = process.env.GCP_PID;
     if (!projectId) throw new Error("GCP_PID env var is not set");
 
-    const location = process.env.VERTEX_AI_LOCATION ?? "europe-west1";
+    const location = process.env.VERTEX_AI_LOCATION ?? "global";
 
     return new VertexAIClientImpl({ model, projectId, location });
 
