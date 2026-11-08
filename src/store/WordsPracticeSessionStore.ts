@@ -59,4 +59,15 @@ export class WordsPracticeSessionStore {
 
         return WordsPracticeSession.fromBSON(doc as any);
     }
+
+    /**
+     * Replaces the stored session with the given state (words, attempts, status, completedAt,
+     * lastAnsweredWordKey). The session must already have an id.
+     *
+     * @param {WordsPracticeSession} session - The session to persist.
+     */
+    async save(session: WordsPracticeSession): Promise<void> {
+
+        await this.db.collection(COLLECTION).replaceOne({ _id: new ObjectId(session.id!) }, session.toBSON());
+    }
 }

@@ -42,6 +42,17 @@ export class FakeDb {
 
                 return { insertedId: _id };
             },
+            bulkWrite: async (operations: any[]) => {
+                for (const op of operations) {
+                    const { filter, replacement, upsert } = op.replaceOne;
+                    const index = docs.findIndex(d => matches(d, filter));
+
+                    if (index >= 0) docs[index] = { ...replacement, _id: docs[index]._id };
+                    else if (upsert) docs.push({ ...replacement, _id: new ObjectId() });
+                }
+
+                return {};
+            },
             replaceOne: async (filter: any, doc: any, options?: any) => {
                 const index = docs.findIndex(d => matches(d, filter));
 
