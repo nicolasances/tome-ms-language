@@ -48,6 +48,9 @@ import { GetDailyActivity } from './dlg/stats/GetDailyActivity';
 import { StartBackup } from './dlg/backup/StartBackup';
 import { StartRestore } from './dlg/backup/StartRestore';
 import { RePracticeModule } from './dlg/moduleProgress/RePracticeModule';
+import { GetWordsPracticeSummary } from './dlg/wordsPractice/GetWordsPracticeSummary';
+import { PostWordsPracticeSession } from './dlg/wordsPractice/PostWordsPracticeSession';
+import { GetWordsPracticeSession } from './dlg/wordsPractice/GetWordsPracticeSession';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -86,6 +89,11 @@ const config: TotoMicroserviceConfiguration = {
 
             { method: 'GET', path: '/me/progress', delegate: GetMeProgress },
             { method: 'GET', path: '/me/stats/dailyActivity', delegate: GetDailyActivity },
+
+            { method: 'GET', path: '/me/wordsPractice/summary', delegate: GetWordsPracticeSummary },
+
+            { method: 'POST', path: '/users/:userId/wordsPracticeSessions', delegate: PostWordsPracticeSession },
+            { method: 'GET', path: '/users/:userId/wordsPracticeSessions/:sessionId', delegate: GetWordsPracticeSession },
 
             { method: 'POST', path: '/users/:userId/modules/:moduleId/rePractice', delegate: RePracticeModule },
 

@@ -49,6 +49,17 @@ export class ModuleStore {
     }
 
     /**
+     * Finds several modules by their caller-provided ids in a single query.
+     * Ids with no matching module are simply absent from the result.
+     */
+    async findByIds(ids: string[]): Promise<Module[]> {
+
+        const docs = await this.db.collection(MODULES_COLLECTION).find({ id: { $in: ids } }).toArray();
+
+        return docs.map(doc => Module.fromBSON(doc as any));
+    }
+
+    /**
      * Lists modules, optionally filtered by cefrLevel and/or isUserGenerated.
      * Results are sorted by id ascending to preserve curriculum ordering.
      */
