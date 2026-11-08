@@ -1,6 +1,6 @@
 export class ExerciseResult {
 
-    exerciseId: string;
+    exerciseId: string | null;     // The exercise answered. Null for results that do not stem from an exercise (e.g. words_practice, F26).
     type: string;
     isCorrect: boolean;
     userAnswer: string;
@@ -20,7 +20,7 @@ export class ExerciseResult {
 
     static fromBSON(data: any): ExerciseResult {
         return new ExerciseResult({
-            exerciseId: data.exerciseId,
+            exerciseId: data.exerciseId ?? null,
             type: data.type,
             isCorrect: data.isCorrect,
             userAnswer: data.userAnswer,
@@ -44,7 +44,7 @@ export class ExerciseResult {
 }
 
 interface ExerciseResultInput {
-    exerciseId: string;
+    exerciseId: string | null;
     type: string;
     isCorrect: boolean;
     userAnswer: string;
