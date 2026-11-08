@@ -16,6 +16,7 @@
 - [Module Tests (F11)](#module-tests-f11)
 - [Level Test Banks (F20)](#level-test-banks-f20)
 - [Level Test (F21)](#level-test-f21)
+- [Words Practice (F26)](#words-practice-f26)
 - [Activity Stats (F24)](#activity-stats-f24)
 - [Operations](#operations)
 - [API Design compliance](#api-design-compliance)
@@ -332,6 +333,37 @@
 ### GET /users/:userId/levelTests/:attemptId/review
 **Used for:** Fetching the full graded review for a submitted level test attempt. Returns `score`, `passed`, a `questions` array (each exercise's `prompt`, `isCorrect`, `userAnswer`, `correctAnswer`), and a `weakAreas` summary `{ vocabulary[], grammar[] }` — the distinct vocab items and grammar concepts the user answered incorrectly (any incorrect answer flags the item — OQ-03). Only valid after submission (`takenAt` set); **exposes correct answers**. Unanswered exercises appear with `isCorrect: false` and `userAnswer: ""`. Enables "Explain my mistake" (F12) per incorrect item. Verifies ownership (403 otherwise).
 **Request & Response:** `GetLevelTestReviewRequest` / `GetLevelTestReviewResponse` in `src/dlg/levelTests/GetLevelTestReview.ts`
+
+---
+
+## Words Practice (F26)
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| GET | `/me/wordsPractice/summary` | Pool size and open-session id for the authenticated user |
+| POST | `/users/:userId/wordsPracticeSessions` | Start a Words Practice session, or point at the open one (409) |
+| GET | `/users/:userId/wordsPracticeSessions/:sessionId` | Get a session (resume, results screen) |
+| POST | `/users/:userId/wordsPracticeSessions/:sessionId/answers` | Submit an answer for one practice word |
+| POST | `/users/:userId/wordsPracticeSessions/:sessionId/complete` | Close a session once every word is answered correctly |
+
+### GET /me/wordsPractice/summary
+**Used for:** The Home dashboard's Words Practice entry point. Returns `{ poolSize, openSessionId }` for the authenticated user: `poolSize` is the number of distinct practice words (vocabulary of every `completed` module at any level, deduplicated by normalized Danish form; user-added items excluded), `0` when no module is completed; `openSessionId` is the id of the user's `in_progress` session or `null`. Read-only.
+**Request & Response:** `GetWordsPracticeSummaryRequest` / `GetWordsPracticeSummaryResponse` in `src/dlg/wordsPractice/GetWordsPracticeSummary.ts`
+
+### POST /users/:userId/wordsPracticeSessions
+**Used for:** Starting a session. Draws `min(WORDS_PRACTICE_SESSION_SIZE, poolSize)` practice words by weighted sampling (weight = `WORDS_PRACTICE_MASTERY_WEIGHT`·(1 − mastery) + `WORDS_PRACTICE_STALENESS_WEIGHT`·staleness) and returns the full session with **201**. Rejects with **409** and `sessionId` when the user already has an `in_progress` session (nothing is created), and with **400** and `reason: "emptyPool"` when the pool is empty.
+**Request & Response:** `PostWordsPracticeSessionRequest` in `src/dlg/wordsPractice/PostWordsPracticeSession.ts`; response is the `WordsPracticeSession` model in `src/model/WordsPracticeSession.ts`
+
+### GET /users/:userId/wordsPracticeSessions/:sessionId
+**Used for:** Resuming an open session and rendering the results screen of a completed one. Returns the session with its words in presentation order, including the canonical `danish`. **404** when the session does not exist or belongs to another user.
+**Request & Response:** `GetWordsPracticeSessionRequest` in `src/dlg/wordsPractice/GetWordsPracticeSession.ts`; response is the `WordsPracticeSession` model
+
+### POST /users/:userId/wordsPracticeSessions/:sessionId/answers
+**Used for:** Submitting a typed answer for one word. Body: `{ wordKey, userAnswer }`. Returns `{ isCorrect, correctAnswer, isFirstAttempt }`. Matching ignores case, punctuation and a leading `at`/`en`/`et`; canonical forms of 4 characters or fewer need an exact match, longer ones allow the usual fuzzy threshold. Mastery (F06) is written for first attempts only, to every item sharing the word's Danish form: a correct first attempt immediately, a wrong one only when finalized (the next answer in the session, or `/complete`). **400** when the word is not in the session, is already correct, or the session is completed.
+**Request & Response:** `SubmitWordsPracticeAnswerRequest` / `SubmitWordsPracticeAnswerResponse` in `src/dlg/wordsPractice/SubmitWordsPracticeAnswer.ts`
+
+### POST /users/:userId/wordsPracticeSessions/:sessionId/complete
+**Used for:** Closing a session after the last word is answered correctly. Rejects with **400** and `outstandingWordKeys` while any word is not yet correct (nothing is written). Otherwise finalizes a pending wrong first attempt, sets `status = completed` and `completedAt`, and returns the session. Idempotent on an already-completed session.
+**Request & Response:** `CompleteWordsPracticeSessionRequest` in `src/dlg/wordsPractice/CompleteWordsPracticeSession.ts`; response is the `WordsPracticeSession` model
 
 ---
 
