@@ -7,7 +7,7 @@
 This feature tracks, per user, how well each **vocabulary item** and each **grammar concept** is known, as a Mastery Score in [0.0–1.0] computed by a spaced-repetition (SRS) algorithm from exercise history. Mastery is the signal that drives exercise selection (F08) and the weak-areas report (F21). The two progress entities are intentionally identical mirrors (one for vocabulary, one for grammar) sharing the same SRS algorithm, so they are delivered together.
 
 **Out of scope**:
-- *When* mastery is updated — that is decided by the consuming features. Mastery is updated **continuously**: every completed exercise — in Practice (F10), the Module Test (F11), and the Level Test (F21) — updates the mastery of its linked item. This feature provides the update operation; the callers decide when to call it. The practice ladder (F10) changes nothing here: mastery stays **global and per-item**, while rung coverage is **module-scoped** and lives on F07's `UserModuleProgress`. An item's mastery is not reset or re-scoped when a module advances a rung.
+- *When* mastery is updated — that is decided by the consuming features. Mastery is updated **continuously**: every completed exercise — in Practice (F10), the Module Test (F11), and the Level Test (F21) — updates the mastery of its linked item, and so does every finalized first-attempt answer in Words Practice (F26). This feature provides the update operation; the callers decide when to call it. The practice ladder (F10) changes nothing here: mastery stays **global and per-item**, while rung coverage is **module-scoped** and lives on F07's `UserModuleProgress`. An item's mastery is not reset or re-scoped when a module advances a rung.
 - The selection algorithm that reads mastery (→ [F08](./F08-mastery-aware-exercise-selection.md))
 
 ---
@@ -20,7 +20,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 |------|-----------|
 | Mastery Score | Float [0.0–1.0]; ≥ 0.8 = "mastered" |
 | SRS | Spaced Repetition System: correct ↑, incorrect ↓ (decay deferred — see Technical Decisions) |
-| ExerciseResult | One recorded attempt: exerciseId, type, isCorrect, userAnswer, correctAnswer, timestamp, moduleId |
+| ExerciseResult | One recorded attempt: exerciseId (null for Words Practice), type, isCorrect, userAnswer, correctAnswer, timestamp, moduleId |
 | UserVocabularyProgress | Per-user, per-vocab-item progress record |
 | UserGrammarConceptProgress | Per-user, per-grammar-concept progress record (mirror of the above) |
 
@@ -32,13 +32,13 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 
 | Field | Type | Description | Rules |
 |-------|------|-------------|-------|
-| exerciseId | string | Exercise id | Required |
-| type | string | Exercise type | Required |
+| exerciseId | string \| null | Exercise id | Required for exercise-based results (F10/F11/F21); `null` for Words Practice results (F26), which have no exercise. No logic reads it from history — it is only echoed by the GET progress endpoints |
+| type | string | Exercise type, or `words_practice` for a Words Practice answer (F26) | Required |
 | isCorrect | boolean | Whether the answer was correct | Required |
 | userAnswer | string | What the user submitted | Required |
 | correctAnswer | string | Canonical correct answer | Required |
 | timestamp | Date | When the attempt occurred | Required |
-| moduleId | string | Module context of the attempt | Nullable for level tests |
+| moduleId | string | Module context of the attempt | Nullable for level tests and Words Practice |
 
 **UserVocabularyProgress**
 
@@ -48,7 +48,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 | vocabularyItemId | string | Vocabulary item id | Required; one record per (userId, vocabularyItemId) |
 | masteryScore | number | Mastery score | [0.0, 1.0]; ≥ 0.8 = mastered |
 | lastReviewed | Date | Last time the item appeared in an exercise (practice or test) | Nullable |
-| exerciseHistory | ExerciseResult[] | History of exercise attempts | Appended at practice time (F10) and test time (F11/F21) |
+| exerciseHistory | ExerciseResult[] | History of exercise attempts | Appended at practice time (F10), test time (F11/F21) and Words Practice answer time (F26) |
 
 **UserGrammarConceptProgress**
 
@@ -67,7 +67,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 - `GET /users/:userId/grammarProgress` — list all grammar mastery records for a user.
 - `GET /users/:userId/grammarProgress/:grammarConceptId` — get mastery for a specific grammar concept.
 
-> **Note — applying results is not a REST endpoint.** `UserVocabularyProgressStore.appendResultAndRecompute(userId, vocabularyItemId, result)` and `UserGrammarConceptProgressStore.appendResultAndRecompute(userId, grammarConceptId, result)` run the SRS update directly, in-process — appending the `ExerciseResult` and recomputing `masteryScore`/`lastReviewed` in one operation. F10, F11 and F21 — their only consumers — all live inside this microservice, so HTTP endpoints here would have no external consumer; per the coding standard, the previously-built `POST .../applyResults` endpoints were removed in favour of these direct store calls. See [the change record](./changes/2026-06-08-remove-internal-only-rest-endpoints.md).
+> **Note — applying results is not a REST endpoint.** `UserVocabularyProgressStore.appendResultAndRecompute(userId, vocabularyItemId, result)` and `UserGrammarConceptProgressStore.appendResultAndRecompute(userId, grammarConceptId, result)` run the SRS update directly, in-process — appending the `ExerciseResult` and recomputing `masteryScore`/`lastReviewed` in one operation. F10, F11, F21 and F26 — their only consumers — all live inside this microservice, so HTTP endpoints here would have no external consumer; per the coding standard, the previously-built `POST .../applyResults` endpoints were removed in favour of these direct store calls. See [the change record](./changes/2026-06-08-remove-internal-only-rest-endpoints.md).
 
 #### 2.2.4. Business Logic
 
@@ -96,7 +96,7 @@ This feature tracks, per user, how well each **vocabulary item** and each **gram
 ## 4. Constraints and Assumptions
 
 - **Constraint** — Mastery is **global per item per user**, not per module. The same word mastered in module A counts as mastered when module B references it.
-- **Constraint** — Mastery is updated continuously, on every completed exercise — in practice (F10) and in tests (F11/F21). Practice and tests update mastery identically; there is no "practice doesn't count" mode.
+- **Constraint** — Mastery is updated continuously, on every completed exercise — in practice (F10) and in tests (F11/F21) — and on every finalized first-attempt answer in Words Practice (F26). All of them update mastery identically; there is no "practice doesn't count" mode.
 - **Assumption** — Decay is deferred for v1 (see Technical Decisions / OQ-01); the SRS algorithm only adjusts the score on correct/incorrect answers.
 
 ---

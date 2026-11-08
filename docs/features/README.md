@@ -73,12 +73,18 @@ Features are grouped by layer. Lower groups depend on higher ones.
 ### Group I — Activity & engagement stats
 | # | Feature | Primary model | Status |
 |---|---------|---------------|--------|
-| F24 | [Activity Stats (Rolling Window)](./F24-activity-stats.md) | — (read-only aggregate over PracticeSession, ModuleTestAttempt, LevelTestAttempt) | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+| F24 | [Activity Stats (Rolling Window)](./F24-activity-stats.md) | — (read-only aggregate over PracticeSession, ModuleTestAttempt, LevelTestAttempt, WordsPracticeSession) | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 
 ### Group J — Module re-practice
 | # | Feature | Primary model | Status |
 |---|---------|---------------|--------|
 | F25 | [Module Re-practice](./F25-module-re-practice.md) | UserModuleProgress (passNumber; amends F07) | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
+
+### Group K — Words Practice
+| # | Feature | Primary model | Status |
+|---|---------|---------------|--------|
+| F26 | [Words Practice Session](./F26-words-practice-session.md) | WordsPracticeSession (amends F06 `ExerciseResult`) | ![Not implemented](https://img.shields.io/badge/status-not%20implemented-lightgrey?style=flat-square) |
+| F27 | [Word Answer Verification](./F27-word-answer-verification.md) | — (mutates WordsPracticeSession) | ![Not implemented](https://img.shields.io/badge/status-not%20implemented-lightgrey?style=flat-square) |
 
 ## Build order
 
@@ -91,6 +97,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 | 5 — Level progression | F20, F21 | After at least one full level's modules are seeded |
 | 6 — Extended | F22, F23, F24 | User vocabulary capture + content analysis reports + activity stats (F24 depends on F10/F11/F21) |
 | 7 — Re-practice | F25 | Depends on F07/F09/F10/F11 (resets into the existing flow, adds no branch to it) |
+| 8 — Words Practice | F26, F27, F24 update | F26 depends on F06/F07; F27 depends on F26 (+ the F13 AI client); the F24 `wordsPracticeSessions` count depends on F26 |
 
 ## MVP slice
 
