@@ -40,8 +40,7 @@ export class WordsPoolLoader {
      */
     async load(userId: string): Promise<WordGroup[]> {
 
-        const allProgress = await this.moduleProgressStore.listByUser(userId);
-        const completedModuleIds = allProgress.filter(p => p.status === "completed").map(p => p.moduleId);
+        const completedModuleIds = (await this.moduleProgressStore.findAllCompletedModulesByUser(userId)).map(p => p.moduleId);
 
         if (completedModuleIds.length === 0) return [];
 

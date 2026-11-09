@@ -27,6 +27,21 @@ export class UserModuleProgressStore {
         return docs.map(doc => UserModuleProgress.fromBSON(doc));
     }
 
+    /**
+     * Finds all completed modules for the user. 
+     * 
+     * @param userId the id of the user
+     * @returns all completed modules for all CEFR levels
+     */
+    async findAllCompletedModulesByUser(userId: string): Promise<UserModuleProgress[]> {
+
+        const allProgress = await this.listByUser(userId);
+        const completedModules = allProgress.filter(p => p.status === "completed");
+
+        return completedModules;
+    }
+
+
     async upsert(progress: UserModuleProgress): Promise<UserModuleProgress> {
         await this.db.collection(COLLECTION).replaceOne(
             { userId: progress.userId, moduleId: progress.moduleId },
