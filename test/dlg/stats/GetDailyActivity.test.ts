@@ -8,14 +8,15 @@ const userContext = { email: "u1@u1.com", authProvider: "test", userId: "SHOULD-
 // Mock collection factory — supports find().toArray() per collection name
 // ---------------------------------------------------------------------------
 
-function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTestDocs: any[], user: {userId: string, email: string} = {userId: "u1", email: "u1@u1.com"}) {
-    function makeCol(docs: any[], timestampField: string, passedFilter?: boolean) {
+function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTestDocs: any[], wordsPracticeDocs: any[] = [], user: {userId: string, email: string} = {userId: "u1", email: "u1@u1.com"}) {
+    function makeCol(docs: any[], timestampField: string, passedFilter?: boolean, status?: string) {
         return {
             find: (filter: any) => ({
                 toArray: async () => {
                     return docs.filter(d => {
                         if (d.userId !== filter.userId) return false;
                         if (passedFilter !== undefined && d.passed !== passedFilter) return false;
+                        if (status !== undefined && d.status !== status) return false;
                         const ts = d[timestampField];
                         if (!ts) return false;
                         if (filter[timestampField]?.$gte && ts < filter[timestampField].$gte) return false;
@@ -43,6 +44,7 @@ function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTest
             if (name === "practiceSessions") return makeCol(practiceSessionDocs, "completedAt");
             if (name === "moduleTestAttempts") return makeCol(moduleTestDocs, "takenAt", true);
             if (name === "levelTestAttempts") return makeCol(levelTestDocs, "takenAt", true);
+            if (name === "wordsPracticeSessions") return makeCol(wordsPracticeDocs, "completedAt", undefined, "completed");
             if (name === "users") return makeUserCol(user);
             throw new Error(`Unknown collection: ${name}`);
         },
@@ -80,6 +82,38 @@ describe("GetDailyActivity.parseRequest", () => {
 });
 
 describe("GetDailyActivity.do", () => {
+
+    it("counts completed Words Practice sessions per day as wordsPracticeSessions", async () => {
+        const wordsPracticeDocs = [
+            { userId: "u1", status: "completed", completedAt: "2026-06-22T10:00:00.000Z" },
+            { userId: "u1", status: "completed", completedAt: "2026-06-22T15:00:00.000Z" },
+            { userId: "u1", status: "completed", completedAt: "2026-06-25T09:00:00.000Z" },
+        ];
+        const db = makeMockDb([], [], [], wordsPracticeDocs);
+        const delegate = new GetDailyActivity({} as any, makeMockConfig(db));
+
+        const result = await delegate.do({ from: "20260621" }, userContext);
+
+        assert.equal(result.days.find(d => d.date === "20260621")!.wordsPracticeSessions, 0);
+        assert.equal(result.days.find(d => d.date === "20260622")!.wordsPracticeSessions, 2);
+        assert.equal(result.days.find(d => d.date === "20260625")!.wordsPracticeSessions, 1);
+    });
+
+    it("does not count in-progress Words Practice sessions and leaves the other counts unchanged", async () => {
+        const wordsPracticeDocs = [
+            { userId: "u1", status: "in_progress", completedAt: null },
+            { userId: "u2", status: "completed", completedAt: "2026-06-22T10:00:00.000Z" },
+        ];
+        const practiceSessionDocs = [{ userId: "u1", completedAt: "2026-06-22T10:00:00.000Z" }];
+        const db = makeMockDb(practiceSessionDocs, [], [], wordsPracticeDocs);
+        const delegate = new GetDailyActivity({} as any, makeMockConfig(db));
+
+        const result = await delegate.do({ from: "20260621" }, userContext);
+
+        const day22 = result.days.find(d => d.date === "20260622")!;
+        assert.equal(day22.wordsPracticeSessions, 0);
+        assert.equal(day22.practiceSessions, 1);
+    });
 
     it("returns a dense 7-day array with correct counts from all three stores", async () => {
         const practiceSessionDocs = [

@@ -5,6 +5,7 @@ import { ControllerConfig, REFERENCE_TIMEZONE } from "../../Config";
 import { PracticeSessionStore } from "../../store/PracticeSessionStore";
 import { ModuleTestAttemptStore } from "../../store/ModuleTestAttemptStore";
 import { LevelTestAttemptStore } from "../../store/LevelTestAttemptStore";
+import { WordsPracticeSessionStore } from "../../store/WordsPracticeSessionStore";
 import { UserStore } from "../../store/UserStore";
 
 export class GetDailyActivity extends TotoDelegate<GetDailyActivityRequest, GetDailyActivityResponse> {
@@ -28,10 +29,11 @@ export class GetDailyActivity extends TotoDelegate<GetDailyActivityRequest, GetD
 
         if (!user) throw new ValidationError(404, "User not found");
 
-        const [practiceMap, moduleTestMap, levelTestMap] = await Promise.all([
+        const [practiceMap, moduleTestMap, levelTestMap, wordsPracticeMap] = await Promise.all([
             new PracticeSessionStore({ db, config }).countCompletedByDay(user.id, fromDate, toDate, tz),
             new ModuleTestAttemptStore({ db, config }).countPassedByDay(user.id, fromDate, toDate, tz),
             new LevelTestAttemptStore({ db, config }).countPassedByDay(user.id, fromDate, toDate, tz),
+            new WordsPracticeSessionStore({ db, config }).countCompletedByDay(user.id, fromDate, toDate, tz),
         ]);
 
         const days: DayActivity[] = [];
@@ -42,6 +44,7 @@ export class GetDailyActivity extends TotoDelegate<GetDailyActivityRequest, GetD
                 practiceSessions: practiceMap.get(day) ?? 0,
                 successfulModuleTests: moduleTestMap.get(day) ?? 0,
                 successfulLevelTests: levelTestMap.get(day) ?? 0,
+                wordsPracticeSessions: wordsPracticeMap.get(day) ?? 0,
             });
         }
 
@@ -69,6 +72,7 @@ interface DayActivity {
     practiceSessions: number;
     successfulModuleTests: number;
     successfulLevelTests: number;
+    wordsPracticeSessions: number;
 }
 
 interface GetDailyActivityResponse {
