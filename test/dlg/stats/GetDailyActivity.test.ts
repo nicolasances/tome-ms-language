@@ -8,14 +8,15 @@ const userContext = { email: "u1@u1.com", authProvider: "test", userId: "SHOULD-
 // Mock collection factory — supports find().toArray() per collection name
 // ---------------------------------------------------------------------------
 
-function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTestDocs: any[], user: {userId: string, email: string} = {userId: "u1", email: "u1@u1.com"}) {
-    function makeCol(docs: any[], timestampField: string, passedFilter?: boolean) {
+function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTestDocs: any[], wordsPracticeDocs: any[] = [], user: {userId: string, email: string} = {userId: "u1", email: "u1@u1.com"}) {
+    function makeCol(docs: any[], timestampField: string, passedFilter?: boolean, status?: string) {
         return {
             find: (filter: any) => ({
                 toArray: async () => {
                     return docs.filter(d => {
                         if (d.userId !== filter.userId) return false;
                         if (passedFilter !== undefined && d.passed !== passedFilter) return false;
+                        if (status !== undefined && d.status !== status) return false;
                         const ts = d[timestampField];
                         if (!ts) return false;
                         if (filter[timestampField]?.$gte && ts < filter[timestampField].$gte) return false;
@@ -43,6 +44,7 @@ function makeMockDb(practiceSessionDocs: any[], moduleTestDocs: any[], levelTest
             if (name === "practiceSessions") return makeCol(practiceSessionDocs, "completedAt");
             if (name === "moduleTestAttempts") return makeCol(moduleTestDocs, "takenAt", true);
             if (name === "levelTestAttempts") return makeCol(levelTestDocs, "takenAt", true);
+            if (name === "wordsPracticeSessions") return makeCol(wordsPracticeDocs, "completedAt", undefined, "completed");
             if (name === "users") return makeUserCol(user);
             throw new Error(`Unknown collection: ${name}`);
         },
@@ -81,11 +83,47 @@ describe("GetDailyActivity.parseRequest", () => {
 
 describe("GetDailyActivity.do", () => {
 
-    it("returns a dense 7-day array with correct counts from all three stores", async () => {
+    it("counts completed Words Practice sessions per day as wordsPracticeSessions", async () => {
+        const wordsPracticeDocs = [
+            { userId: "u1", status: "completed", completedAt: "2026-06-22T10:00:00.000Z" },
+            { userId: "u1", status: "completed", completedAt: "2026-06-22T15:00:00.000Z" },
+            { userId: "u1", status: "completed", completedAt: "2026-06-25T09:00:00.000Z" },
+        ];
+        const db = makeMockDb([], [], [], wordsPracticeDocs);
+        const delegate = new GetDailyActivity({} as any, makeMockConfig(db));
+
+        const result = await delegate.do({ from: "20260621" }, userContext);
+
+        assert.equal(result.days.find(d => d.date === "20260621")!.wordsPracticeSessions, 0);
+        assert.equal(result.days.find(d => d.date === "20260622")!.wordsPracticeSessions, 2);
+        assert.equal(result.days.find(d => d.date === "20260625")!.wordsPracticeSessions, 1);
+    });
+
+    it("does not count in-progress Words Practice sessions and leaves the other counts unchanged", async () => {
+        const wordsPracticeDocs = [
+            { userId: "u1", status: "in_progress", completedAt: null },
+            { userId: "u2", status: "completed", completedAt: "2026-06-22T10:00:00.000Z" },
+        ];
+        const practiceSessionDocs = [{ userId: "u1", completedAt: "2026-06-22T10:00:00.000Z" }];
+        const db = makeMockDb(practiceSessionDocs, [], [], wordsPracticeDocs);
+        const delegate = new GetDailyActivity({} as any, makeMockConfig(db));
+
+        const result = await delegate.do({ from: "20260621" }, userContext);
+
+        const day22 = result.days.find(d => d.date === "20260622")!;
+        assert.equal(day22.wordsPracticeSessions, 0);
+        assert.equal(day22.practiceSessions, 1);
+    });
+
+    it("returns a dense 7-day array with correct counts from all 4 stores", async () => {
         const practiceSessionDocs = [
             { userId: "u1", completedAt: "2026-06-21T10:00:00.000Z" },
             { userId: "u1", completedAt: "2026-06-21T14:00:00.000Z" },
             { userId: "u1", completedAt: "2026-06-23T09:00:00.000Z" },
+        ];
+        const wordsPracticeDocs = [
+            { userId: "u1", status: "completed", completedAt: "2026-06-22T10:00:00.000Z" },
+            { userId: "u1", status: "completed", completedAt: "2026-06-23T15:00:00.000Z" },
         ];
         const moduleTestDocs = [
             { userId: "u1", passed: true, takenAt: "2026-06-23T11:00:00.000Z" },
@@ -94,7 +132,7 @@ describe("GetDailyActivity.do", () => {
             { userId: "u1", passed: true, takenAt: "2026-06-27T15:00:00.000Z" },
         ];
 
-        const db = makeMockDb(practiceSessionDocs, moduleTestDocs, levelTestDocs);
+        const db = makeMockDb(practiceSessionDocs, moduleTestDocs, levelTestDocs, wordsPracticeDocs);
         const delegate = new GetDailyActivity({} as any, makeMockConfig(db));
 
         const result = await delegate.do({ from: "20260621" }, userContext);
@@ -105,16 +143,25 @@ describe("GetDailyActivity.do", () => {
 
         const day21 = result.days.find(d => d.date === "20260621")!;
         assert.equal(day21.practiceSessions, 2);
+        assert.equal(day21.wordsPracticeSessions, 0);
         assert.equal(day21.successfulModuleTests, 0);
         assert.equal(day21.successfulLevelTests, 0);
+    
+        const day22 = result.days.find(d => d.date === "20260622")!;
+        assert.equal(day22.practiceSessions, 0);
+        assert.equal(day22.wordsPracticeSessions, 1);
+        assert.equal(day22.successfulModuleTests, 0);
+        assert.equal(day22.successfulLevelTests, 0);
 
         const day23 = result.days.find(d => d.date === "20260623")!;
         assert.equal(day23.practiceSessions, 1);
+        assert.equal(day23.wordsPracticeSessions, 1);
         assert.equal(day23.successfulModuleTests, 1);
         assert.equal(day23.successfulLevelTests, 0);
 
         const day27 = result.days.find(d => d.date === "20260627")!;
         assert.equal(day27.practiceSessions, 0);
+        assert.equal(day27.wordsPracticeSessions, 0);
         assert.equal(day27.successfulModuleTests, 0);
         assert.equal(day27.successfulLevelTests, 1);
     });
