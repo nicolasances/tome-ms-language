@@ -373,7 +373,7 @@
 | GET | `/me/stats/dailyActivity` | Per-day activity counts over the rolling 7-day window ending today |
 
 ### GET /me/stats/dailyActivity
-**Used for:** Backing the Home Dashboard's "This week" activity chart. Returns per-day counts of completed practice sessions, passed module tests, and passed level tests across a rolling 7-day window. The user is resolved from the auth token. Optional `from` query param (YYYYMMDD) sets the first day of the window; defaults to `today − 6` so the window always ends today. Returns exactly 7 entries (oldest → newest), zero-filled for days with no activity.
+**Used for:** Backing the Home Dashboard's "This week" activity chart. Returns per-day counts of completed module practice sessions (`practiceSessions`), passed module tests (`successfulModuleTests`), passed level tests (`successfulLevelTests`), and completed Words Practice sessions (`wordsPracticeSessions`, by `completedAt`) across a rolling 7-day window. The user is resolved from the auth token. Optional `from` query param (YYYYMMDD) sets the first day of the window; defaults to `today − 6` so the window always ends today. Returns exactly 7 entries (oldest → newest), zero-filled for days with no activity.
 **Request & Response:** `GetDailyActivityRequest` / `GetDailyActivityResponse` in `src/dlg/stats/GetDailyActivity.ts`
 
 ---
