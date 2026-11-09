@@ -52,6 +52,7 @@ import { GetWordsPracticeSummary } from './dlg/wordsPractice/GetWordsPracticeSum
 import { PostWordsPracticeSession } from './dlg/wordsPractice/PostWordsPracticeSession';
 import { GetWordsPracticeSession } from './dlg/wordsPractice/GetWordsPracticeSession';
 import { SubmitWordsPracticeAnswer } from './dlg/wordsPractice/SubmitWordsPracticeAnswer';
+import { VerifyWordsPracticeAnswer } from './dlg/wordsPractice/VerifyWordsPracticeAnswer';
 import { CompleteWordsPracticeSession } from './dlg/wordsPractice/CompleteWordsPracticeSession';
 import { GetWordsPracticeSessions } from './dlg/wordsPractice/GetWordsPracticeSessions';
 
@@ -99,6 +100,7 @@ const config: TotoMicroserviceConfiguration = {
             { method: 'POST', path: '/users/:userId/wordsPracticeSessions', delegate: PostWordsPracticeSession },
             { method: 'GET', path: '/users/:userId/wordsPracticeSessions/:sessionId', delegate: GetWordsPracticeSession },
             { method: 'POST', path: '/users/:userId/wordsPracticeSessions/:sessionId/answers', delegate: SubmitWordsPracticeAnswer },
+            { method: 'POST', path: '/users/:userId/wordsPracticeSessions/:sessionId/answers/verify', delegate: VerifyWordsPracticeAnswer },
             { method: 'POST', path: '/users/:userId/wordsPracticeSessions/:sessionId/complete', delegate: CompleteWordsPracticeSession },
 
             { method: 'POST', path: '/users/:userId/modules/:moduleId/rePractice', delegate: RePracticeModule },

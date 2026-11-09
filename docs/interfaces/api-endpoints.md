@@ -343,6 +343,7 @@
 | POST | `/users/:userId/wordsPracticeSessions` | Start a Words Practice session, or point at the open one (409) |
 | GET | `/users/:userId/wordsPracticeSessions/:sessionId` | Get a session (resume, results screen) |
 | POST | `/users/:userId/wordsPracticeSessions/:sessionId/answers` | Submit an answer for one practice word |
+| POST | `/users/:userId/wordsPracticeSessions/:sessionId/answers/verify` | AI check (F27) of the session's most recent wrong answer |
 | POST | `/users/:userId/wordsPracticeSessions/:sessionId/complete` | Close a session once every word is answered correctly |
 
 ### GET /me/wordsPractice/summary
@@ -360,6 +361,10 @@
 ### POST /users/:userId/wordsPracticeSessions/:sessionId/answers
 **Used for:** Submitting a typed answer for one word. Body: `{ wordKey, userAnswer }`. Returns `{ isCorrect, correctAnswer, isFirstAttempt }`. Matching ignores case, punctuation and a leading `at`/`en`/`et`; canonical forms of 4 characters or fewer need an exact match, longer ones allow the usual fuzzy threshold. Mastery (F06) is written for first attempts only, to every item sharing the word's Danish form: a correct first attempt immediately, a wrong one only when finalized (the next answer in the session, or `/complete`). **400** when the word is not in the session, is already correct, or the session is completed.
 **Request & Response:** `SubmitWordsPracticeAnswerRequest` / `SubmitWordsPracticeAnswerResponse` in `src/dlg/wordsPractice/SubmitWordsPracticeAnswer.ts`
+
+### POST /users/:userId/wordsPracticeSessions/:sessionId/answers/verify
+**Used for:** "Check with AI" (F27) on the session's most recent wrong answer. Body: `{ wordKey, cefrLevel }`; the answer is read from the stored attempt. Returns `{ valid, explanation? }` — `explanation` is always present when invalid, and an optional note when valid. The verdict prompt never sees the canonical Danish. Valid: the word becomes correct and, on a first attempt, the pending mastery write is made as correct. Invalid: on a first attempt the pending write is made as incorrect. Nothing is written to vocabulary items or exercises. **404** when the session does not exist or belongs to another user; **400** when `wordKey` is not the most recent answer, that answer is already correct, or the session is completed; **409** when the answer was already checked. An AI failure returns 5xx and changes nothing, so the check can be retried.
+**Request & Response:** `VerifyWordsPracticeAnswerRequest` / `VerifyWordsPracticeAnswerResponse` in `src/dlg/wordsPractice/VerifyWordsPracticeAnswer.ts`
 
 ### POST /users/:userId/wordsPracticeSessions/:sessionId/complete
 **Used for:** Closing a session after the last word is answered correctly. Rejects with **400** and `outstandingWordKeys` while any word is not yet correct (nothing is written). Otherwise finalizes a pending wrong first attempt, sets `status = completed` and `completedAt`, and returns the session. Idempotent on an already-completed session.

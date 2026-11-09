@@ -1,6 +1,6 @@
 # F27 — Word Answer Verification (Words Practice "Check with AI")
 
-![Status](https://img.shields.io/badge/status-not%20implemented-lightgrey?style=flat-square)
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
 
 ## 1. Purpose & Scope
 
