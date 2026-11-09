@@ -45,8 +45,9 @@ export class WordsPoolLoader {
 
         if (completedModuleIds.length === 0) return [];
 
-        const modules = await this.moduleStore.findByIds(completedModuleIds);
-        const itemIds = [...new Set(modules.flatMap(m => m.vocabularyItemIds))];
+        const completedModules = await this.moduleStore.findByIds(completedModuleIds);
+        
+        const itemIds = [...new Set(completedModules.flatMap(m => m.vocabularyItemIds))];
 
         if (itemIds.length === 0) return [];
 
