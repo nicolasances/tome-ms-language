@@ -45,6 +45,17 @@ export class WordsPracticeSessionStore {
     }
 
     /**
+     * Finds all sessions for a user, sorted by startedAt descending (most recent first).
+     * 
+     * @param {string} userId - The user whose sessions to list.
+     * @returns the list of sessions, sorted by startedAt descending (most recent first).
+     */
+    async listByUser(userId: string): Promise<WordsPracticeSession[]> {
+
+        return await this.db.collection(COLLECTION).find({ userId }).sort({ startedAt: -1 }).toArray().then(docs => docs.map(doc => WordsPracticeSession.fromBSON(doc as any)));
+    }
+
+    /**
      * Finds the user's open (`in_progress`) session. There is at most one per user.
      *
      * @param {string} userId - The owner.

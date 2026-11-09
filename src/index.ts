@@ -53,6 +53,7 @@ import { PostWordsPracticeSession } from './dlg/wordsPractice/PostWordsPracticeS
 import { GetWordsPracticeSession } from './dlg/wordsPractice/GetWordsPracticeSession';
 import { SubmitWordsPracticeAnswer } from './dlg/wordsPractice/SubmitWordsPracticeAnswer';
 import { CompleteWordsPracticeSession } from './dlg/wordsPractice/CompleteWordsPracticeSession';
+import { GetWordsPracticeSessions } from './dlg/wordsPractice/GetWordsPracticeSessions';
 
 const config: TotoMicroserviceConfiguration = {
     serviceName: "tome-ms-language",
@@ -94,6 +95,7 @@ const config: TotoMicroserviceConfiguration = {
 
             { method: 'GET', path: '/me/wordsPractice/summary', delegate: GetWordsPracticeSummary },
 
+            { method: 'GET', path: '/users/:userId/wordsPracticeSessions', delegate: GetWordsPracticeSessions },
             { method: 'POST', path: '/users/:userId/wordsPracticeSessions', delegate: PostWordsPracticeSession },
             { method: 'GET', path: '/users/:userId/wordsPracticeSessions/:sessionId', delegate: GetWordsPracticeSession },
             { method: 'POST', path: '/users/:userId/wordsPracticeSessions/:sessionId/answers', delegate: SubmitWordsPracticeAnswer },
