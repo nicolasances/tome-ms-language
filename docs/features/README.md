@@ -83,7 +83,7 @@ Features are grouped by layer. Lower groups depend on higher ones.
 ### Group K — Words Practice
 | # | Feature | Primary model | Status |
 |---|---------|---------------|--------|
-| F26 | [Words Practice Session](./F26-words-practice-session.md) | WordsPracticeSession (amends F06 `ExerciseResult`) | ![Not implemented](https://img.shields.io/badge/status-not%20implemented-lightgrey?style=flat-square) |
+| F26 | [Words Practice Session](./F26-words-practice-session.md) | WordsPracticeSession (amends F06 `ExerciseResult`) | ![Implemented](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square) |
 | F27 | [Word Answer Verification](./F27-word-answer-verification.md) | — (mutates WordsPracticeSession) | ![Not implemented](https://img.shields.io/badge/status-not%20implemented-lightgrey?style=flat-square) |
 
 ## Build order

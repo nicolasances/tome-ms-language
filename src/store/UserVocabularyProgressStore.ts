@@ -59,4 +59,38 @@ export class UserVocabularyProgressStore {
 
         return this.upsert(updated);
     }
+
+    /**
+     * Appends one ExerciseResult to every given item in a single read and a single bulk write,
+     * recomputing each item's masteryScore (SRS) and lastReviewed. Items never reviewed before
+     * start from 0.0. Used where one answer counts for several duplicate items (F26).
+     *
+     * @param {string} userId - The user whose progress is updated.
+     * @param {string[]} vocabularyItemIds - The items that all receive the result.
+     * @param {ExerciseResult} result - The result appended to each item's history.
+     */
+    async appendResultToItems(userId: string, vocabularyItemIds: string[], result: ExerciseResult): Promise<void> {
+
+        if (vocabularyItemIds.length === 0) return;
+
+        const existing = await this.listByUser(userId, vocabularyItemIds);
+        const existingById = new Map(existing.map(p => [p.vocabularyItemId, p]));
+
+        const operations = vocabularyItemIds.map(vocabularyItemId => {
+            const current = existingById.get(vocabularyItemId);
+            const currentScore = current?.masteryScore ?? 0.0;
+
+            const updated = new UserVocabularyProgress({
+                userId,
+                vocabularyItemId,
+                masteryScore: result.isCorrect ? applyCorrect(currentScore) : applyIncorrect(currentScore),
+                lastReviewed: result.timestamp,
+                exerciseHistory: [...(current?.exerciseHistory ?? []), result],
+            });
+
+            return { replaceOne: { filter: { userId, vocabularyItemId }, replacement: updated.toBSON(), upsert: true } };
+        });
+
+        await this.db.collection(COLLECTION).bulkWrite(operations);
+    }
 }

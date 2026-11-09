@@ -1,6 +1,6 @@
 # F26 — Words Practice Session
 
-![Status](https://img.shields.io/badge/status-not%20implemented-lightgrey?style=flat-square)
+![Status](https://img.shields.io/badge/status-implemented-brightgreen?style=flat-square)
 
 ## 1. Purpose & Scope
 

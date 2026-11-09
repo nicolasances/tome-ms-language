@@ -148,6 +148,26 @@ export const PROFICIENCY_RUNG_WEIGHTS: Record<number, number> = { 1: 0, 2: 1, 3:
  */
 export const REFERENCE_TIMEZONE = 'Europe/Copenhagen';
 
+/**
+ * Maximum number of practice words in one Words Practice session (F26).
+ */
+export const WORDS_PRACTICE_SESSION_SIZE = 40;
+
+/**
+ * Weight of `(1 − mastery)` in the Words Practice selection weight (F26).
+ */
+export const WORDS_PRACTICE_MASTERY_WEIGHT = 0.5;
+
+/**
+ * Weight of staleness in the Words Practice selection weight (F26).
+ */
+export const WORDS_PRACTICE_STALENESS_WEIGHT = 0.5;
+
+/**
+ * Days without practice after which a word's staleness saturates at 1 (F26).
+ */
+export const WORDS_PRACTICE_STALENESS_HORIZON_DAYS = 30;
+
 export class ControllerConfig extends TotoControllerConfig {
 
     getMongoSecretNames(): { userSecretName: string; pwdSecretName: string; } | null {
@@ -183,6 +203,7 @@ export class ControllerConfig extends TotoControllerConfig {
             "userVocabularyProgress",
             "users",
             "vocabulary",
+            "wordsPracticeSessions",
         ];
 
     }
