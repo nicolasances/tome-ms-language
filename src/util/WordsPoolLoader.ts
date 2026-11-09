@@ -46,15 +46,14 @@ export class WordsPoolLoader {
 
         const completedModules = await this.moduleStore.findByIds(completedModuleIds);
         
-        const itemIds = [...new Set(completedModules.flatMap(m => m.vocabularyItemIds))];
+        const vocabularyItemIds = [...new Set(completedModules.flatMap(m => m.vocabularyItemIds))];
 
-        if (itemIds.length === 0) return [];
+        if (vocabularyItemIds.length === 0) return [];
 
-        const allItems = await this.vocabularyStore.findByIds(itemIds);
-        const items = allItems.filter(item => item.source === "curriculum");
-        
-        const progress = await this.vocabularyProgressStore.listByUser(userId, items.map(i => i.id));
+        const words = (await this.vocabularyStore.findByIds(vocabularyItemIds)).filter(item => item.source === "curriculum");
 
-        return buildWordGroups({ items, progress });
+        const progress = await this.vocabularyProgressStore.listByUser(userId, words.map(i => i.id));
+
+        return buildWordGroups({ items: words, progress });
     }
 }
