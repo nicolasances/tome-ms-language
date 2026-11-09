@@ -6,10 +6,8 @@ import { PracticeSessionStore } from "../../store/PracticeSessionStore";
 import { ModuleTestAttemptStore } from "../../store/ModuleTestAttemptStore";
 import { LevelTestAttemptStore } from "../../store/LevelTestAttemptStore";
 import { VocabularyItemStore } from "../../store/VocabularyItemStore";
-import { VertexAIClient, buildVertexAIClient } from "../../ai/VertexAIClient";
-
-/** Model for the answer check. Judging real-world Danish needs more than the smallest tier. Overridable with VERTEX_AI_VERIFICATION_MODEL. */
-const VERIFICATION_MODEL = process.env.VERTEX_AI_VERIFICATION_MODEL ?? "gemini-3.5-flash-lite";
+import { VertexAIClient } from "../../ai/VertexAIClient";
+import { COMMON_JUDGING_RULES, generateOptionalNote, resolveVerificationClient } from "../../ai/AnswerVerification";
 
 export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAnswerVerificationRequest, PostExerciseAnswerVerificationResponse> {
 
@@ -102,7 +100,7 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
 
         if (!vocab) throw new ValidationError(404, `Vocabulary item not found for id '${exercise.vocabularyItemId}'`);
 
-        const client = this.aiClient ?? (this.aiClient = buildVertexAIClient(VERIFICATION_MODEL));
+        const client = this.aiClient = resolveVerificationClient(this.aiClient);
 
         const raw = await client.generate(buildVerdictPrompt({ exercisePrompt: exercise.prompt, userAnswer: req.userAnswer, cefrLevel: req.cefrLevel }));
 
@@ -123,39 +121,12 @@ export class PostExerciseAnswerVerification extends TotoDelegate<PostExerciseAns
 
             await exerciseStore.appendUserContributedAnswer(req.exerciseId, req.userAnswer);
 
-            const note = await this.buildNote({ client, exercise, userAnswer: req.userAnswer, cefrLevel: req.cefrLevel, vocabDanish: vocab.danish, vocabEnglish: vocab.english, vocabContext: vocab.context ?? vocab.type });
+            const note = await generateOptionalNote(client, buildNotePrompt({ exercise, userAnswer: req.userAnswer, cefrLevel: req.cefrLevel, vocabDanish: vocab.danish, vocabEnglish: vocab.english, vocabContext: vocab.context ?? vocab.type }));
 
             return note ? { valid: true, explanation: note } : { valid: true };
         }
 
         return { valid: false, explanation: parsed.explanation };
-    }
-
-    /**
-     * Asks the AI for a short note on a valid answer that differs from the expected answer / target vocabulary item.
-     * The note is a nicety: any failure (AI error, unparsable output) yields no note instead of failing the verification.
-     *
-     * @param {NoteInput} input - The AI client, the exercise data, the student's answer and the linked vocabulary item.
-     *
-     * @returns {Promise<string | undefined>} The note, or undefined if there is nothing to add.
-     */
-    private async buildNote(input: NoteInput): Promise<string | undefined> {
-
-        try {
-
-            const raw = await input.client.generate(buildNotePrompt(input));
-
-            const parsed = JSON.parse(raw) as AINoteResponse;
-
-            return parsed.explanation?.trim() || undefined;
-
-        } catch (error) {
-
-            console.error("Could not generate the note for a valid answer", error);
-
-            return undefined;
-
-        }
     }
 }
 
@@ -182,8 +153,7 @@ function buildVerdictPrompt({ exercisePrompt, userAnswer, cefrLevel }: VerdictPr
             A different but correct phrasing is valid. There is no single expected translation: do not mark it wrong because other phrasings exist, or because it uses different words than you would have used.
 
             Other considerations to keep in mind:
-            - Ignore case, always.
-            - Ignore punctuation differences (periods, commas, quotation marks, dashes, etc.), always.
+            ${COMMON_JUDGING_RULES}
 
             Return a JSON object with exactly these fields, in this order:
             - reasoning: string — a brief analysis of the student's translation: grammar, meaning and naturalness
@@ -227,17 +197,12 @@ interface VerdictPromptInput {
 }
 
 interface NoteInput {
-    client: VertexAIClient;                                                         // The AI client to call
     exercise: { prompt: string; answer: string; alternativeAnswers: string[] };    // Exercise data for the prompt
     userAnswer: string;                                                             // The student's answer
     cefrLevel: string;                                                              // The student's CEFR level
     vocabContext: string;                                                           // Context or type of the linked vocab item
     vocabDanish: string;                                                            // Danish form of the linked vocab item
     vocabEnglish: string;                                                           // English translation of the linked vocab item
-}
-
-interface AINoteResponse {
-    explanation?: string;       // Short note on how the valid answer differs from the expected one, if anything is worth saying
 }
 
 interface AIVerificationResponse {

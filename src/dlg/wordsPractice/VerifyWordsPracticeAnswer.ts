@@ -1,14 +1,12 @@
 import { Request } from "express";
 import { TotoDelegate, UserContext, ValidationError } from "totoms";
 import { ControllerConfig } from "../../Config";
-import { VertexAIClient, buildVertexAIClient } from "../../ai/VertexAIClient";
+import { VertexAIClient } from "../../ai/VertexAIClient";
+import { COMMON_JUDGING_RULES, generateOptionalNote, resolveVerificationClient } from "../../ai/AnswerVerification";
 import { WordsPracticeWord } from "../../model/WordsPracticeSession";
 import { UserVocabularyProgressStore } from "../../store/UserVocabularyProgressStore";
 import { WordsPracticeSessionStore } from "../../store/WordsPracticeSessionStore";
 import { WordsPracticeMastery } from "../../util/WordsPracticeMastery";
-
-/** Model for the answer check, same selection as F13. Overridable with VERTEX_AI_VERIFICATION_MODEL. */
-const VERIFICATION_MODEL = process.env.VERTEX_AI_VERIFICATION_MODEL ?? "gemini-3.5-flash-lite";
 
 export class VerifyWordsPracticeAnswer extends TotoDelegate<VerifyWordsPracticeAnswerRequest, VerifyWordsPracticeAnswerResponse> {
 
@@ -66,7 +64,7 @@ export class VerifyWordsPracticeAnswer extends TotoDelegate<VerifyWordsPracticeA
         if (attempt.isCorrect) throw new ValidationError(400, "The most recent answer is already correct");
         if (attempt.aiChecked) throw new ValidationError(409, "This answer has already been checked with AI");
 
-        const client = this.aiClient ?? (this.aiClient = buildVertexAIClient(VERIFICATION_MODEL));
+        const client = this.aiClient = resolveVerificationClient(this.aiClient);
 
         const raw = await client.generate(buildVerdictPrompt({ word, userAnswer: attempt.userAnswer, cefrLevel: req.cefrLevel }));
         const verdict = JSON.parse(raw) as AIVerdictResponse;
@@ -90,30 +88,9 @@ export class VerifyWordsPracticeAnswer extends TotoDelegate<VerifyWordsPracticeA
 
         if (!valid) return { valid: false, explanation: verdict.explanation };
 
-        const note = await this.buildNote({ client, word, userAnswer: attempt.userAnswer, cefrLevel: req.cefrLevel });
+        const note = await generateOptionalNote(client, buildNotePrompt({ word, userAnswer: attempt.userAnswer, cefrLevel: req.cefrLevel }));
 
         return note ? { valid: true, explanation: note } : { valid: true };
-    }
-
-    /**
-     * Asks the AI for a short note on a valid answer. The only step that sees the canonical Danish.
-     * A failure never affects the verdict: it simply yields no note.
-     */
-    private async buildNote(input: NoteInput): Promise<string | undefined> {
-
-        try {
-
-            const raw = await input.client.generate(buildNotePrompt(input));
-            const parsed = JSON.parse(raw) as AINoteResponse;
-
-            return parsed.explanation?.trim() || undefined;
-
-        } catch (error) {
-
-            console.error("Could not generate the note for a valid word answer", error);
-
-            return undefined;
-        }
     }
 }
 
@@ -138,8 +115,7 @@ function buildVerdictPrompt({ word, userAnswer, cefrLevel }: { word: WordsPracti
             A different but correct word (a synonym) is valid. There is no single expected answer: do not mark it wrong because other words exist.
 
             Other considerations to keep in mind:
-            - Ignore case, always.
-            - Ignore punctuation differences, always.
+            ${COMMON_JUDGING_RULES}
             - A bare noun without en/et, or an infinitive with or without "at", is not a reason to reject.
 
             Return a JSON object with exactly these fields, in this order:
@@ -170,7 +146,6 @@ function buildNotePrompt({ word, userAnswer, cefrLevel }: NoteInput): string {
 }
 
 interface NoteInput {
-    client: VertexAIClient;     // The AI client to call
     word: WordsPracticeWord;    // The practice word (carries the canonical Danish)
     userAnswer: string;         // The student's answer
     cefrLevel: string;          // The student's CEFR level
@@ -180,10 +155,6 @@ interface AIVerdictResponse {
     reasoning: string;          // The AI's analysis, produced before the verdict
     valid: boolean;             // Whether the answer is acceptable
     explanation?: string;       // Present only when valid is false
-}
-
-interface AINoteResponse {
-    explanation?: string;       // Short note on a valid answer, if anything is worth saying
 }
 
 interface VerifyWordsPracticeAnswerRequest {
