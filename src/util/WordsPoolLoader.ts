@@ -52,6 +52,7 @@ export class WordsPoolLoader {
 
         const allItems = await this.vocabularyStore.findByIds(itemIds);
         const items = allItems.filter(item => item.source === "curriculum");
+        
         const progress = await this.vocabularyProgressStore.listByUser(userId, items.map(i => i.id));
 
         return buildWordGroups({ items, progress });
