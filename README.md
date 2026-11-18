@@ -17,6 +17,11 @@ Resources:
 | [Practice Sessions](docs/specs/practice-sessions.md) | Generic session lifecycle API (start, resume, submit answers, complete) with probabilistic word selection based on per-user failure ratios. |
 | [Session Stats](docs/specs/session-stats.md) | Stats endpoints returning per-day completed session counts: ISO week view and rolling N-day window. |
 
+### Capabilities
+| Document | Description |
+|----------|-------------|
+| [Deployment](docs/capabilities/deployment.md) | CI/CD: branches → environments, image tags, version bump rule, Cloud Run + GKE deploy and rollback. |
+
 ### Operations
 | Document | Description |
 |----------|-------------|
