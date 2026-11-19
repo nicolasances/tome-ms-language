@@ -4,51 +4,80 @@ on:
   push:
     branches: 
       - 'feature/**'
-      - main
     paths-ignore: 
       - 'docs/**'
       - '**.md'
       - 'infra/**'
 
+# Two deploys to the same namespace must not race
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
 jobs:
-  # This workflow contains a single job called "release"
   release:
-    name: Build & Deploy to Cloud run
+    name: Build & Deploy to Cloud Run and GKE
     environment: totoexperiments
     runs-on: ubuntu-latest
 
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - name: Authenticate to Artifact Registry
-      run: |
-        echo '${{ secrets.CICD_SERVICE_ACCOUNT }}' > ./credentials.json
-        gcloud auth activate-service-account --key-file=./credentials.json
-        gcloud auth configure-docker europe-west1-docker.pkg.dev
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v3
+      with:
+        credentials_json: ${{ secrets.CICD_SERVICE_ACCOUNT }}
+
+    - name: Setup GCloud
+      uses: google-github-actions/setup-gcloud@v3
+      with:
+        project_id: ${{ vars.GCP_PID }}
+
+    - name: Configure Docker for Artifact Registry
+      run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
 
     - name: Create Environment Variables
       run: |
-        export PACKAGE_VERSION=$(cat package.json | grep version | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')
-        export PACKAGE_NAME=$(cat package.json | grep name | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')
+        PACKAGE_VERSION=$(cat package.json | grep version | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')
+        PACKAGE_NAME=$(cat package.json | grep name | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')
+        # Dev tag: <version>-<short sha>. Unique per commit, no version bump needed on feature branches.
+        IMAGE_TAG=${PACKAGE_VERSION}-${GITHUB_SHA::7}
+        IMAGE=europe-west1-docker.pkg.dev/${{ vars.GCP_PID }}/${PACKAGE_NAME}/${PACKAGE_NAME}:${IMAGE_TAG}
         echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
         echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+    # On a re-run for the same commit the image may already exist: skip build and push, just redeploy it.
+    - name: Check if image already exists
+      run: |
+        if gcloud artifacts docker images describe "$IMAGE" >/dev/null 2>&1; then
+          echo "IMAGE_EXISTS=true" >> $GITHUB_ENV
+          echo "Image $IMAGE already exists, skipping build and push."
+        else
+          echo "IMAGE_EXISTS=false" >> $GITHUB_ENV
+        fi
 
     - name: Build Docker image
-      run: |
-        docker build . -t europe-west1-docker.pkg.dev/${{ vars.GCP_PID }}/${{env.PACKAGE_NAME}}/${{env.PACKAGE_NAME}}:${{env.PACKAGE_VERSION}}
- 
-    - name: Push Docker image to Dockerhub 
-      run: |
-        docker push europe-west1-docker.pkg.dev/${{ vars.GCP_PID }}/${{env.PACKAGE_NAME}}/${{env.PACKAGE_NAME}}:${{env.PACKAGE_VERSION}}
-    
-    - name: Setup GCloud 
-      uses: google-github-actions/setup-gcloud@v0
-      with:
-        project_id: ${{ vars.GCP_PID }}
-        service_account_key: ${{ secrets.CICD_SERVICE_ACCOUNT }}
-        export_default_credentials: true
-    
-    - name: Deploy image
+      if: env.IMAGE_EXISTS != 'true'
+      run: docker build . -t "$IMAGE"
+
+    - name: Push Docker image to Artifact Registry
+      if: env.IMAGE_EXISTS != 'true'
+      run: docker push "$IMAGE"
+
+    - name: Deploy to Cloud Run
       run: | 
-        gcloud run deploy ${{env.PACKAGE_NAME}} --set-env-vars "HYPERSCALER=gcp,SERVICE_BASE_URL=${{ secrets.SERVICE_BASE_URL }},GALE_BROKER_URL=${{ secrets.GALE_BROKER_URL }},GCP_PID=${{ vars.GCP_PID }}" --service-account=${{ secrets.SERVICE_ACCOUNT }} --project=${{ vars.GCP_PID }} --image=europe-west1-docker.pkg.dev/${{ vars.GCP_PID }}/${{env.PACKAGE_NAME}}/${{env.PACKAGE_NAME}}:${{env.PACKAGE_VERSION}} --platform=managed --region=europe-west1 --allow-unauthenticated
+        gcloud run deploy ${{env.PACKAGE_NAME}} --set-env-vars "HYPERSCALER=gcp,SERVICE_BASE_URL=${{ secrets.SERVICE_BASE_URL }},GALE_BROKER_URL=${{ secrets.GALE_BROKER_URL }},GCP_PID=${{ vars.GCP_PID }}" --service-account=${{ secrets.SERVICE_ACCOUNT }} --project=${{ vars.GCP_PID }} --image="$IMAGE" --platform=managed --region=europe-west1 --allow-unauthenticated
+
+    - name: Get GKE credentials
+      uses: google-github-actions/get-gke-credentials@v3
+      with:
+        project_id: ${{ vars.GKE_PROJECT_ID }}
+        cluster_name: ${{ vars.GKE_CLUSTER_NAME }}
+        location: ${{ vars.GKE_CLUSTER_LOCATION }}
+
+    - name: Deploy to GKE
+      run: |
+        kubectl -n ${{ vars.GKE_NAMESPACE }} set image deployment/tome-ms-language tome-ms-language="$IMAGE"
+        kubectl -n ${{ vars.GKE_NAMESPACE }} rollout status deployment/tome-ms-language --timeout=5m
